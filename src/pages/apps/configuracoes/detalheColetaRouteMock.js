@@ -1,0 +1,1 @@
+import DetalheColeta from './DetalheColeta';\n\n// Exemplo de como a rota deve ser adicionada ao seu arquivo de rotas (routes/index.js ou similar):\nconst DetalheColetaRoute = {\n  path: '/apps/configuracoes/detalhe-coleta/:coletaId',\n  element: <DetalheColeta />\n};\n\nexport default DetalheColetaRoute;

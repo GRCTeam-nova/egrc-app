@@ -1,0 +1,80 @@
+import { useState, useEffect } from 'react';
+
+// Mock de dados para causaRaizEmpresas
+const mockDocumentos = [
+  {
+    nome: "Empresa Alpha",
+    cnpj: "12.345.678/0001-90",
+    centroCusto: "Centro Financeiro 1",
+    adicionadoEm: "26/12/2024",
+    via: "Manual"
+  },
+  {
+    nome: "Empresa Beta",
+    cnpj: "98.765.432/0001-21",
+    centroCusto: "Centro Administrativo 2",
+    adicionadoEm: "25/12/2024",
+    via: "Automático"
+  },
+  {
+    nome: "Empresa Gama",
+    cnpj: "11.222.333/0001-44",
+    centroCusto: "Centro de Tecnologia",
+    adicionadoEm: "24/12/2024",
+    via: "Manual"
+  },
+  {
+    nome: "Empresa Delta",
+    cnpj: "11.552.343/0001-44",
+    centroCusto: "Centro de Tecnologia",
+    adicionadoEm: "27/12/2024",
+    via: "Automático"
+  },
+  {
+    nome: "Empresa Upsilon",
+    cnpj: "11.552.343/0001-44",
+    centroCusto: "Centro de Tecnologia",
+    adicionadoEm: "27/12/2024",
+    via: "Automático"
+  },
+  {
+    nome: "Empresa Lambda",
+    cnpj: "11.552.343/0001-44",
+    centroCusto: "Centro de Tecnologia",
+    adicionadoEm: "27/12/2024",
+    via: "Automático"
+  },
+];
+
+// Hook personalizado para buscar dados de causaRaizEmpresas
+export function useGetDocumentos(formData, processoSelecionadoId) {
+  const [causaRaizEmpresas, setDocumentos] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Simulando um atraso de carregamento para emular a chamada de uma API
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        setDocumentos(mockDocumentos);
+      } catch (err) {
+        setError("Erro ao carregar os dados do mock.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [formData]);
+
+  return {
+    causaRaizEmpresas,
+    isLoading,
+    error,
+    customersEmpty: !causaRaizEmpresas?.length
+  };
+}
