@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from 'config';
 import { useToken } from "./TokenContext";
 
 export function useGetResultado(formData, novoOrgao) {
@@ -16,7 +17,7 @@ export function useGetResultado(formData, novoOrgao) {
         const token = localStorage.getItem('access_token');
 
         // Define o endpoint de acordo com a existência de projectId
-        const url = `https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/${novoOrgao}/attributes`
+        const url = `${process.env.REACT_APP_API_URL}projects/tests/phases/${novoOrgao}/attributes`
          
         const response = await fetch(url, {
           headers: {

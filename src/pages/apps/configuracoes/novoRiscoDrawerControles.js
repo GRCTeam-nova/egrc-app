@@ -46,7 +46,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onRiscoCreated }) {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/categories`,
+      `${process.env.REACT_APP_API_URL}categories`,
       setCategorias
     );
     window.scrollTo(0, 0);
@@ -149,7 +149,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onRiscoCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/risks";
+      url = `${process.env.REACT_APP_API_URL}risks`;
       method = "POST";
       payload = {
         name: nomeRisco,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from 'config';
 
 // Hook para buscar os dados de empresas
 export function useGetProcessos(formData = {}) {
@@ -15,7 +16,7 @@ export function useGetProcessos(formData = {}) {
       return;
     }
 
-    let url = "https://api.egrc.homologacao.com.br/api/v1/processes/reports";
+    let url = `${process.env.REACT_APP_API_URL}processes/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

@@ -42,7 +42,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks`,
+      `${process.env.REACT_APP_API_URL}risks`,
       setRiscoAssociados
     );
   }, []);
@@ -159,7 +159,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
 
       if (acionista) {
         // Modo edição: Atualiza o acionista incluindo o campo porcentagem (caso informado)
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives/${acionista.idNormativePart}/parts`;
+        url = `${process.env.REACT_APP_API_URL}normatives/${acionista.idNormativePart}/parts`;
         method = "PUT";
         payload = {
           idNormativePart: acionista.idNormativePart,
@@ -183,7 +183,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         }
       } else {
         // Modo cadastro: O payload do POST não inclui o campo porcentagem.
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives/${normativeId}/parts`;
+        url = `${process.env.REACT_APP_API_URL}normatives/${normativeId}/parts`;
         method = "POST";
         payload = {
           code: nome,
@@ -233,7 +233,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
     for (const riskId of riskIds) {
       try {
         // 1. Consultar o endpoint de risco para pegar o conteúdo atual
-        const response = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/risks/${riskId}`, {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}risks/${riskId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -274,7 +274,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           idNormatives: Array.from(new Set([...(riskData.normatives || []).map(n => n.idNormative), normativeId])), // Extrai os IDs existentes, adiciona o novo e remove duplicatas
         };
 
-        await axios.put(`https://api.egrc.homologacao.com.br/api/v1/risks`, putPayload, {
+        await axios.put(`${process.env.REACT_APP_API_URL}risks`, putPayload, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,

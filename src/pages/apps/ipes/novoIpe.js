@@ -134,13 +134,13 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/actives`, setAtivos);
+    fetchData(`${process.env.REACT_APP_API_URL}actives`, setAtivos);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ipe/types`,
+      `${process.env.REACT_APP_API_URL}ipe/types`,
       setTipoInformacoes
     );
     window.scrollTo(0, 0);
@@ -152,7 +152,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/ipe/${dadosApi.idInformationActivity}`,
+            `${process.env.REACT_APP_API_URL}ipe/${dadosApi.idInformationActivity}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -316,14 +316,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/ipe";
+      url = `${process.env.REACT_APP_API_URL}ipe`;
       method = "POST";
       payload = {
         code: codigo,
         name: nome
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/ipe`;
+      url = `${process.env.REACT_APP_API_URL}ipe`;
       method = "PUT";
       payload = {
         idInformationActivity: dadosApi?.idInformationActivity,

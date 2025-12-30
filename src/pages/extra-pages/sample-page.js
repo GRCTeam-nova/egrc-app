@@ -1,4 +1,5 @@
 import React from 'react';
+import { EGRC_COLLABORA_URL } from '../../config';
 import { Grid } from '@mui/material';
 
 const SamplePage = () => {
@@ -13,12 +14,12 @@ const SamplePage = () => {
 
   const fileName = "teste.xlsx";
   const token = localStorage.getItem('access_token');
-  const wopiSrc = `https://egrc-ext.homologacao.com.br/wopi/files/${fileName}?access_token=${token}`;
+  const wopiSrc = `${EGRC_COLLABORA_URL}/wopi/files/${fileName}?access_token=${token}`;
   const encodedWopiSrc = encodeURIComponent(wopiSrc);
 
   console.log("Tenant ID:", tenantId);
 
-  const url = `https://egrc-collabora.homologacao.com.br/browser/${tenantId}/cool.html?WOPISrc=${encodedWopiSrc}`;
+  const url = `${EGRC_COLLABORA_URL}/browser/${tenantId}/cool.html?WOPISrc=${encodedWopiSrc}`;
 
   return (
     <Grid container style={{ width: '100%', height: '80vh' }}>

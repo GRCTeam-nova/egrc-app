@@ -84,7 +84,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onControlCreated }) {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     window.scrollTo(0, 0);
@@ -139,7 +139,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onControlCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/controls";
+      url = `${process.env.REACT_APP_API_URL}controls`;
       method = "POST";
       payload = {
         name: nomeControle,

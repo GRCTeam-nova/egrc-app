@@ -80,7 +80,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}ledger-accounts/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -133,31 +133,31 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmpresas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/types`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/types`,
       setTiposResponsabilidades
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/assertions`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/assertions`,
       setAssertions
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContasSuperiores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     window.scrollTo(0, 0);
@@ -417,7 +417,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/ledger-accounts";
+      url = `${process.env.REACT_APP_API_URL}ledger-accounts`;
       method = "POST";
       payload = {
         name: nomeConta,
@@ -425,7 +425,7 @@ function ColumnsLayouts() {
         idLedgerAccountType: formData.tipoConta,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts`;
+      url = `${process.env.REACT_APP_API_URL}ledger-accounts`;
       method = "PUT";
       payload = {
         idLedgerAccount: empresaDados?.idLedgerAccount,

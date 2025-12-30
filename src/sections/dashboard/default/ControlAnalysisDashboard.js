@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Box, 
@@ -25,7 +26,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 // 1. Importação do hook de token
 import { useToken } from "../../../api/TokenContext";
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/controls/reports";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}controls/reports`;
 
 // 2. Hook de Dados
 const useControlReports = (url, token) => {

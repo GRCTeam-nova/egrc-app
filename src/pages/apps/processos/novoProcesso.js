@@ -95,7 +95,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/processes/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}processes/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -260,55 +260,55 @@ function ColumnsLayouts() {
   useEffect(() => {
     if (!authToken) return;
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setDepartamentosLaterais
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setDepartamentosSuperiores
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks`, setRiscos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/datas`, setDados);
+    fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
+    fetchData(`${process.env.REACT_APP_API_URL}datas`, setDados);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/deficiencies`,
+      `${process.env.REACT_APP_API_URL}deficiencies`,
       setDeficiencias
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessoInferior
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
     // Carrega os mesmos processos para os novos campos
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessosAnteriores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessosPosteriores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes/types`,
+      `${process.env.REACT_APP_API_URL}processes/types`,
       setFormatoUnidades
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidentes
     );
     window.scrollTo(0, 0);
@@ -721,7 +721,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+        `${process.env.REACT_APP_API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -746,7 +746,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/processes";
+      url = `${process.env.REACT_APP_API_URL}processes`;
       method = "POST";
       payload = {
         name: nomeDepartamento,
@@ -754,7 +754,7 @@ function ColumnsLayouts() {
         idCompanies: formData.empresa,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/processes`;
+      url = `${process.env.REACT_APP_API_URL}processes`;
       method = "PUT";
       payload = {
         idProcess: processosDados?.idProcess,

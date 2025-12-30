@@ -539,7 +539,7 @@ function ActionCell({ row, refreshData }) {
     
     try {
       // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/objective/${idObjective}`, {
+      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}objective/${idObjective}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -551,7 +551,7 @@ function ActionCell({ row, refreshData }) {
       const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
   
       // Enviar os dados atualizados via PUT
-      await axios.put("https://api.egrc.homologacao.com.br/api/v1/objective", dadosAtualizados, {
+      await axios.put(`${process.env.REACT_APP_API_URL}objective`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

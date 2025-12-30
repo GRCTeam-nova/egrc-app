@@ -502,7 +502,7 @@ function ActionCell({ row, refreshData, normativaDados }) {
 
       // Envia a requisição PUT com o payload atualizado
       const response = await axios.put(
-        "https://api.egrc.homologacao.com.br/api/v1/companies/shared-holders",
+        `${process.env.REACT_APP_API_URL}companies/shared-holders`,
         dadosAtualizados,
         {
           headers: {

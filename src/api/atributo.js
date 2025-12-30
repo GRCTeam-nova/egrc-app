@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useToken } from "./TokenContext";
+import { API_URL } from 'config';
 
 // Hook para buscar os dados de empresas
 export function useGetTeste(formData, atributo) {
@@ -17,7 +18,7 @@ export function useGetTeste(formData, atributo) {
         const token = localStorage.getItem('access_token');
 
         // Define o endpoint de acordo com a existência de projectId
-        const url = `https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/${atributo}/attributes`
+        const url = `${process.env.REACT_APP_API_URL}projects/tests/phases/${atributo}/attributes`
          
         const response = await fetch(url, {
           headers: {

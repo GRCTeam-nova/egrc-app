@@ -12,7 +12,7 @@ import ApexTree from 'apextree';
 import { useProcessStructure } from './useProcessStructure';
 
 // Endpoint centralizado para processos
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/processes/reports/types";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}processes/reports/types`;
 
 const ProcessFlowChart = () => {
   const containerRef = useRef(null);

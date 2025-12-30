@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import { API_URL} from 'config';
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
@@ -648,7 +649,7 @@ function ActionCell({ row, refreshData }) {
     
     try {
       // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/assessments/${idAssessment}`, {
+      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}assessments/${idAssessment}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -660,7 +661,7 @@ function ActionCell({ row, refreshData }) {
       const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
   
       // Enviar os dados atualizados via PUT
-      await axios.put("https://api.egrc.homologacao.com.br/api/v1/assessments", dadosAtualizados, {
+      await axios.put(`${process.env.REACT_APP_API_URL}assessments`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

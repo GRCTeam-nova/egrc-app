@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { 
   Box, Typography, CircularProgress, Alert, Paper, useTheme, 
@@ -14,7 +15,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ApexCharts from 'apexcharts';
 
 // --- CONFIGURAÇÕES ---
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/risks/reports/all"; // Endpoint Sugerido
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}risks/reports/all`; // Endpoint Sugerido
 
 // Função auxiliar de status
 const getStatusConfig = (active) => {

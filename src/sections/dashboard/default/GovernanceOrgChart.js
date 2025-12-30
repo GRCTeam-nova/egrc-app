@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import PropTypes from 'prop-types';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
@@ -9,7 +10,7 @@ import { useGovernanceStructure } from './useGovernanceStructure';
 
 // API endpoint used by the governance structure hook. Move this to a config file
 // if you need to reuse it elsewhere.
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/companies/reports/governance-structure";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}companies/reports/governance-structure`;
 
 const GovernanceOrgChartAdvanced = () => {
   // Reference to the container element where ApexTree will render the SVG

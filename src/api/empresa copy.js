@@ -16,7 +16,7 @@ export function useGetEmpresa(formData) {
       try {
         const token = localStorage.getItem('access_token');
         const response = await fetch(
-          "https://api.egrc.homologacao.com.br/api/v1/companies",
+          `${process.env.REACT_APP_API_URL}companies`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

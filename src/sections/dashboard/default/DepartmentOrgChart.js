@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { 
   Box, Typography, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, 
@@ -12,7 +13,7 @@ import DepartmentActionPlanChart from './DepartmentActionPlanChart';
 import DepartmentRiskChart from './DepartmentRiskChart';
 import DepartmentNormativeChart from './DepartmentNormativeChart';
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/departments/reports/types";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}departments/reports/types`;
 
 const DepartmentOrgChartAdvanced = () => {
   const containerRef = useRef(null);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from 'config';
 
 // Hook para buscar os dados de empresas
 export function useGetContas(formData = {}) {
@@ -15,7 +16,7 @@ export function useGetContas(formData = {}) {
       return;
     }
 
-    let url = "https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/reports";
+    let url = `${process.env.REACT_APP_API_URL}ledger-accounts/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

@@ -100,7 +100,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onActiveCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/actives";
+      url = `${process.env.REACT_APP_API_URL}actives`;
       method = "POST";
       payload = {
         name: nomeAtivo,

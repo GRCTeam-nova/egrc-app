@@ -53,7 +53,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/objective/${dadosApi.idObjective}`,
+            `${process.env.REACT_APP_API_URL}objective/${dadosApi.idObjective}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -159,7 +159,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/objective";
+      url = `${process.env.REACT_APP_API_URL}objective`;
       method = "POST";
       payload = {
         code: codigo,
@@ -167,7 +167,7 @@ function ColumnsLayouts() {
         description: descricao
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/objective`;
+      url = `${process.env.REACT_APP_API_URL}objective`;
       method = "PUT";
       payload = {
         idObjective: controleDados?.idObjective,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useToken } from "./TokenContext";
 import { useLocation } from "react-router-dom";
+import { API_URL } from 'config';
 
 // Hook para buscar os dados de empresas
 export function useGetEmpresa(formData) {
@@ -22,7 +23,7 @@ export function useGetEmpresa(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `https://api.egrc.homologacao.com.br/api/v1/companies/${dadosApi.idCompany}/shared-holders`,
+          `${process.env.REACT_APP_API_URL}companies/${dadosApi.idCompany}/shared-holders`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

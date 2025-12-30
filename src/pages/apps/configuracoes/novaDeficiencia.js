@@ -135,23 +135,23 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/deficiencies/types`,
+      `${process.env.REACT_APP_API_URL}deficiencies/types`,
       setTipoDeficiencias
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/deficiencies/classifications`,
+      `${process.env.REACT_APP_API_URL}deficiencies/classifications`,
       setClassificacaoDeficiencias
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControles
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     window.scrollTo(0, 0);
@@ -179,7 +179,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/deficiencies/${dadosApi.idDeficiency}`,
+            `${process.env.REACT_APP_API_URL}deficiencies/${dadosApi.idDeficiency}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -371,14 +371,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/deficiencies";
+      url = `${process.env.REACT_APP_API_URL}deficiencies`;
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/deficiencies`;
+      url = `${process.env.REACT_APP_API_URL}deficiencies`;
       method = "PUT";
       payload = {
         idDeficiency: deficienciaDados?.idDeficiency,

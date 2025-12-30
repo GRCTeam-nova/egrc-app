@@ -1,6 +1,5 @@
 // Defina manualmente a variável para alternar entre os ambientes, sendo eles 'dev' ou 'hom'
 const ambiente = 'hom';
-
 let API_COMMAND, API_QUERY;
 
 if (ambiente === 'dev') {
@@ -10,7 +9,12 @@ if (ambiente === 'dev') {
   API_COMMAND = 'http://10.0.72.13:5030';
   API_QUERY = 'http://10.0.72.13:5020';
 }
-export { API_COMMAND, API_QUERY };
+debugger
+ const API_URL =
+  process.env.REACT_APP_API_URL || process.env.EGRC_API_URL_URL || 'https://api.egrc.homologacao.com.br/api/v1/';
+export const EGRC_COLLABORA_URL =
+  process.env.REACT_APP_EGRC_COLLABORA_URL || process.env.EGRC_COLLABORA_URL || 'https://clbr.egrc.homologacao.com.br';
+export { API_URL, API_COMMAND, API_QUERY };
 
 // ==============================|| CONFIGURAÇÕES DO MANTIS (TEMPLATE) ||============================== //
 

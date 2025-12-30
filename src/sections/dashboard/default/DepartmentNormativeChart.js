@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { 
   Box, 
@@ -24,7 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ApexCharts from 'apexcharts';
 import { useDepartmentNormatives } from './useDepartmentNormatives';
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/departments/reports/normatives";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}departments/reports/normatives`;
 
 const DepartmentNormativeChart = () => {
   const chartRef = useRef(null);

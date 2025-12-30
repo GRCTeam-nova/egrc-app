@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import {API_URL} from "config";
 import * as React from 'react';
 import {
   Button, Box, TextField, Switch, Typography, Grid, Stack, InputLabel, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
@@ -65,7 +66,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/indexs/${dadosApi.idIndex}`,
+            `${process.env.REACT_APP_API_URL}indexs/${dadosApi.idIndex}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -196,7 +197,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = 'https://api.egrc.homologacao.com.br/api/v1/indexs';
+      url = `${process.env.REACT_APP_API_URL}indexs`;
       method = 'POST';
       payload = {
         date: formData.dataIndice?.toISOString(),
@@ -204,7 +205,7 @@ function ColumnsLayouts() {
         name: nome
       };
     } else if (requisicao === 'Editar') {
-      url = `https://api.egrc.homologacao.com.br/api/v1/indexs`;
+      url = `${process.env.REACT_APP_API_URL}indexs`;
       method = 'PUT';
       payload = {
         idIndex: IndiceDados?.idIndex,

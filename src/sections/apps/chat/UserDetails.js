@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 
@@ -62,7 +63,7 @@ const UserDetails = ({ onClose }) => {
           return;
         }
 
-        const response = await fetch(`https://api.egrc.homologacao.com.br/api/v1/collaborators/${userId}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}collaborators/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

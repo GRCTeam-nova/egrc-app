@@ -51,7 +51,7 @@ function DrawerAtributo({ teste, hideButton = false }) {
         try {
           setLoading(true);
           const response = await axios.get(
-            `https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/attributes/${teste.idAttribute}`,
+            `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes/${teste.idAttribute}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -117,7 +117,7 @@ function DrawerAtributo({ teste, hideButton = false }) {
       if (teste) {
         // Modo edição: Atualiza o teste incluindo os novos campos de data
         url =
-          "https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/attributes";
+          `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
         method = "PUT";
         payload = {
           idControl:
@@ -150,7 +150,7 @@ function DrawerAtributo({ teste, hideButton = false }) {
       } else {
         // Modo cadastro: Inclui os campos de data no payload do POST
         url =
-          "https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/attributes";
+          `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
         method = "POST";
         payload = {
           code: codigo,
@@ -178,7 +178,7 @@ function DrawerAtributo({ teste, hideButton = false }) {
           const idTest = createdData.data.idTest;
 
           const editUrl =
-            "https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/attributes";
+            `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
           const editPayload = {
             idTest,
             description: descricao,

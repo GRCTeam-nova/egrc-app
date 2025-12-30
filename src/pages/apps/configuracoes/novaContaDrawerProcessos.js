@@ -61,7 +61,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onAccountCreated }) {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/types`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/types`,
       setTiposResponsabilidades
     );
     window.scrollTo(0, 0);
@@ -143,7 +143,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onAccountCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/ledger-accounts";
+      url = `${process.env.REACT_APP_API_URL}ledger-accounts`;
       method = "POST";
       payload = {
         name: nomeConta,

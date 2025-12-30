@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { 
   Box, 
@@ -27,7 +28,7 @@ import ApexCharts from 'apexcharts';
 // 1. Importação do hook de token
 import { useToken } from "../../../api/TokenContext";
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/processes/reports";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}processes/reports`;
 
 // 2. Hook interno para buscar dados
 const useProcessReports = (url, token) => {

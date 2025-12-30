@@ -104,22 +104,22 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/categories`, setCategorias);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/departments`, setDepartamentos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks`, setRiscoAssociados);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/frameworks`, setFrameworks);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/treatments`, setTratamentos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/strategic-guidelines`, setDiretrizes);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/factors`, setFatores);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/causes`, setCausas);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/impacts`, setImpactos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/kris`, setKris);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/threats`, setAmeacas);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/normatives`, setNormativas);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/controls`, setControles);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/processes`, setProcessos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/incidents`, setIncidentes);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`, setResponsavel);
+    fetchData(`${process.env.REACT_APP_API_URL}categories`, setCategorias);
+    fetchData(`${process.env.REACT_APP_API_URL}departments`, setDepartamentos);
+    fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscoAssociados);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/frameworks`, setFrameworks);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/treatments`, setTratamentos);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/strategic-guidelines`, setDiretrizes);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/factors`, setFatores);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/causes`, setCausas);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/impacts`, setImpactos);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/threats`, setAmeacas);
+    fetchData(`${process.env.REACT_APP_API_URL}normatives`, setNormativas);
+    fetchData(`${process.env.REACT_APP_API_URL}controls`, setControles);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
+    fetchData(`${process.env.REACT_APP_API_URL}incidents`, setIncidentes);
+    fetchData(`${process.env.REACT_APP_API_URL}collaborators/responsibles`, setResponsavel);
     window.scrollTo(0, 0);
   }, []);
 
@@ -129,7 +129,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/risks/${dadosApi.idRisk}`,
+            `${process.env.REACT_APP_API_URL}risks/${dadosApi.idRisk}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -447,14 +447,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = 'https://api.egrc.homologacao.com.br/api/v1/risks';
+      url = `${process.env.REACT_APP_API_URL}risks`;
       method = 'POST';
       payload = {
         code: codigo,
         name: nome
       };
     } else if (requisicao === 'Editar') {
-      url = `https://api.egrc.homologacao.com.br/api/v1/risks`;
+      url = `${process.env.REACT_APP_API_URL}risks`;
       method = 'PUT';
       payload = {
         idRisk: riscoDados?.idRisk,
@@ -531,7 +531,7 @@ function ColumnsLayouts() {
           idThreats: formData.ameaca
         };
 
-        const putResponse = await fetch(`https://api.egrc.homologacao.com.br/api/v1/risks`, {
+        const putResponse = await fetch(`${process.env.REACT_APP_API_URL}risks`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

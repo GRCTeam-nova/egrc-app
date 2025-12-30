@@ -99,7 +99,7 @@ function NovoColaborador() {
       const fetchColaboradorDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/collaborators/${dadosApi.idCollaborator}`,
+            `${process.env.REACT_APP_API_URL}collaborators/${dadosApi.idCollaborator}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -155,44 +155,44 @@ function NovoColaborador() {
   useEffect(() => {
     // Buscar dados para os campos de seleção
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/positions`,
+      `${process.env.REACT_APP_API_URL}collaborators/positions`,
       setCargos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmpresas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/languages`,
+      `${process.env.REACT_APP_API_URL}collaborators/languages`,
       setIdiomas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/groups`,
+      `${process.env.REACT_APP_API_URL}collaborators/groups`,
       setGrupos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/functions`,
+      `${process.env.REACT_APP_API_URL}collaborators/functions`,
       setFuncoes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/graduations`,
+      `${process.env.REACT_APP_API_URL}collaborators/graduations`,
       setGraduacoes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/certifications`,
+      `${process.env.REACT_APP_API_URL}collaborators/certifications`,
       setCertificacoes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/specializations`,
+      `${process.env.REACT_APP_API_URL}collaborators/specializations`,
       setEspecializacoes
     );
     // [NOVO] Busca de Perfis
     fetchData(
-        `https://api.egrc.homologacao.com.br/api/v1/access`,
+        `${process.env.REACT_APP_API_URL}access`,
         setPerfis
     );
     
@@ -502,7 +502,7 @@ function NovoColaborador() {
         });
 
         const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -526,7 +526,7 @@ function NovoColaborador() {
 
       // Configuração da URL, método e payload conforme a operação
       if (requisicao === "Criar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/collaborators";
+        url = `${process.env.REACT_APP_API_URL}collaborators`;
         method = "POST";
         payload = {
           name: nomeColaborador,
@@ -537,7 +537,7 @@ function NovoColaborador() {
           isUser: true
         };
       } else if (requisicao === "Editar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/collaborators";
+        url = `${process.env.REACT_APP_API_URL}collaborators`;
         method = "PUT";
         payload = {
           idCollaborator: colaboradorDados?.idCollaborator,

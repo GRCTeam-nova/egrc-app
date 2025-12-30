@@ -77,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onDataCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/datas";
+      url = `${process.env.REACT_APP_API_URL}datas`;
       method = "POST";
       payload = {
         name: nomeDado,

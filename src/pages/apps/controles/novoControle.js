@@ -157,61 +157,61 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks`,
+      `${process.env.REACT_APP_API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/objective`,
+      `${process.env.REACT_APP_API_URL}objective`,
       setObjetivoControle
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/actives`, setAtivos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/ipe`, setIpes);
+    fetchData(`${process.env.REACT_APP_API_URL}actives`, setAtivos);
+    fetchData(`${process.env.REACT_APP_API_URL}ipe`, setIpes);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/deficiencies`,
+      `${process.env.REACT_APP_API_URL}deficiencies`,
       setDeficiencias
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setCompensadosControles
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setCompensaControles
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/assertions`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/assertions`,
       setAssertions
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls/types`,
+      `${process.env.REACT_APP_API_URL}controls/types`,
       setTiposControles
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls/classifications`,
+      `${process.env.REACT_APP_API_URL}controls/classifications`,
       setClassificacoes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls/cvars`,
+      `${process.env.REACT_APP_API_URL}controls/cvars`,
       setCarvs
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls/element-cosos`,
+      `${process.env.REACT_APP_API_URL}controls/element-cosos`,
       setElementos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls/executions`,
+      `${process.env.REACT_APP_API_URL}controls/executions`,
       setExecucoes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     const frequencias = [
@@ -237,7 +237,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/controls/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}controls/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -723,7 +723,7 @@ function ColumnsLayouts() {
         const deletedFilesPayload = deletedFiles.map((file) => file.name); // ajuste conforme a necessidade
         
         await axios.delete(
-          "https://api.egrc.homologacao.com.br/api/v1/files",
+          `${process.env.REACT_APP_API_URL}files`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -755,7 +755,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -779,7 +779,7 @@ function ColumnsLayouts() {
 
       // --- Configuração do payload e endpoint para CONTROLES ---
       if (requisicao === "Criar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/controls";
+        url = `${process.env.REACT_APP_API_URL}controls`;
         method = "POST";
         payload = {
           code: codigo,
@@ -787,7 +787,7 @@ function ColumnsLayouts() {
           idProcess: formData.processo,
         };
       } else if (requisicao === "Editar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/controls";
+        url = `${process.env.REACT_APP_API_URL}controls`;
         method = "PUT";
         payload = {
           idControl: controleDados?.idControl,

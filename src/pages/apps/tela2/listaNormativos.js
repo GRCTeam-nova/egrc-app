@@ -1,3 +1,5 @@
+import { API_URL} from 'config';
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
@@ -533,7 +535,7 @@ const toggleStatus = async () => {
     
     try {
       // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/normatives/${idProcess}`, {
+      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}normatives/${idProcess}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -552,7 +554,7 @@ const toggleStatus = async () => {
       const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
   
       // Enviar os dados atualizados via PUT
-      await axios.put("https://api.egrc.homologacao.com.br/api/v1/normatives", dadosAtualizados, {
+      await axios.put(`${process.env.REACT_APP_API_URL}normatives`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

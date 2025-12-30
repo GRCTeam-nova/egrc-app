@@ -85,7 +85,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   
       if (acionista) {
         // Modo edição: Atualiza o acionista incluindo o campo porcentagem (caso informado)
-        url = "https://api.egrc.homologacao.com.br/api/v1/companies/shared-holders";
+        url = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
         method = "PUT";
         payload = {
           idSharedholder: acionista.idSharedholder,
@@ -109,7 +109,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         }
       } else {
         // Modo cadastro: O payload do POST não inclui o campo porcentagem.
-        url = "https://api.egrc.homologacao.com.br/api/v1/companies/shared-holders";
+        url = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
         method = "POST";
         payload = {
           name: nome,
@@ -135,7 +135,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           const createdData = await postResponse.json();
           const idSharedholder = createdData.data.idSharedholder;
   
-          const editUrl = "https://api.egrc.homologacao.com.br/api/v1/companies/shared-holders";
+          const editUrl = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
           const editPayload = {
             idSharedholder,
             name: nome,

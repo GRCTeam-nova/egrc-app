@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { 
   Box, Typography, CircularProgress, Alert, Paper, useTheme, 
@@ -14,7 +15,7 @@ import ApexCharts from 'apexcharts';
 import { useProcessControls } from './useProcessControls';
 
 // Mesmo endpoint de processos
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/processes/reports/types";
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}processes/reports/types`;
 
 const ProcessControlChart = () => {
   const chartRef = useRef(null);

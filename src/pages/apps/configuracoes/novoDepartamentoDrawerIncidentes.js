@@ -77,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onDepartmentCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/departments";
+      url = `${process.env.REACT_APP_API_URL}departments`;
       method = "POST";
       payload = {
         name: nomeDepartamento,

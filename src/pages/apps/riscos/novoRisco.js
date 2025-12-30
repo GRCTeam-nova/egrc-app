@@ -172,68 +172,68 @@ function ColumnsLayoutsCorrigido() {
   useEffect(() => {
     if (!authToken) return;
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/categories`,
+      `${process.env.REACT_APP_API_URL}categories`,
       setCategorias
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks`,
+      `${process.env.REACT_APP_API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/frameworks`,
+      `${process.env.REACT_APP_API_URL}risks/frameworks`,
       setFrameworks
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/treatments`,
+      `${process.env.REACT_APP_API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/strategic-guidelines`,
+      `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
       setDiretrizes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/factors`,
+      `${process.env.REACT_APP_API_URL}risks/factors`,
       setFatores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/causes`,
+      `${process.env.REACT_APP_API_URL}risks/causes`,
       setCausas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/impacts`,
+      `${process.env.REACT_APP_API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/threats`,
+      `${process.env.REACT_APP_API_URL}risks/threats`,
       setAmeacas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
+      `${process.env.REACT_APP_API_URL}normatives`,
       setNormativas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControles
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidentes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     window.scrollTo(0, 0);
@@ -253,7 +253,7 @@ function ColumnsLayoutsCorrigido() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/risks/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}risks/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -781,7 +781,7 @@ function ColumnsLayoutsCorrigido() {
         });
 
         const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -806,7 +806,7 @@ function ColumnsLayoutsCorrigido() {
 
       // --- Configuração do payload e endpoint para riscos ---
       if (requisicao === "Criar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/risks";
+        url = `${process.env.REACT_APP_API_URL}risks`;
         method = "POST";
         payload = {
           code: codigo,
@@ -814,7 +814,7 @@ function ColumnsLayoutsCorrigido() {
           idCategory: formData.categoria || null,
         };
       } else if (requisicao === "Editar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/risks";
+        url = `${process.env.REACT_APP_API_URL}risks`;
         method = "PUT";
         payload = {
           idRisk: riscoDados?.idRisk,
