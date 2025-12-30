@@ -20,146 +20,144 @@ jobs:
       packages: write
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 7.0.x
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Detected version: $VERSION"
 
-    - name: Get Version
-      id: get_version
-      run: |
-        VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-        echo "Detected version: $VERSION"
-
-    - name: Check if image exists
-      id: check_image
-      run: |
-        echo "Checking for existing image: ${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
-        if docker manifest inspect ${{ env.IMAGE_NAME }}:${{ env.VERSION }} > /dev/null 2>&1; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-        fi
+      - name: Check if image exists
+        id: check_image
+        if: github.event_name == 'push'
+        run: |
+          echo "Checking for existing image: ${{ env.IMAGE_NAME }}:${{ env.VERSION }}"
+          if docker manifest inspect ${{ env.IMAGE_NAME }}:${{ env.VERSION }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
 
 
-    - name: Get current date
-      id: datetime
-      run: echo "now=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
+      - name: Get current date
+        id: datetime
+        run: echo "now=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
 
-    - name: Alert Duplicate Version
-      if: steps.check_image.outputs.exists == 'true'
-      uses: appleboy/telegram-action@v0.1.1
-      with:
-        to: ${{ secrets.TELEGRAM_CHAT_ID }}
-        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        format: markdown
-        message: |
-          ⛔ **Erro de Versão**
-          
-          A imagem **${{ env.IMAGE_NAME }}:${{ env.VERSION }}** já existe!
-          
-          Repositório: ${{ github.repository }}
-          Branch: ${{ github.ref_name }}
-          Commit: ${{ github.event.head_commit.message }}
-          Autor: ${{ github.actor }}
-          Data/Hora: ${{ steps.datetime.outputs.now }}
-          
-          Por favor, incremente a versão no arquivo .csproj antes de fazer o merge.
+      - name: Alert Duplicate Version
+        if: github.event_name == 'push' && steps.check_image.outputs.exists == 'true'
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
+          message: |
+            ⛔ **Erro de Versão**
+            
+            A imagem **${{ env.IMAGE_NAME }}:${{ env.VERSION }}** já existe!
+            
+            Repositório: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.event.head_commit.message }}
+            Autor: ${{ github.actor }}
+            Data/Hora: ${{ steps.datetime.outputs.now }}
+            
+            Por favor, incremente a versão no arquivo `package.json` antes de fazer o merge.
 
-    - name: Exit if image exists
-      if: steps.check_image.outputs.exists == 'true'
-      run: exit 1
+      - name: Exit if image exists
+        if: github.event_name == 'push' && steps.check_image.outputs.exists == 'true'
+        run: exit 1
 
-    - name: Restore dependencies
-      run: dotnet restore
+      - name: Build Docker image (PR)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          build-args: |
+            EGRC_API_URL_URL=${{ secrets.EGRC_API_URL_URL }}
+            EGRC_COLLABORA_URL=${{ secrets.EGRC_COLLABORA_URL }}
 
-    - name: Build
-      run: dotnet build --no-restore
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    # - name: Test
-    #   run: dotnet test --no-build --verbosity normal
+      - name: Build and Push Docker Image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.VERSION }},${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            EGRC_API_URL_URL=${{ secrets.EGRC_API_URL_URL }}
+            EGRC_COLLABORA_URL=${{ secrets.EGRC_COLLABORA_URL }}
 
-    - name: Login to GitHub Container Registry
-      if: github.event_name == 'push'
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Notify Success
+        if: success() && github.event_name == 'push'
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
+          message: |
+            🚀 **Deploy Realizado com Sucesso!**
+            
+            Nova versão: **${{ env.VERSION }}**
+            Imagem: `${{ env.IMAGE_NAME }}:${{ env.VERSION }}`
+            
+            Repositório: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.event.head_commit.message }}
+            Autor: ${{ github.actor }}
+            Data/Hora: ${{ steps.datetime.outputs.now }}
+            Link: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Tudo certo! 🎉
 
-    - name: Build and Push Docker Image
-      if: github.event_name == 'push'
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ env.IMAGE_NAME }}:${{ env.VERSION }},${{ env.IMAGE_NAME }}:latest
-        build-args: |
-          EGRC_API_URL_URL=${{ secrets.EGRC_API_URL_URL }}
-          EGRC_COLLABORA_URL=${{ secrets.EGRC_COLLABORA_URL }}
+      - name: Notify Build Success (PR)
+        if: success() && github.event_name == 'pull_request'
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
+          message: |
+            ✅ **Build de PR Sucesso!**
+            
+            Versão testada: **${{ env.VERSION }}**
+            
+            Repositório: ${{ github.repository }}
+            Branch: ${{ github.head_ref }}
+            Autor: ${{ github.actor }}
+            Data/Hora: ${{ steps.datetime.outputs.now }}
+            Link: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Pode fazer o merge! 👍
 
-    - name: Notify Success
-      if: success() && github.event_name == 'push'
-      uses: appleboy/telegram-action@v0.1.1
-      with:
-        to: ${{ secrets.TELEGRAM_CHAT_ID }}
-        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        format: markdown
-        message: |
-          🚀 **Deploy Realizado com Sucesso!**
-          
-          Nova versão: **${{ env.VERSION }}**
-          Imagem: `${{ env.IMAGE_NAME }}:${{ env.VERSION }}`
-          
-          Repositório: ${{ github.repository }}
-          Branch: ${{ github.ref_name }}
-          Commit: ${{ github.event.head_commit.message }}
-          Autor: ${{ github.actor }}
-          Data/Hora: ${{ steps.datetime.outputs.now }}
-          Link: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          Tudo certo! 🎉
-
-    - name: Notify Build Success (PR)
-      if: success() && github.event_name == 'pull_request'
-      uses: appleboy/telegram-action@v0.1.1
-      with:
-        to: ${{ secrets.TELEGRAM_CHAT_ID }}
-        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        format: markdown
-        message: |
-          ✅ **Build de PR Sucesso!**
-          
-          Versão testada: **${{ env.VERSION }}**
-          
-          Repositório: ${{ github.repository }}
-          Branch: ${{ github.head_ref }}
-          Autor: ${{ github.actor }}
-          Data/Hora: ${{ steps.datetime.outputs.now }}
-          Link: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          Pode fazer o merge! 👍
-
-    - name: Notify Failure
-      if: failure()
-      uses: appleboy/telegram-action@v0.1.1
-      with:
-        to: ${{ secrets.TELEGRAM_CHAT_ID }}
-        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        format: markdown
-        message: |
-          ❌ **Falha no Pipeline**
-          
-          Versão: **${{ env.VERSION }}**
-          
-          Repositório: ${{ github.repository }}
-          Branch: ${{ github.ref_name }}
-          Commit: ${{ github.event.head_commit.message }}
-          Autor: ${{ github.actor }}
-          Data/Hora: ${{ steps.datetime.outputs.now }}
-          Link: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          Verifique os logs no GitHub Actions. 😢
+      - name: Notify Failure
+        if: failure()
+        uses: appleboy/telegram-action@v0.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
+          message: |
+            ❌ **Falha no Pipeline**
+            
+            Versão: **${{ env.VERSION }}**
+            
+            Repositório: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.event.head_commit.message }}
+            Autor: ${{ github.actor }}
+            Data/Hora: ${{ steps.datetime.outputs.now }}
+            Link: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Verifique os logs no GitHub Actions. 😢
