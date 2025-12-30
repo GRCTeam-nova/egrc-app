@@ -46,7 +46,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onRiscoCreated }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}categories`,
+      `${process.env.REACT_APP_API_URL}categories`,
       setCategorias
     );
     window.scrollTo(0, 0);
@@ -149,7 +149,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onRiscoCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}risks`;
+      url = `${process.env.REACT_APP_API_URL}risks`;
       method = "POST";
       payload = {
         name: nomeRisco,

@@ -17,7 +17,7 @@ export function useGetIncidentes(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}incidents`,
+          `${process.env.REACT_APP_API_URL}incidents`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

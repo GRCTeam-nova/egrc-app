@@ -124,19 +124,19 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}incidents/types`,
+      `${process.env.REACT_APP_API_URL}incidents/types`,
       setTipoIncidentes
     );
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${API_URL}risks`,
+      `${process.env.REACT_APP_API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     window.scrollTo(0, 0);
@@ -148,7 +148,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}incidents/${dadosApi.idIncident}`,
+            `${process.env.REACT_APP_API_URL}incidents/${dadosApi.idIncident}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -390,7 +390,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}incidents`;
+      url = `${process.env.REACT_APP_API_URL}incidents`;
       method = "POST";
       payload = {
         code: codigo,
@@ -402,7 +402,7 @@ function ColumnsLayouts() {
             : null,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}incidents`;
+      url = `${process.env.REACT_APP_API_URL}incidents`;
       method = "PUT";
       payload = {
         idIncident: incidenteDados?.idIncident,

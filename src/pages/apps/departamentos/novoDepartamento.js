@@ -88,7 +88,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}departments/${dadosApi.idDepartment}`,
+            `${process.env.REACT_APP_API_URL}departments/${dadosApi.idDepartment}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -145,48 +145,48 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosLaterais
     );
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosSuperiores
     );
-    fetchData(`${API_URL}risks`, setRiscos);
+    fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}departments/responsability-types`,
+      `${process.env.REACT_APP_API_URL}departments/responsability-types`,
       setTiposResponsabilidades
     );
     fetchData(
-      `${API_URL}departments/unit-formats`,
+      `${process.env.REACT_APP_API_URL}departments/unit-formats`,
       setFormatoUnidades
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `${API_URL}incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidentes
     );
     fetchData(
-      `${API_URL}datas`,
+      `${process.env.REACT_APP_API_URL}datas`,
       setDados
     );
     fetchData(
-      `${API_URL}normatives`,
+      `${process.env.REACT_APP_API_URL}normatives`,
       setNormativas
     );
     fetchData(
-      `${API_URL}action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanosAcao
     );
     window.scrollTo(0, 0);
@@ -596,7 +596,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        `${API_URL}files/uploads`,
+        `${process.env.REACT_APP_API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -621,14 +621,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}departments`;
+      url = `${process.env.REACT_APP_API_URL}departments`;
       method = "POST";
       payload = {
         name: nomeDepartamento,
         code: codigo,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}departments`;
+      url = `${process.env.REACT_APP_API_URL}departments`;
       method = "PUT";
       payload = {
         idDepartment: departamentoDados?.idDepartment,

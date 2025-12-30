@@ -58,7 +58,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
     const fetchResponsaveis = async () => {
       try {
         const response = await axios.get(
-          `${API_URL}collaborators/responsibles`,
+          `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -167,7 +167,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -206,7 +206,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
 
       if (acionista) {
         // Modo edição
-        url = `${API_URL}action-plans/steps`;
+        url = `${process.env.REACT_APP_API_URL}action-plans/steps`;
         method = "PUT";
         payload = {
           ...commonPayload,
@@ -228,7 +228,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         }
       } else {
         // Modo cadastro
-        url = `${API_URL}action-plans/steps`;
+        url = `${process.env.REACT_APP_API_URL}action-plans/steps`;
         method = "POST";
         payload = {
           ...commonPayload,

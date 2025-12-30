@@ -135,23 +135,23 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}deficiencies/types`,
+      `${process.env.REACT_APP_API_URL}deficiencies/types`,
       setTipoDeficiencias
     );
     fetchData(
-      `${API_URL}deficiencies/classifications`,
+      `${process.env.REACT_APP_API_URL}deficiencies/classifications`,
       setClassificacaoDeficiencias
     );
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControles
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     window.scrollTo(0, 0);
@@ -179,7 +179,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}deficiencies/${dadosApi.idDeficiency}`,
+            `${process.env.REACT_APP_API_URL}deficiencies/${dadosApi.idDeficiency}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -371,14 +371,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}deficiencies`;
+      url = `${process.env.REACT_APP_API_URL}deficiencies`;
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}deficiencies`;
+      url = `${process.env.REACT_APP_API_URL}deficiencies`;
       method = "PUT";
       payload = {
         idDeficiency: deficienciaDados?.idDeficiency,

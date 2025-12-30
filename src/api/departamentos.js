@@ -17,7 +17,7 @@ export function useGetDepartamentos(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}departments`,
+          `${process.env.REACT_APP_API_URL}departments`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

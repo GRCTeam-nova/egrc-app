@@ -63,7 +63,7 @@ const UserDetails = ({ onClose }) => {
           return;
         }
 
-        const response = await fetch(`${API_URL}collaborators/${userId}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}collaborators/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

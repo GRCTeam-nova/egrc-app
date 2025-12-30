@@ -77,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onDeficienciaCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}deficiencies`;
+      url = `${process.env.REACT_APP_API_URL}deficiencies`;
       method = "POST";
       payload = {
         name: nomeDeficiencia,

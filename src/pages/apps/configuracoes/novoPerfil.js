@@ -146,7 +146,7 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`${API_URL}indexs`, setIndices);
+    fetchData(`${process.env.REACT_APP_API_URL}indexs`, setIndices);
 
     const niveisAvaliacaoLocal = [
       { id: 1, nome: "Inerente" },
@@ -168,7 +168,7 @@ function ColumnsLayouts() {
       const fetchPerfilDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}analisys-profile/${dadosApi.idAnalysisProfile}`,
+            `${process.env.REACT_APP_API_URL}analisys-profile/${dadosApi.idAnalysisProfile}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -413,11 +413,11 @@ function ColumnsLayouts() {
     let url = "";
     let method = "";
     if (requisicao === "Criar") {
-      url = `${API_URL}analisys-profile`;
+      url = `${process.env.REACT_APP_API_URL}analisys-profile`;
       method = "POST";
     } else if (requisicao === "Editar") {
       // Caso seja edição, ajuste a URL e método conforme necessário (exemplo com PUT)
-      url = `${API_URL}analisys-profile/${dadosApi.idAnalysisProfile}`;
+      url = `${process.env.REACT_APP_API_URL}analisys-profile/${dadosApi.idAnalysisProfile}`;
       method = "PUT";
     }
 

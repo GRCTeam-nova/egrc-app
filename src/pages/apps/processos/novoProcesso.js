@@ -95,7 +95,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}processes/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}processes/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -260,55 +260,55 @@ function ColumnsLayouts() {
   useEffect(() => {
     if (!authToken) return;
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setDepartamentosLaterais
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setDepartamentosSuperiores
     );
-    fetchData(`${API_URL}risks`, setRiscos);
-    fetchData(`${API_URL}datas`, setDados);
+    fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
+    fetchData(`${process.env.REACT_APP_API_URL}datas`, setDados);
     fetchData(
-      `${API_URL}ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
     fetchData(
-      `${API_URL}action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `${API_URL}deficiencies`,
+      `${process.env.REACT_APP_API_URL}deficiencies`,
       setDeficiencias
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessoInferior
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
-    fetchData(`${API_URL}risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
     // Carrega os mesmos processos para os novos campos
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessosAnteriores
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessosPosteriores
     );
     fetchData(
-      `${API_URL}processes/types`,
+      `${process.env.REACT_APP_API_URL}processes/types`,
       setFormatoUnidades
     );
     fetchData(
-      `${API_URL}incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidentes
     );
     window.scrollTo(0, 0);
@@ -721,7 +721,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        `${API_URL}files/uploads`,
+        `${process.env.REACT_APP_API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -746,7 +746,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}processes`;
+      url = `${process.env.REACT_APP_API_URL}processes`;
       method = "POST";
       payload = {
         name: nomeDepartamento,
@@ -754,7 +754,7 @@ function ColumnsLayouts() {
         idCompanies: formData.empresa,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}processes`;
+      url = `${process.env.REACT_APP_API_URL}processes`;
       method = "PUT";
       payload = {
         idProcess: processosDados?.idProcess,

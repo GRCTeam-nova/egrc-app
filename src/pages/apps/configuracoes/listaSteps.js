@@ -512,7 +512,7 @@ function ActionCell({ row, refreshData, onEdit }) {
   const handleEditStep = async () => {
     try {
       const getResponse = await axios.get(
-        `${API_URL}action-plans/steps/${row.original.idActionPlanStep}`,
+        `${process.env.REACT_APP_API_URL}action-plans/steps/${row.original.idActionPlanStep}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -558,7 +558,7 @@ function ActionCell({ row, refreshData, onEdit }) {
     try {
       // Consulta o endpoint para obter os dados atuais do step
       const getResponse = await axios.get(
-        `${API_URL}action-plans/steps/${row.original.idActionPlanStep}`,
+        `${process.env.REACT_APP_API_URL}action-plans/steps/${row.original.idActionPlanStep}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -575,7 +575,7 @@ function ActionCell({ row, refreshData, onEdit }) {
 
       // Envia a requisição PUT com o payload atualizado para o endpoint de edição
       const putResponse = await axios.put(
-        `${API_URL}action-plans/steps`,
+        `${process.env.REACT_APP_API_URL}action-plans/steps`,
         dadosAtualizados,
         {
           headers: {
@@ -787,7 +787,7 @@ const ListagemAvaliacoes = () => {
   const handleStepClick = async (stepId) => {
     try {
       const response = await fetch(
-        `${API_URL}action-plans/steps/${stepId}`,
+        `${process.env.REACT_APP_API_URL}action-plans/steps/${stepId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

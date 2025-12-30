@@ -134,13 +134,13 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`${API_URL}actives`, setAtivos);
+    fetchData(`${process.env.REACT_APP_API_URL}actives`, setAtivos);
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}ipe/types`,
+      `${process.env.REACT_APP_API_URL}ipe/types`,
       setTipoInformacoes
     );
     window.scrollTo(0, 0);
@@ -152,7 +152,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}ipe/${dadosApi.idInformationActivity}`,
+            `${process.env.REACT_APP_API_URL}ipe/${dadosApi.idInformationActivity}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -316,14 +316,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}ipe`;
+      url = `${process.env.REACT_APP_API_URL}ipe`;
       method = "POST";
       payload = {
         code: codigo,
         name: nome
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}ipe`;
+      url = `${process.env.REACT_APP_API_URL}ipe`;
       method = "PUT";
       payload = {
         idInformationActivity: dadosApi?.idInformationActivity,

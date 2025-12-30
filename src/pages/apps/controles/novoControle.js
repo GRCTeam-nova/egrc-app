@@ -157,61 +157,61 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}risks`,
+      `${process.env.REACT_APP_API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `${API_URL}objective`,
+      `${process.env.REACT_APP_API_URL}objective`,
       setObjetivoControle
     );
     fetchData(
-      `${API_URL}ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
-    fetchData(`${API_URL}actives`, setAtivos);
-    fetchData(`${API_URL}ipe`, setIpes);
+    fetchData(`${process.env.REACT_APP_API_URL}actives`, setAtivos);
+    fetchData(`${process.env.REACT_APP_API_URL}ipe`, setIpes);
     fetchData(
-      `${API_URL}deficiencies`,
+      `${process.env.REACT_APP_API_URL}deficiencies`,
       setDeficiencias
     );
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setCompensadosControles
     );
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setCompensaControles
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}ledger-accounts/assertions`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/assertions`,
       setAssertions
     );
     fetchData(
-      `${API_URL}controls/types`,
+      `${process.env.REACT_APP_API_URL}controls/types`,
       setTiposControles
     );
     fetchData(
-      `${API_URL}controls/classifications`,
+      `${process.env.REACT_APP_API_URL}controls/classifications`,
       setClassificacoes
     );
     fetchData(
-      `${API_URL}controls/cvars`,
+      `${process.env.REACT_APP_API_URL}controls/cvars`,
       setCarvs
     );
     fetchData(
-      `${API_URL}controls/element-cosos`,
+      `${process.env.REACT_APP_API_URL}controls/element-cosos`,
       setElementos
     );
     fetchData(
-      `${API_URL}controls/executions`,
+      `${process.env.REACT_APP_API_URL}controls/executions`,
       setExecucoes
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     const frequencias = [
@@ -237,7 +237,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}controls/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}controls/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -723,7 +723,7 @@ function ColumnsLayouts() {
         const deletedFilesPayload = deletedFiles.map((file) => file.name); // ajuste conforme a necessidade
         
         await axios.delete(
-          `${API_URL}files`,
+          `${process.env.REACT_APP_API_URL}files`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -755,7 +755,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -779,7 +779,7 @@ function ColumnsLayouts() {
 
       // --- Configuração do payload e endpoint para CONTROLES ---
       if (requisicao === "Criar") {
-        url = `${API_URL}controls`;
+        url = `${process.env.REACT_APP_API_URL}controls`;
         method = "POST";
         payload = {
           code: codigo,
@@ -787,7 +787,7 @@ function ColumnsLayouts() {
           idProcess: formData.processo,
         };
       } else if (requisicao === "Editar") {
-        url = `${API_URL}controls`;
+        url = `${process.env.REACT_APP_API_URL}controls`;
         method = "PUT";
         payload = {
           idControl: controleDados?.idControl,

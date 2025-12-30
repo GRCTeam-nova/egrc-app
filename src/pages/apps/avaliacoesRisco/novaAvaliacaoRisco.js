@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import {API_URL} from "config";
 import {
   Accordion,
   AccordionDetails,
@@ -223,53 +224,53 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}categories`,
+      `${process.env.REACT_APP_API_URL}categories`,
       setCategorias
     );
-    fetchData(`${API_URL}cycles`, setCiclo);
+    fetchData(`${process.env.REACT_APP_API_URL}cycles`, setCiclo);
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setRespondentes
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsaveis
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsaveisAv
     );
     fetchData(
-      `${API_URL}risks/treatments`,
+      `${process.env.REACT_APP_API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `${API_URL}risks/causes`,
+      `${process.env.REACT_APP_API_URL}risks/causes`,
       setCausa
     );
     fetchData(
-      `${API_URL}risks/impacts`,
+      `${process.env.REACT_APP_API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`${API_URL}risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControle
     );
     fetchData(
-      `${API_URL}risks/strategic-guidelines`,
+      `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
       setDiretriz
     );
     fetchData(
-      `${API_URL}incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidente
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}risks?onlyWithAnalisysProfile=true`,
+      `${process.env.REACT_APP_API_URL}risks?onlyWithAnalisysProfile=true`,
       setRiscos
     );
     window.scrollTo(0, 0);
@@ -281,7 +282,7 @@ function ColumnsLayouts() {
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}assessments/${dadosApi.idAssessment}`,
+            `${process.env.REACT_APP_API_URL}assessments/${dadosApi.idAssessment}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -295,7 +296,7 @@ function ColumnsLayouts() {
 
           const [resUsers] = await Promise.all([
             fetch(
-              `${API_URL}collaborators/responsibles`,
+              `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -305,7 +306,7 @@ function ColumnsLayouts() {
 
           const [resRisco] = await Promise.all([
             fetch(
-              `${API_URL}risks/${data.idRisk}`,
+              `${process.env.REACT_APP_API_URL}risks/${data.idRisk}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -314,7 +315,7 @@ function ColumnsLayouts() {
 
           const [resCategoria] = await Promise.all([
             fetch(
-              `${API_URL}categories/${dataRisk.idCategory}`,
+              `${process.env.REACT_APP_API_URL}categories/${dataRisk.idCategory}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -323,7 +324,7 @@ function ColumnsLayouts() {
 
           const [resPerfil] = await Promise.all([
             fetch(
-              `${API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
+              `${process.env.REACT_APP_API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -332,7 +333,7 @@ function ColumnsLayouts() {
 
           const [resQuiz] = await Promise.all([
             fetch(
-              `${API_URL}quiz/assessments/${dadosApi.idAssessment}`,
+              `${process.env.REACT_APP_API_URL}quiz/assessments/${dadosApi.idAssessment}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -341,7 +342,7 @@ function ColumnsLayouts() {
 
           const [resCycle] = await Promise.all([
             fetch(
-              `${API_URL}cycles/${data.idCycle}`,
+              `${process.env.REACT_APP_API_URL}cycles/${data.idCycle}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -554,7 +555,7 @@ function ColumnsLayouts() {
     if (normativaDados?.idAssessment) {
       axios
         .get(
-          `${API_URL}quiz/assessments/${normativaDados.idAssessment}`,
+          `${process.env.REACT_APP_API_URL}quiz/assessments/${normativaDados.idAssessment}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         .then((res) => setFilledQuestionarios(res.data))
@@ -889,7 +890,7 @@ const handleStart = async () => {
       setLoading(true);
 
       if (requisicao === "Editar") {
-        url = `${API_URL}assessments`;
+        url = `${process.env.REACT_APP_API_URL}assessments`;
         method = "PUT";
 
         // Lógica de mapeamento igual ao tratarSubmit
@@ -984,7 +985,7 @@ const handleStart = async () => {
       setLoading(true);
 
       if (requisicao === "Editar") {
-        url = `${API_URL}assessments`;
+        url = `${process.env.REACT_APP_API_URL}assessments`;
         method = "PUT";
 
         // Lógica de mapeamento
@@ -1104,7 +1105,7 @@ const handleStart = async () => {
       setLoading(true);
 
       if (requisicao === "Editar") {
-        url = `${API_URL}assessments`;
+        url = `${process.env.REACT_APP_API_URL}assessments`;
         method = "PUT";
 
         // Lógica de mapeamento
@@ -1196,7 +1197,7 @@ const handleStart = async () => {
   const handleRetornar = async () => {
     try {
       setLoading(true);
-      const url = `${API_URL}assessments`;
+      const url = `${process.env.REACT_APP_API_URL}assessments`;
       
       // Lógica de mapeamento
       const findProb = (name) =>
@@ -1310,7 +1311,7 @@ const handleStart = async () => {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}assessments`;
+      url = `${process.env.REACT_APP_API_URL}assessments`;
       method = "POST";
       payload = {
         idRisk: formData.risco,
@@ -1319,7 +1320,7 @@ const handleStart = async () => {
         idResponsible: formData.responsavelAv,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}assessments`;
+      url = `${process.env.REACT_APP_API_URL}assessments`;
       method = "PUT";
       // mapeia nome → objeto dentro do heatmapDataAv
       const findProb = (name) =>

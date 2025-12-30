@@ -20,7 +20,7 @@ export function useGetEmpresa(formData, normativaDados) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}quiz/assessments/${normativaDados.idAssessment}`,
+          `${process.env.REACT_APP_API_URL}quiz/assessments/${normativaDados.idAssessment}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

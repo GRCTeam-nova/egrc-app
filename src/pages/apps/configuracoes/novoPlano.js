@@ -142,21 +142,21 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${API_URL}deficiencies`,
+      `${process.env.REACT_APP_API_URL}deficiencies`,
       setDeficiencia
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
-    fetchData(`${API_URL}risks`, setRiscos);
+    fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
     
     fetchData(
-      `${API_URL}action-plans/types`,
+      `${process.env.REACT_APP_API_URL}action-plans/types`,
       setTipoPlano
     );
     window.scrollTo(0, 0);
@@ -168,7 +168,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}action-plans/${dadosApi.idActionPlan}`,
+            `${process.env.REACT_APP_API_URL}action-plans/${dadosApi.idActionPlan}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -412,7 +412,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}action-plans`;
+      url = `${process.env.REACT_APP_API_URL}action-plans`;
       method = "POST";
       payload = {
         code: codigo,
@@ -420,7 +420,7 @@ function ColumnsLayouts() {
         actionPlanPriority: formData.prioridade,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}action-plans`;
+      url = `${process.env.REACT_APP_API_URL}action-plans`;
       method = "PUT";
       payload = {
         idActionPlan: normativaDados?.idActionPlan,

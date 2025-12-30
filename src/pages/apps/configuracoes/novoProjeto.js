@@ -78,7 +78,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}projects/${dadosApi.idProject}`,
+            `${process.env.REACT_APP_API_URL}projects/${dadosApi.idProject}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -133,19 +133,19 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `${API_URL}projects/types`,
+      `${process.env.REACT_APP_API_URL}projects/types`,
       setTiposProjetos
     );
     fetchData(
-      `${API_URL}projects`,
+      `${process.env.REACT_APP_API_URL}projects`,
       setProjetosAnteriores
     );
     fetchData(
-      `${API_URL}projects`,
+      `${process.env.REACT_APP_API_URL}projects`,
       setProjetosPosteriores
     );
     window.scrollTo(0, 0);
@@ -260,7 +260,7 @@ function ColumnsLayouts() {
       // Supondo que deletedFilesPayload deva conter dados relevantes e não apenas o resultado de file instanceof File
       const deletedFilesPayload = deletedFiles.map((file) => file.name); // ajuste conforme a necessidade
 
-      await axios.delete(`${API_URL}files`, {
+      await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -290,7 +290,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        `${API_URL}files/uploads`,
+        `${process.env.REACT_APP_API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -313,14 +313,14 @@ function ColumnsLayouts() {
     });
 
     if (requisicao === "Criar") {
-      url = `${API_URL}projects`;
+      url = `${process.env.REACT_APP_API_URL}projects`;
       method = "POST";
       payload = {
         name: nomeProjeto,
         idProjectType: formData.tipoProjeto,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}projects`;
+      url = `${process.env.REACT_APP_API_URL}projects`;
       method = "PUT";
       payload = {
         idProject: projetoDados?.idProject,

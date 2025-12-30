@@ -99,7 +99,7 @@ function NovoColaborador() {
       const fetchColaboradorDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}collaborators/${dadosApi.idCollaborator}`,
+            `${process.env.REACT_APP_API_URL}collaborators/${dadosApi.idCollaborator}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -155,44 +155,44 @@ function NovoColaborador() {
   useEffect(() => {
     // Buscar dados para os campos de seleção
     fetchData(
-      `${API_URL}collaborators/positions`,
+      `${process.env.REACT_APP_API_URL}collaborators/positions`,
       setCargos
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmpresas
     );
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${API_URL}collaborators/languages`,
+      `${process.env.REACT_APP_API_URL}collaborators/languages`,
       setIdiomas
     );
     fetchData(
-      `${API_URL}collaborators/groups`,
+      `${process.env.REACT_APP_API_URL}collaborators/groups`,
       setGrupos
     );
     fetchData(
-      `${API_URL}collaborators/functions`,
+      `${process.env.REACT_APP_API_URL}collaborators/functions`,
       setFuncoes
     );
     fetchData(
-      `${API_URL}collaborators/graduations`,
+      `${process.env.REACT_APP_API_URL}collaborators/graduations`,
       setGraduacoes
     );
     fetchData(
-      `${API_URL}collaborators/certifications`,
+      `${process.env.REACT_APP_API_URL}collaborators/certifications`,
       setCertificacoes
     );
     fetchData(
-      `${API_URL}collaborators/specializations`,
+      `${process.env.REACT_APP_API_URL}collaborators/specializations`,
       setEspecializacoes
     );
     // [NOVO] Busca de Perfis
     fetchData(
-        `${API_URL}access`,
+        `${process.env.REACT_APP_API_URL}access`,
         setPerfis
     );
     
@@ -502,7 +502,7 @@ function NovoColaborador() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -526,7 +526,7 @@ function NovoColaborador() {
 
       // Configuração da URL, método e payload conforme a operação
       if (requisicao === "Criar") {
-        url = `${API_URL}collaborators`;
+        url = `${process.env.REACT_APP_API_URL}collaborators`;
         method = "POST";
         payload = {
           name: nomeColaborador,
@@ -537,7 +537,7 @@ function NovoColaborador() {
           isUser: true
         };
       } else if (requisicao === "Editar") {
-        url = `${API_URL}collaborators`;
+        url = `${process.env.REACT_APP_API_URL}collaborators`;
         method = "PUT";
         payload = {
           idCollaborator: colaboradorDados?.idCollaborator,

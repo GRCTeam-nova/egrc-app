@@ -58,11 +58,11 @@ function ColumnsLayoutsDrawer({ buttonSx, onCategoryCreated }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setDepartamentosLaterais
     );
     window.scrollTo(0, 0);
@@ -179,7 +179,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onCategoryCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}categories`;
+      url = `${process.env.REACT_APP_API_URL}categories`;
       method = "POST";
       payload = {
         name: nome,

@@ -17,7 +17,7 @@ export function useGetPerfis(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}analisys-profile`,
+          `${process.env.REACT_APP_API_URL}analisys-profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

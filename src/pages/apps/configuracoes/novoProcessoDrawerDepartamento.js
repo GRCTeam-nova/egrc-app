@@ -58,11 +58,11 @@ function ColumnsLayoutsDrawer({ buttonSx, onProcessCreated }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setDepartamentosLaterais
     );
     window.scrollTo(0, 0);
@@ -181,7 +181,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onProcessCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}processes`;
+      url = `${process.env.REACT_APP_API_URL}processes`;
       method = "POST";
       payload = {
         name: nomeDepartamento,

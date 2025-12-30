@@ -80,7 +80,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}ledger-accounts/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}ledger-accounts/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -133,31 +133,31 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmpresas
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}ledger-accounts/types`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/types`,
       setTiposResponsabilidades
     );
     fetchData(
-      `${API_URL}ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
     fetchData(
-      `${API_URL}ledger-accounts/assertions`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/assertions`,
       setAssertions
     );
     fetchData(
-      `${API_URL}ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContasSuperiores
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     window.scrollTo(0, 0);
@@ -417,7 +417,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}ledger-accounts`;
+      url = `${process.env.REACT_APP_API_URL}ledger-accounts`;
       method = "POST";
       payload = {
         name: nomeConta,
@@ -425,7 +425,7 @@ function ColumnsLayouts() {
         idLedgerAccountType: formData.tipoConta,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}ledger-accounts`;
+      url = `${process.env.REACT_APP_API_URL}ledger-accounts`;
       method = "PUT";
       payload = {
         idLedgerAccount: empresaDados?.idLedgerAccount,

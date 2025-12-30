@@ -59,7 +59,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onAccountCreated }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}ledger-accounts/types`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts/types`,
       setTiposResponsabilidades
     );
     window.scrollTo(0, 0);
@@ -132,7 +132,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onAccountCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}ledger-accounts`;
+      url = `${process.env.REACT_APP_API_URL}ledger-accounts`;
       method = "POST";
       payload = {
         name: nomeConta,

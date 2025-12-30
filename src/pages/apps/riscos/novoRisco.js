@@ -172,68 +172,68 @@ function ColumnsLayoutsCorrigido() {
   useEffect(() => {
     if (!authToken) return;
     fetchData(
-      `${API_URL}categories`,
+      `${process.env.REACT_APP_API_URL}categories`,
       setCategorias
     );
     fetchData(
-      `${API_URL}action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${API_URL}risks`,
+      `${process.env.REACT_APP_API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `${API_URL}risks/frameworks`,
+      `${process.env.REACT_APP_API_URL}risks/frameworks`,
       setFrameworks
     );
     fetchData(
-      `${API_URL}risks/treatments`,
+      `${process.env.REACT_APP_API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `${API_URL}risks/strategic-guidelines`,
+      `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
       setDiretrizes
     );
     fetchData(
-      `${API_URL}risks/factors`,
+      `${process.env.REACT_APP_API_URL}risks/factors`,
       setFatores
     );
     fetchData(
-      `${API_URL}risks/causes`,
+      `${process.env.REACT_APP_API_URL}risks/causes`,
       setCausas
     );
     fetchData(
-      `${API_URL}risks/impacts`,
+      `${process.env.REACT_APP_API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`${API_URL}risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
     fetchData(
-      `${API_URL}risks/threats`,
+      `${process.env.REACT_APP_API_URL}risks/threats`,
       setAmeacas
     );
     fetchData(
-      `${API_URL}normatives`,
+      `${process.env.REACT_APP_API_URL}normatives`,
       setNormativas
     );
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControles
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidentes
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     window.scrollTo(0, 0);
@@ -253,7 +253,7 @@ function ColumnsLayoutsCorrigido() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}risks/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}risks/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -781,7 +781,7 @@ function ColumnsLayoutsCorrigido() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -806,7 +806,7 @@ function ColumnsLayoutsCorrigido() {
 
       // --- Configuração do payload e endpoint para riscos ---
       if (requisicao === "Criar") {
-        url = `${API_URL}risks`;
+        url = `${process.env.REACT_APP_API_URL}risks`;
         method = "POST";
         payload = {
           code: codigo,
@@ -814,7 +814,7 @@ function ColumnsLayoutsCorrigido() {
           idCategory: formData.categoria || null,
         };
       } else if (requisicao === "Editar") {
-        url = `${API_URL}risks`;
+        url = `${process.env.REACT_APP_API_URL}risks`;
         method = "PUT";
         payload = {
           idRisk: riscoDados?.idRisk,

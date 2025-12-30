@@ -17,7 +17,7 @@ export function useGetIndices(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}indexs`,
+          `${process.env.REACT_APP_API_URL}indexs`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

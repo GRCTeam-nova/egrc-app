@@ -63,11 +63,11 @@ function ColumnsLayoutsDrawer({ buttonSx, onPlansCreated }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setDepartamentosLaterais
     );
     window.scrollTo(0, 0);
@@ -151,7 +151,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onPlansCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}action-plans`;
+      url = `${process.env.REACT_APP_API_URL}action-plans`;
       method = "POST";
       payload = {
         name: nomePlano,

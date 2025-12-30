@@ -634,7 +634,7 @@ function ActionCell({ row, refreshData }) {
     
     try {
       // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${API_URL}analisys-profile/${idAnalysisProfile}`, {
+      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}analisys-profile/${idAnalysisProfile}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -646,7 +646,7 @@ function ActionCell({ row, refreshData }) {
       const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
   
       // Enviar os dados atualizados via PUT
-      await axios.put(`${API_URL}analisys-profile`, dadosAtualizados, {
+      await axios.put(`${process.env.REACT_APP_API_URL}analisys-profile`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

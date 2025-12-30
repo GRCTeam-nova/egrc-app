@@ -79,7 +79,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onIpeCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}ipe`;
+      url = `${process.env.REACT_APP_API_URL}ipe`;
       method = "POST";
       payload = {
         name: nomeIpe,

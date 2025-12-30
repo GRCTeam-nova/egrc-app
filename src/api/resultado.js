@@ -17,7 +17,7 @@ export function useGetResultado(formData, novoOrgao) {
         const token = localStorage.getItem('access_token');
 
         // Define o endpoint de acordo com a existência de projectId
-        const url = `${API_URL}projects/tests/phases/${novoOrgao}/attributes`
+        const url = `${process.env.REACT_APP_API_URL}projects/tests/phases/${novoOrgao}/attributes`
          
         const response = await fetch(url, {
           headers: {

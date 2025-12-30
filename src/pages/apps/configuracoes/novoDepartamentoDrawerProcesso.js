@@ -77,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onDepartmentCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}departments`;
+      url = `${process.env.REACT_APP_API_URL}departments`;
       method = "POST";
       payload = {
         name: nomeDepartamento,

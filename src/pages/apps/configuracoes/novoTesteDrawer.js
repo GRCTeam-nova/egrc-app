@@ -51,7 +51,7 @@ function DrawerTeste({ teste, hideButton = false }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControle
     );
     window.scrollTo(0, 0);
@@ -85,7 +85,7 @@ function DrawerTeste({ teste, hideButton = false }) {
         try {
           setLoading(true);
           const response = await axios.get(
-            `${API_URL}projects/tests/${teste.idTest}`,
+            `${process.env.REACT_APP_API_URL}projects/tests/${teste.idTest}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -144,7 +144,7 @@ function DrawerTeste({ teste, hideButton = false }) {
 
       if (teste) {
         // Modo edição: Atualiza o teste incluindo os novos campos de data
-        url = `${API_URL}projects/tests`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests`;
         method = "PUT";
         payload = {
           idControl:
@@ -176,7 +176,7 @@ function DrawerTeste({ teste, hideButton = false }) {
         }
       } else {
         // Modo cadastro: Inclui os campos de data no payload do POST
-        url = `${API_URL}projects/tests`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests`;
         method = "POST";
         payload = {
           idControl:
@@ -209,7 +209,7 @@ function DrawerTeste({ teste, hideButton = false }) {
           const idTest = createdData.data.idTest;
 
           const editUrl =
-            `${API_URL}projects/tests`;
+            `${process.env.REACT_APP_API_URL}projects/tests`;
           const editPayload = {
             idTest,
             description: descricao,

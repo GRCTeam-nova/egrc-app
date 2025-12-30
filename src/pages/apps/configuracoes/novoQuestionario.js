@@ -171,53 +171,53 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}categories`,
+      `${process.env.REACT_APP_API_URL}categories`,
       setCategorias
     );
-    fetchData(`${API_URL}cycles`, setCiclo);
+    fetchData(`${process.env.REACT_APP_API_URL}cycles`, setCiclo);
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setRespondentes
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsaveis
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsaveisAv
     );
     fetchData(
-      `${API_URL}risks/treatments`,
+      `${process.env.REACT_APP_API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `${API_URL}risks/causes`,
+      `${process.env.REACT_APP_API_URL}risks/causes`,
       setCausa
     );
     fetchData(
-      `${API_URL}risks/impacts`,
+      `${process.env.REACT_APP_API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`${API_URL}risks/kris`, setKris);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControle
     );
     fetchData(
-      `${API_URL}risks/strategic-guidelines`,
+      `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
       setDiretriz
     );
     fetchData(
-      `${API_URL}incidents`,
+      `${process.env.REACT_APP_API_URL}incidents`,
       setIncidente
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}risks?onlyWithAnalisysProfile=true`,
+      `${process.env.REACT_APP_API_URL}risks?onlyWithAnalisysProfile=true`,
       setRiscos
     );
     window.scrollTo(0, 0);
@@ -229,7 +229,7 @@ function ColumnsLayouts() {
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}assessments/${dadosApi.idAssessment}`,
+            `${process.env.REACT_APP_API_URL}assessments/${dadosApi.idAssessment}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -243,7 +243,7 @@ function ColumnsLayouts() {
 
           const [resUsers] = await Promise.all([
             fetch(
-              `${API_URL}collaborators/responsibles`,
+              `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -253,7 +253,7 @@ function ColumnsLayouts() {
 
           const [resRisco] = await Promise.all([
             fetch(
-              `${API_URL}risks/${data.idRisk}`,
+              `${process.env.REACT_APP_API_URL}risks/${data.idRisk}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -262,7 +262,7 @@ function ColumnsLayouts() {
 
           const [resCategoria] = await Promise.all([
             fetch(
-              `${API_URL}categories/${dataRisk.idCategory}`,
+              `${process.env.REACT_APP_API_URL}categories/${dataRisk.idCategory}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -271,7 +271,7 @@ function ColumnsLayouts() {
 
           const [resPerfil] = await Promise.all([
             fetch(
-              `${API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
+              `${process.env.REACT_APP_API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -280,7 +280,7 @@ function ColumnsLayouts() {
 
           const [resQuestionario] = await Promise.all([
             fetch(
-              ` ${API_URL}quiz/${dadosApi.idQuiz}`,
+              ` ${process.env.REACT_APP_API_URL}quiz/${dadosApi.idQuiz}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -723,7 +723,7 @@ function ColumnsLayouts() {
 
       // 1) Responde ao quiz
       await axios.put(
-        `${API_URL}quiz/answer`,
+        `${process.env.REACT_APP_API_URL}quiz/answer`,
         payloadAnswer,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -733,7 +733,7 @@ function ColumnsLayouts() {
 
       // 2) Atualiza o quiz (ativa + mantém todas as outras infos)
       await axios.put(
-        `${API_URL}quiz`,
+        `${process.env.REACT_APP_API_URL}quiz`,
         payloadUpdate,
         { headers: { Authorization: `Bearer ${token}` } }
       );

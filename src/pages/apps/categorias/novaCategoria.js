@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import {API_URL} from "config";
 import * as React from 'react';
 import {
   Button, Box, TextField, Autocomplete, Grid, Stack, InputLabel, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
@@ -87,7 +88,7 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`${API_URL}analisys-profile`, setPerfil);
+    fetchData(`${process.env.REACT_APP_API_URL}analisys-profile`, setPerfil);
     window.scrollTo(0, 0);
   }, []);
 
@@ -97,7 +98,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}categories/${dadosApi.idCategory}`,
+            `${process.env.REACT_APP_API_URL}categories/${dadosApi.idCategory}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -179,14 +180,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = '${API_URL}categories';
+      url = `${process.env.REACT_APP_API_URL}categories`;
       method = 'POST';
       payload = {
         name: nome,
         description: descricao,
       };
     } else if (requisicao === 'Editar') {
-      url = `${API_URL}categories`;
+      url = `${process.env.REACT_APP_API_URL}categories`;
       method = 'PUT';
       payload = {
         idCategory: categoriaDados?.idCategory,

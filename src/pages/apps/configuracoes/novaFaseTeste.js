@@ -187,11 +187,11 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setTestadores
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setRevisores
     );
     window.scrollTo(0, 0);
@@ -203,7 +203,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}projects/tests/phases/${dadosApi.idTestPhase}`,
+            `${process.env.REACT_APP_API_URL}projects/tests/phases/${dadosApi.idTestPhase}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -274,7 +274,7 @@ function ColumnsLayouts() {
     setLoading(true);
     try {
       await axios.put(
-        `${API_URL}projects/tests/phases/attributes/result/sample`,
+        `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes/result/sample`,
         {
           idTestPhase: faseTesteDados.idTestPhase,
           sample: Number(pendingSampleValue),
@@ -405,7 +405,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${API_URL}files`, {
+        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -434,7 +434,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -458,7 +458,7 @@ function ColumnsLayouts() {
         const hasReviewers =
           Array.isArray(formData.revisor) && formData.revisor.length > 0;
 
-        url = `${API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
         method = "PUT";
         payload = {
           idTestPhase: faseTesteDados?.idTestPhase,
@@ -598,7 +598,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${API_URL}files`, {
+        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -627,7 +627,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -648,7 +648,7 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
         method = "PUT";
         payload = {
           idTestPhase: faseTesteDados?.idTestPhase,
@@ -766,7 +766,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${API_URL}files`, {
+        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -795,7 +795,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -816,7 +816,7 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
         method = "PUT";
         payload = {
           idTestPhase: faseTesteDados?.idTestPhase,
@@ -914,7 +914,7 @@ function ColumnsLayouts() {
     }
     try {
       setLoading(true);
-      const url = `${API_URL}projects/tests/${TesteId}/phases/${faseTesteDados.idTestPhase}`;
+      const url = `${process.env.REACT_APP_API_URL}projects/tests/${TesteId}/phases/${faseTesteDados.idTestPhase}`;
       const payload = {
         idTestPhase: faseTesteDados.idTestPhase,
         name: nomeFaseTeste,
@@ -1020,7 +1020,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${API_URL}files`, {
+        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1049,7 +1049,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -1071,7 +1071,7 @@ function ColumnsLayouts() {
 
       // Monta payload para criação e edição
       if (requisicao === "Criar") {
-        url = `${API_URL}projects/tests/${TesteId}/phases`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests/${TesteId}/phases`;
         method = "POST";
         payload = {
           name: nomeFaseTeste,
@@ -1086,7 +1086,7 @@ function ColumnsLayouts() {
           })),
         };
       } else if (requisicao === "Editar") {
-        url = `${API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests/${TesteId}/phases/${faseTesteDados?.idTestPhase}`;
         method = "PUT";
         payload = {
           idTestPhase: faseTesteDados?.idTestPhase,

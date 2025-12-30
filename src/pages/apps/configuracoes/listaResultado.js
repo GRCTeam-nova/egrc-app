@@ -756,7 +756,7 @@ const ListagemResultado = ({ amostras, canEdit, novoOrgao }) => {
 
       const token = localStorage.getItem("access_token");
       const url =
-        `${API_URL}projects/tests/phases/attributes/result`;
+        `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes/result`;
 
       const headers = {
         Authorization: `Bearer ${token}`,

@@ -77,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onDataCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}datas`;
+      url = `${process.env.REACT_APP_API_URL}datas`;
       method = "POST";
       payload = {
         name: nomeDado,

@@ -16,7 +16,7 @@ export function useGetDados(formData = {}) {
       return;
     }
 
-    let url = `${API_URL}datas/reports`;
+    let url = `${process.env.REACT_APP_API_URL}datas/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

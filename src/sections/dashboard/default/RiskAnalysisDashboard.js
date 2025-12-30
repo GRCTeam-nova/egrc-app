@@ -15,7 +15,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ApexCharts from 'apexcharts';
 
 // --- CONFIGURAÇÕES ---
-const API_ENDPOINT = `${API_URL}risks/reports/all`; // Endpoint Sugerido
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}risks/reports/all`; // Endpoint Sugerido
 
 // Função auxiliar de status
 const getStatusConfig = (active) => {

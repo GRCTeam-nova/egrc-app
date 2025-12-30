@@ -18,7 +18,7 @@ export function useGetProjetos(formData) {
         const token = localStorage.getItem('access_token');
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}projects`,
+          `${process.env.REACT_APP_API_URL}projects`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

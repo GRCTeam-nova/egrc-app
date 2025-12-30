@@ -180,20 +180,20 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}projects`,
+      `${process.env.REACT_APP_API_URL}projects`,
       setProjetos
     );
     fetchData(
-      `${API_URL}projects/types`,
+      `${process.env.REACT_APP_API_URL}projects/types`,
       setTipoProjetos
     );
-    fetchData(`${API_URL}ipe`, setIpes);
+    fetchData(`${process.env.REACT_APP_API_URL}ipe`, setIpes);
     fetchData(
-      `${API_URL}controls`,
+      `${process.env.REACT_APP_API_URL}controls`,
       setControles
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavelTeste
     );
     const frequencias = [
@@ -221,7 +221,7 @@ function ColumnsLayouts() {
       try {
         // 1) Busca dados do teste existente
         const resTest = await axios.get(
-          `${API_URL}projects/tests/${dadosApi.idTest}`,
+          `${process.env.REACT_APP_API_URL}projects/tests/${dadosApi.idTest}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = resTest.data;
@@ -259,7 +259,7 @@ function ColumnsLayouts() {
 
         // 2) Busca fases do teste e calcula status principal
         const resPhases = await axios.get(
-          `${API_URL}projects/tests/${dadosApi.idTest}/phases`,
+          `${process.env.REACT_APP_API_URL}projects/tests/${dadosApi.idTest}/phases`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const mainStatus = computeMainStatus(resPhases.data);
@@ -458,7 +458,7 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
       if (requisicao === "Criar") {
-        url = `${API_URL}projects/tests`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests`;
         method = "POST";
         payload = {
           description: descricaoTeste,
@@ -467,7 +467,7 @@ function ColumnsLayouts() {
           idControl: formData.controle,
         };
       } else if (requisicao === "Editar") {
-        url = `${API_URL}projects/tests`;
+        url = `${process.env.REACT_APP_API_URL}projects/tests`;
         method = "PUT";
         payload = {
           idTest: controleDados?.idTest,

@@ -16,7 +16,7 @@ export function useGetProcessos(formData = {}) {
       return;
     }
 
-    let url = `${API_URL}processes/reports`;
+    let url = `${process.env.REACT_APP_API_URL}processes/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

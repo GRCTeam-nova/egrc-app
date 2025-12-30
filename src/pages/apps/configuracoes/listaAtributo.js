@@ -629,7 +629,7 @@ function ActionCell({ row, refreshData, onEdit }) {
       };
 
       const response = await axios.put(
-        `${API_URL}companies/shared-holders`,
+        `${process.env.REACT_APP_API_URL}companies/shared-holders`,
         dadosAtualizados,
         {
           headers: {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -264,7 +265,7 @@ function DetalheColeta() {
   const handleAcaoBotao = (acao) => {
     // Simula a lógica do botão de ação
     enqueueSnackbar(
-      `Ação '${acao}' executada para a coleta ${coletaId} (simulação).`,
+      `Ação ${acao}' executada para a coleta ${coletaId} (simulação).`,
       {
         variant: "info",
       }

@@ -28,7 +28,7 @@ import ApexCharts from 'apexcharts';
 // 1. Importação do hook de token
 import { useToken } from "../../../api/TokenContext";
 
-const API_ENDPOINT = `${API_URL}processes/reports`;
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}processes/reports`;
 
 // 2. Hook interno para buscar dados (Reutilizado do padrão anterior)
 const useProcessReports = (url, token) => {

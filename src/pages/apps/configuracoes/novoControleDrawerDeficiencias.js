@@ -84,7 +84,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onControlCreated }) {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     window.scrollTo(0, 0);
@@ -139,7 +139,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onControlCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}controls`;
+      url = `${process.env.REACT_APP_API_URL}controls`;
       method = "POST";
       payload = {
         name: nomeControle,

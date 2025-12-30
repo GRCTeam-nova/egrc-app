@@ -78,7 +78,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onNormativeCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}normatives`;
+      url = `${process.env.REACT_APP_API_URL}normatives`;
       method = "POST";
       payload = {
         name: nome,

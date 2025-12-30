@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+import {API_URL} from "config";
 import React, { useState } from 'react';
 import {
   Button,
@@ -85,7 +87,7 @@ function TrocarSenha() {
       const token = localStorage.getItem('access_token');
 
       const response = await fetch(
-        '${API_URL}collaborators/change-password',
+          `${process.env.REACT_APP_API_URL}collaborators/change-password`,
         {
           method: 'PUT', 
           headers: {

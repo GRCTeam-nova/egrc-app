@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import {API_URL} from "config";
 import React, { useState } from "react";
 import {
   Button,
@@ -76,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onProcessCreated }) {
     }
 
     if (requisicao === 'Criar') {
-      url = '${API_URL}processes';
+      url = `${process.env.REACT_APP_API_URL}processes`;
       method = 'POST';
       payload = {
         name: nomeDepartamento,

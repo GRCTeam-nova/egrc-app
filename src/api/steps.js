@@ -23,7 +23,7 @@ export function useAvaliacoesMock(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
+          `${process.env.REACT_APP_API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

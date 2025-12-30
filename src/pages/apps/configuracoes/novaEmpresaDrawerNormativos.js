@@ -152,7 +152,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onCompanyCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}companies`;
+      url = `${process.env.REACT_APP_API_URL}companies`;
       method = "POST";
       payload = {
         name: nomeEmpresa,

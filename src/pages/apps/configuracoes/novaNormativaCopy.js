@@ -160,43 +160,43 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${API_URL}normatives/types`,
+      `${process.env.REACT_APP_API_URL}normatives/types`,
       setTipoNormas
     );
     fetchData(
-      `${API_URL}normatives/regulatories`,
+      `${process.env.REACT_APP_API_URL}normatives/regulatories`,
       setReguladores
     );
     fetchData(
-      `${API_URL}normatives`,
+      `${process.env.REACT_APP_API_URL}normatives`,
       setNormaOrigem
     );
     fetchData(
-      `${API_URL}normatives`,
+      `${process.env.REACT_APP_API_URL}normatives`,
       setNormaDestino
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmpresa
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}action-plans`,
+      `${process.env.REACT_APP_API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setAprovador
     );
     window.scrollTo(0, 0);
@@ -208,7 +208,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}normatives/${dadosApi.idNormative}`,
+            `${process.env.REACT_APP_API_URL}normatives/${dadosApi.idNormative}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -533,7 +533,7 @@ function ColumnsLayouts() {
     if (deletedFiles.length > 0) {
       const deletedFilesPayload = deletedFiles.map((file) => file.name);
 
-      await axios.delete(`${API_URL}files`, {
+      await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -563,7 +563,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        `${API_URL}files/uploads`,
+        `${process.env.REACT_APP_API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -587,14 +587,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}normatives`;
+      url = `${process.env.REACT_APP_API_URL}normatives`;
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}normatives`;
+      url = `${process.env.REACT_APP_API_URL}normatives`;
       method = "PUT";
       payload = {
         idNormative: normativaDados.idNormative,

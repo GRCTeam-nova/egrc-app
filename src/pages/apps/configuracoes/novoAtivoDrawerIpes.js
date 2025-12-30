@@ -100,7 +100,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onActiveCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = `${API_URL}actives`;
+      url = `${process.env.REACT_APP_API_URL}actives`;
       method = "POST";
       payload = {
         name: nomeAtivo,

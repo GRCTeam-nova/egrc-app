@@ -17,7 +17,7 @@ export function useGetColaboradores(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}collaborators`,
+          `${process.env.REACT_APP_API_URL}collaborators`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

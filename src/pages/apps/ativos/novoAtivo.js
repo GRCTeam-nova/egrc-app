@@ -71,7 +71,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}actives/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}actives/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -119,23 +119,23 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}departments`,
+      `${process.env.REACT_APP_API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${API_URL}actives/information-activities`,
+      `${process.env.REACT_APP_API_URL}actives/information-activities`,
       setAtividades
     );
     fetchData(
-      `${API_URL}actives/environments`,
+      `${process.env.REACT_APP_API_URL}actives/environments`,
       setAmbientes
     );
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${API_URL}actives/types`,
+      `${process.env.REACT_APP_API_URL}actives/types`,
       setTiposResponsabilidades
     );
     window.scrollTo(0, 0);
@@ -354,14 +354,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${API_URL}actives`;
+      url = `${process.env.REACT_APP_API_URL}actives`;
       method = "POST";
       payload = {
         name: nomeAtivo,
         code: codigo,
       };
     } else if (requisicao === "Editar") {
-      url = `${API_URL}actives`;
+      url = `${process.env.REACT_APP_API_URL}actives`;
       method = "PUT";
       payload = {
         idPlatform: ativoDados?.idPlatform,

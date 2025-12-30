@@ -15,7 +15,7 @@ import ApexCharts from 'apexcharts';
 import { useProcessControls } from './useProcessControls';
 
 // Mesmo endpoint de processos
-const API_ENDPOINT = `${API_URL}processes/reports/types`;
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}processes/reports/types`;
 
 const ProcessControlChart = () => {
   const chartRef = useRef(null);

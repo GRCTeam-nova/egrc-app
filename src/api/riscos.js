@@ -16,7 +16,7 @@ export function useGetRiscos(formData = {}) {
       return;
     }
 
-    let url = `${API_URL}risks/reports`;
+    let url = `${process.env.REACT_APP_API_URL}risks/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

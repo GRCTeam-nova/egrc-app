@@ -94,7 +94,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}companies/${dadosApi.idCompany}`,
+            `${process.env.REACT_APP_API_URL}companies/${dadosApi.idCompany}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -152,38 +152,38 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmprasasInferiores
     );
     fetchData(
-      `${API_URL}companies`,
+      `${process.env.REACT_APP_API_URL}companies`,
       setEmpresasSuperiores
     );
 
     fetchData(
-      `${API_URL}collaborators/responsibles`,
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
     
     // Buscar dados dos novos campos
     fetchData(
-      `${API_URL}companies/business-lines`,
+      `${process.env.REACT_APP_API_URL}companies/business-lines`,
       setLinhasNegocio
     );
     fetchData(
-      `${API_URL}companies/regulatories`,
+      `${process.env.REACT_APP_API_URL}companies/regulatories`,
       setOrgaosReguladores
     );
     fetchData(
-      `${API_URL}companies/classifications`,
+      `${process.env.REACT_APP_API_URL}companies/classifications`,
       setClassificacoes
     );
     fetchData(
-      `${API_URL}companies/legal-nature`,
+      `${process.env.REACT_APP_API_URL}companies/legal-nature`,
       setNaturezasJuridicas
     );
     fetchData(
-      `${API_URL}companies/tax-regime`,
+      `${process.env.REACT_APP_API_URL}companies/tax-regime`,
       setRegimesTributacao
     );
     
@@ -192,14 +192,14 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${API_URL}processes`,
+      `${process.env.REACT_APP_API_URL}processes`,
       setProcessos
     );
   }, [updateProcessos]);
 
   useEffect(() => {
     fetchData(
-      `${API_URL}ledger-accounts`,
+      `${process.env.REACT_APP_API_URL}ledger-accounts`,
       setContas
     );
   }, [updateContas]);
@@ -539,7 +539,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
+          `${process.env.REACT_APP_API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -564,7 +564,7 @@ function ColumnsLayouts() {
 
       // Configuração da URL, método e payload conforme a operação
       if (requisicao === "Criar") {
-        url = `${API_URL}companies`;
+        url = `${process.env.REACT_APP_API_URL}companies`;
         method = "POST";
         payload = {
           name: nomeEmpresa,
@@ -589,7 +589,7 @@ function ColumnsLayouts() {
           idTaxRegime: formData.regimeTributacao === "" ? null : formData.regimeTributacao,
         };
       } else if (requisicao === "Editar") {
-        url = `${API_URL}companies`;
+        url = `${process.env.REACT_APP_API_URL}companies`;
         method = "PUT";
         payload = {
           idCompany: empresaDados?.idCompany,

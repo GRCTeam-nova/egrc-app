@@ -25,7 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ApexCharts from 'apexcharts';
 import { useDepartmentRisks } from './useDepartmentRisks';
 
-const API_ENDPOINT = `${API_URL}departments/reports/risks`;
+const API_ENDPOINT = `${process.env.REACT_APP_API_URL}departments/reports/risks`;
 
 const DepartmentRiskChart = () => {
   const chartRef = useRef(null);

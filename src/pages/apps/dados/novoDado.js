@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import {API_URL} from "../../../config";
 import * as React from 'react';
 import {
   Button, Box, TextField, Autocomplete, Grid, Switch, Stack, Typography, Checkbox, InputLabel, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
@@ -57,7 +58,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `${API_URL}datas/${dadosApi.id}`,
+            `${process.env.REACT_APP_API_URL}datas/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -100,8 +101,8 @@ function ColumnsLayouts() {
 
 
   useEffect(() => {
-    fetchData(`${API_URL}processes`, setProcessos);
-    fetchData(`${API_URL}datas/evaluation-givens`, setTiposResponsabilidades);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
+    fetchData(`${process.env.REACT_APP_API_URL}datas/evaluation-givens`, setTiposResponsabilidades);
     window.scrollTo(0, 0);
   }, []);
 
@@ -217,14 +218,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = '${API_URL}datas';
+      url = `${process.env.REACT_APP_API_URL}datas`;
       method = 'POST';
       payload = {
         name: nomeDado,
         code: codigo
       };
     } else if (requisicao === 'Editar') {
-      url = `${API_URL}datas`;
+      url = `${process.env.REACT_APP_API_URL}datas`;
       method = 'PUT';
       payload = {
         idLgpd: empresaDados?.idLgpd,

@@ -17,7 +17,7 @@ export function useGetPlanos(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${API_URL}assessments`,
+          `${process.env.REACT_APP_API_URL}assessments`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

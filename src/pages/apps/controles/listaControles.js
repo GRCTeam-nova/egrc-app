@@ -1030,7 +1030,7 @@ function ActionCell({ row, refreshData }) {
     const newStatus = status === true ? "Inativo" : "Ativo";
     
     try {
-      const getResponse = await axios.get(`${API_URL}controls/${idControl}`, {
+      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}controls/${idControl}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1039,7 +1039,7 @@ function ActionCell({ row, refreshData }) {
       const dadosEndpoint = getResponse.data;
       const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
   
-      await axios.put(`${API_URL}controls`, dadosAtualizados, {
+      await axios.put(`${process.env.REACT_APP_API_URL}controls`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
