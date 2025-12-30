@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
+import { API_COMMAND, EGRC_COLLABORA_URL } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -283,7 +283,7 @@ function UploadModal({ open, onClose, onUploadSuccess }) {
       formData.append("Files", selectedFile);
 
       const response = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/files/integration",
+        `${API_URL}files/integration`,
         formData,
         {
           headers: {
@@ -588,7 +588,7 @@ function ActionCell({
     try {
       // Buscar os dados do departamento pelo ID
       const getResponse = await axios.get(
-        `https://api.egrc.homologacao.com.br/api/v1/normatives/${idProcess}`,
+        `${API_URL}normatives/${idProcess}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -606,7 +606,7 @@ function ActionCell({
 
       // Enviar os dados atualizados via PUT
       await axios.put(
-        "https://api.egrc.homologacao.com.br/api/v1/normatives",
+        `${API_URL}normatives`,
         dadosAtualizados,
         {
           headers: {
@@ -645,7 +645,7 @@ function ActionCell({
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `https://api.egrc.homologacao.com.br/api/v1/normatives/${row.original.idNormative}`,
+        `${API_URL}normatives/${row.original.idNormative}`,
         {
           method: "DELETE",
           headers: {
@@ -1820,10 +1820,10 @@ const LibreOfficeViewerFinal = () => {
     const pathParts = file.idFile.split("/");
     const fileName = pathParts.slice(-2).join("/");
 
-    const wopiSrc = `https://egrc-ext.homologacao.com.br/wopi/files/${fileName}?access_token=${token}`;
+    const wopiSrc = `${EGRC_COLLABORA_URL}/wopi/files/${fileName}?access_token=${token}`;
     const encodedWopiSrc = encodeURIComponent(wopiSrc);
 
-    return `https://egrc-collabora.homologacao.com.br/browser/5aa2ead294/cool.html?WOPISrc=${encodedWopiSrc}`;
+    return `${EGRC_COLLABORA_URL}/browser/5aa2ead294/cool.html?WOPISrc=${encodedWopiSrc}`;
   };
 
   // Função chamada quando um arquivo é selecionado

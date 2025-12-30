@@ -81,7 +81,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onObjetivoCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/objective";
+      url = `${API_URL}objective`;
       method = "POST";
       payload = {
         name: nome,

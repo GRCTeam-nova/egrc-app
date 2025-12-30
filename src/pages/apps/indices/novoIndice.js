@@ -65,7 +65,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/indexs/${dadosApi.idIndex}`,
+            `${API_URL}indexs/${dadosApi.idIndex}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -196,7 +196,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = 'https://api.egrc.homologacao.com.br/api/v1/indexs';
+      url = '${API_URL}indexs';
       method = 'POST';
       payload = {
         date: formData.dataIndice?.toISOString(),
@@ -204,7 +204,7 @@ function ColumnsLayouts() {
         name: nome
       };
     } else if (requisicao === 'Editar') {
-      url = `https://api.egrc.homologacao.com.br/api/v1/indexs`;
+      url = `${API_URL}indexs`;
       method = 'PUT';
       payload = {
         idIndex: IndiceDados?.idIndex,

@@ -223,53 +223,53 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/categories`,
+      `${API_URL}categories`,
       setCategorias
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/cycles`, setCiclo);
+    fetchData(`${API_URL}cycles`, setCiclo);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setRespondentes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsaveis
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsaveisAv
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/treatments`,
+      `${API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/causes`,
+      `${API_URL}risks/causes`,
       setCausa
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/impacts`,
+      `${API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/kris`, setKris);
+    fetchData(`${API_URL}risks/kris`, setKris);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${API_URL}controls`,
       setControle
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/strategic-guidelines`,
+      `${API_URL}risks/strategic-guidelines`,
       setDiretriz
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/incidents`,
+      `${API_URL}incidents`,
       setIncidente
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks?onlyWithAnalisysProfile=true`,
+      `${API_URL}risks?onlyWithAnalisysProfile=true`,
       setRiscos
     );
     window.scrollTo(0, 0);
@@ -281,7 +281,7 @@ function ColumnsLayouts() {
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/assessments/${dadosApi.idAssessment}`,
+            `${API_URL}assessments/${dadosApi.idAssessment}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -295,7 +295,7 @@ function ColumnsLayouts() {
 
           const [resUsers] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+              `${API_URL}collaborators/responsibles`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -305,7 +305,7 @@ function ColumnsLayouts() {
 
           const [resRisco] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/risks/${data.idRisk}`,
+              `${API_URL}risks/${data.idRisk}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -314,7 +314,7 @@ function ColumnsLayouts() {
 
           const [resCategoria] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/categories/${dataRisk.idCategory}`,
+              `${API_URL}categories/${dataRisk.idCategory}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -323,7 +323,7 @@ function ColumnsLayouts() {
 
           const [resPerfil] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/analisys-profile/${dataCategory.idAnalysisProfile}`,
+              `${API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -332,7 +332,7 @@ function ColumnsLayouts() {
 
           const [resQuiz] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/quiz/assessments/${dadosApi.idAssessment}`,
+              `${API_URL}quiz/assessments/${dadosApi.idAssessment}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -341,7 +341,7 @@ function ColumnsLayouts() {
 
           const [resCycle] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/cycles/${data.idCycle}`,
+              `${API_URL}cycles/${data.idCycle}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -554,7 +554,7 @@ function ColumnsLayouts() {
     if (normativaDados?.idAssessment) {
       axios
         .get(
-          `https://api.egrc.homologacao.com.br/api/v1/quiz/assessments/${normativaDados.idAssessment}`,
+          `${API_URL}quiz/assessments/${normativaDados.idAssessment}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
         .then((res) => setFilledQuestionarios(res.data))
@@ -889,7 +889,7 @@ const handleStart = async () => {
       setLoading(true);
 
       if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/assessments`;
+        url = `${API_URL}assessments`;
         method = "PUT";
 
         // Lógica de mapeamento igual ao tratarSubmit
@@ -984,7 +984,7 @@ const handleStart = async () => {
       setLoading(true);
 
       if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/assessments`;
+        url = `${API_URL}assessments`;
         method = "PUT";
 
         // Lógica de mapeamento
@@ -1104,7 +1104,7 @@ const handleStart = async () => {
       setLoading(true);
 
       if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/assessments`;
+        url = `${API_URL}assessments`;
         method = "PUT";
 
         // Lógica de mapeamento
@@ -1196,7 +1196,7 @@ const handleStart = async () => {
   const handleRetornar = async () => {
     try {
       setLoading(true);
-      const url = `https://api.egrc.homologacao.com.br/api/v1/assessments`;
+      const url = `${API_URL}assessments`;
       
       // Lógica de mapeamento
       const findProb = (name) =>
@@ -1310,7 +1310,7 @@ const handleStart = async () => {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/assessments";
+      url = `${API_URL}assessments`;
       method = "POST";
       payload = {
         idRisk: formData.risco,
@@ -1319,7 +1319,7 @@ const handleStart = async () => {
         idResponsible: formData.responsavelAv,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/assessments`;
+      url = `${API_URL}assessments`;
       method = "PUT";
       // mapeia nome → objeto dentro do heatmapDataAv
       const findProb = (name) =>

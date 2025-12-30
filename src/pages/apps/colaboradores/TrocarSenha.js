@@ -85,7 +85,7 @@ function TrocarSenha() {
       const token = localStorage.getItem('access_token');
 
       const response = await fetch(
-        'https://api.egrc.homologacao.com.br/api/v1/collaborators/change-password',
+        '${API_URL}collaborators/change-password',
         {
           method: 'PUT', 
           headers: {

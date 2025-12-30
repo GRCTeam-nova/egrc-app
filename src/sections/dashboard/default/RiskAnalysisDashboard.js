@@ -14,7 +14,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ApexCharts from 'apexcharts';
 
 // --- CONFIGURAÇÕES ---
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/risks/reports/all"; // Endpoint Sugerido
+const API_ENDPOINT = `${API_URL}risks/reports/all`; // Endpoint Sugerido
 
 // Função auxiliar de status
 const getStatusConfig = (active) => {

@@ -58,11 +58,11 @@ function ColumnsLayoutsDrawer({ buttonSx, onProcessCreated }) {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/companies`,
+      `${API_URL}companies`,
       setDepartamentosLaterais
     );
     window.scrollTo(0, 0);
@@ -181,7 +181,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onProcessCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/processes";
+      url = `${API_URL}processes`;
       method = "POST";
       payload = {
         name: nomeDepartamento,

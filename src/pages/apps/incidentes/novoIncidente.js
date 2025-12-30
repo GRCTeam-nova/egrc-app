@@ -124,19 +124,19 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/incidents/types`,
+      `${API_URL}incidents/types`,
       setTipoIncidentes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks`,
+      `${API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     window.scrollTo(0, 0);
@@ -148,7 +148,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/incidents/${dadosApi.idIncident}`,
+            `${API_URL}incidents/${dadosApi.idIncident}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -390,7 +390,7 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/incidents";
+      url = `${API_URL}incidents`;
       method = "POST";
       payload = {
         code: codigo,
@@ -402,7 +402,7 @@ function ColumnsLayouts() {
             : null,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/incidents`;
+      url = `${API_URL}incidents`;
       method = "PUT";
       payload = {
         idIncident: incidenteDados?.idIncident,

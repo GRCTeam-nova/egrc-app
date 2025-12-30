@@ -144,7 +144,7 @@ const AuthSetPassword = () => {
                     // Chamada ao endpoint que o backend mencionou no áudio
                     // O endpoint final exato deve ser confirmado com ele, mas a estrutura é essa:
                     await axios.post(
-                      'https://api.egrc.homologacao.com.br/api/v1/accounts/reset-password',
+                      '${API_URL}accounts/reset-password',
                       {
                         token: urlParams.token,
                         email: urlParams.email, // ou idUser dependendo do backend

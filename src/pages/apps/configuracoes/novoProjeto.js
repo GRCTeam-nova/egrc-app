@@ -78,7 +78,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/projects/${dadosApi.idProject}`,
+            `${API_URL}projects/${dadosApi.idProject}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -133,19 +133,19 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/projects/types`,
+      `${API_URL}projects/types`,
       setTiposProjetos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/projects`,
+      `${API_URL}projects`,
       setProjetosAnteriores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/projects`,
+      `${API_URL}projects`,
       setProjetosPosteriores
     );
     window.scrollTo(0, 0);
@@ -260,7 +260,7 @@ function ColumnsLayouts() {
       // Supondo que deletedFilesPayload deva conter dados relevantes e não apenas o resultado de file instanceof File
       const deletedFilesPayload = deletedFiles.map((file) => file.name); // ajuste conforme a necessidade
 
-      await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
+      await axios.delete(`${API_URL}files`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -290,7 +290,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+        `${API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -313,14 +313,14 @@ function ColumnsLayouts() {
     });
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/projects";
+      url = `${API_URL}projects`;
       method = "POST";
       payload = {
         name: nomeProjeto,
         idProjectType: formData.tipoProjeto,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/projects`;
+      url = `${API_URL}projects`;
       method = "PUT";
       payload = {
         idProject: projetoDados?.idProject,

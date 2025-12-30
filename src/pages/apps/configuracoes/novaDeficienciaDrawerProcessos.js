@@ -77,7 +77,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onDeficienciaCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/deficiencies";
+      url = `${API_URL}deficiencies`;
       method = "POST";
       payload = {
         name: nomeDeficiencia,

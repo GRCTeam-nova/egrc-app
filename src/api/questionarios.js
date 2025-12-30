@@ -19,7 +19,7 @@ export function useGetEmpresa(formData, normativaDados) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `https://api.egrc.homologacao.com.br/api/v1/quiz/assessments/${normativaDados.idAssessment}`,
+          `${API_URL}quiz/assessments/${normativaDados.idAssessment}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

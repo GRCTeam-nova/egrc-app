@@ -25,7 +25,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 // 1. Importação do hook de token
 import { useToken } from "../../../api/TokenContext";
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/controls/reports";
+const API_ENDPOINT = `${API_URL}controls/reports`;
 
 // 2. Hook de Dados
 const useControlReports = (url, token) => {

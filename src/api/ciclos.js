@@ -16,7 +16,7 @@ export function useGetCiclos(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          "https://api.egrc.homologacao.com.br/api/v1/cycles",
+          `${API_URL}cycles`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

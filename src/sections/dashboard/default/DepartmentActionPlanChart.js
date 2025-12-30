@@ -25,7 +25,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import ApexCharts from 'apexcharts';
 import { useDepartmentActionPlans } from './useDepartmentActionPlans';
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/departments/reports/action-plans";
+const API_ENDPOINT = `${API_URL}departments/reports/action-plans`;
 
 const getStatusConfig = (status) => {
   switch (status) {

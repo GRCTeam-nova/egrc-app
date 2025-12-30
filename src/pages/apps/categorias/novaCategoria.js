@@ -87,7 +87,7 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/analisys-profile`, setPerfil);
+    fetchData(`${API_URL}analisys-profile`, setPerfil);
     window.scrollTo(0, 0);
   }, []);
 
@@ -97,7 +97,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/categories/${dadosApi.idCategory}`,
+            `${API_URL}categories/${dadosApi.idCategory}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -179,14 +179,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = 'https://api.egrc.homologacao.com.br/api/v1/categories';
+      url = '${API_URL}categories';
       method = 'POST';
       payload = {
         name: nome,
         description: descricao,
       };
     } else if (requisicao === 'Editar') {
-      url = `https://api.egrc.homologacao.com.br/api/v1/categories`;
+      url = `${API_URL}categories`;
       method = 'PUT';
       payload = {
         idCategory: categoriaDados?.idCategory,

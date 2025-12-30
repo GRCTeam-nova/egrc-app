@@ -15,7 +15,7 @@ export function useGetAtivos(formData = {}) {
       return;
     }
 
-    let url = "https://api.egrc.homologacao.com.br/api/v1/actives/reports";
+    let url = `${API_URL}actives/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

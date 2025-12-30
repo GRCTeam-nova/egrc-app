@@ -160,43 +160,43 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives/types`,
+      `${API_URL}normatives/types`,
       setTipoNormas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives/regulatories`,
+      `${API_URL}normatives/regulatories`,
       setReguladores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
+      `${API_URL}normatives`,
       setNormaOrigem
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
+      `${API_URL}normatives`,
       setNormaDestino
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/companies`,
+      `${API_URL}companies`,
       setEmpresa
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
+      `${API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setAprovador
     );
     window.scrollTo(0, 0);
@@ -208,7 +208,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/normatives/${dadosApi.idNormative}`,
+            `${API_URL}normatives/${dadosApi.idNormative}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -533,7 +533,7 @@ function ColumnsLayouts() {
     if (deletedFiles.length > 0) {
       const deletedFilesPayload = deletedFiles.map((file) => file.name);
 
-      await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
+      await axios.delete(`${API_URL}files`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -563,7 +563,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+        `${API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -587,14 +587,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/normatives";
+      url = `${API_URL}normatives`;
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
+      url = `${API_URL}normatives`;
       method = "PUT";
       payload = {
         idNormative: normativaDados.idNormative,

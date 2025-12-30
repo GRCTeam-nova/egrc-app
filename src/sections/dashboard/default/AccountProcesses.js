@@ -29,7 +29,7 @@ import ApexCharts from 'apexcharts';
 // 1. Importação do hook de token
 import { useToken } from "../../../api/TokenContext";
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/reports";
+const API_ENDPOINT = `${API_URL}ledger-accounts/reports`;
 
 // 2. Hook para buscar dados de Contas
 const useLedgerReports = (url, token) => {

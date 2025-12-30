@@ -15,7 +15,7 @@ export function useGetDados(formData = {}) {
       return;
     }
 
-    let url = "https://api.egrc.homologacao.com.br/api/v1/datas/reports";
+    let url = `${API_URL}datas/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

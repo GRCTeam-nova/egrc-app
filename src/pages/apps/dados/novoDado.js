@@ -57,7 +57,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/datas/${dadosApi.id}`,
+            `${API_URL}datas/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -100,8 +100,8 @@ function ColumnsLayouts() {
 
 
   useEffect(() => {
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/processes`, setProcessos);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/datas/evaluation-givens`, setTiposResponsabilidades);
+    fetchData(`${API_URL}processes`, setProcessos);
+    fetchData(`${API_URL}datas/evaluation-givens`, setTiposResponsabilidades);
     window.scrollTo(0, 0);
   }, []);
 
@@ -217,14 +217,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = 'https://api.egrc.homologacao.com.br/api/v1/datas';
+      url = '${API_URL}datas';
       method = 'POST';
       payload = {
         name: nomeDado,
         code: codigo
       };
     } else if (requisicao === 'Editar') {
-      url = `https://api.egrc.homologacao.com.br/api/v1/datas`;
+      url = `${API_URL}datas`;
       method = 'PUT';
       payload = {
         idLgpd: empresaDados?.idLgpd,

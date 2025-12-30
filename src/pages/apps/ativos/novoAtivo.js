@@ -70,7 +70,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/actives/${dadosApi.id}`,
+            `${API_URL}actives/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -118,23 +118,23 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/actives/information-activities`,
+      `${API_URL}actives/information-activities`,
       setAtividades
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/actives/environments`,
+      `${API_URL}actives/environments`,
       setAmbientes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/actives/types`,
+      `${API_URL}actives/types`,
       setTiposResponsabilidades
     );
     window.scrollTo(0, 0);
@@ -353,14 +353,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/actives";
+      url = `${API_URL}actives`;
       method = "POST";
       payload = {
         name: nomeAtivo,
         code: codigo,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/actives`;
+      url = `${API_URL}actives`;
       method = "PUT";
       payload = {
         idPlatform: ativoDados?.idPlatform,

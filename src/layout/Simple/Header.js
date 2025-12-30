@@ -58,6 +58,8 @@ const Header = () => {
   const theme = useTheme();
   const matchDownMd = useMediaQuery(theme.breakpoints.down('md'));
 
+  const appVersion = document.querySelector('meta[name="app-version"]')?.getAttribute('content') || '';
+
   const [drawerToggle, setDrawerToggle] = useState(false);
 
   /** Method called on multiple components with different event types */
@@ -78,7 +80,7 @@ const Header = () => {
                 <Logo reverse to="/" />
               </Typography>
               <Chip
-                label={process.env.REACT_APP_VERSION}
+                label={appVersion}
                 variant="outlined"
                 size="small"
                 color="secondary"

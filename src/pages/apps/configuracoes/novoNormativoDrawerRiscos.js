@@ -78,7 +78,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onNormativeCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/normatives";
+      url = `${API_URL}normatives`;
       method = "POST";
       payload = {
         name: nome,

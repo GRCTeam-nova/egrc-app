@@ -14,7 +14,7 @@ import ApexCharts from 'apexcharts';
 import { useProcessControls } from './useProcessControls';
 
 // Mesmo endpoint de processos
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/processes/reports/types";
+const API_ENDPOINT = `${API_URL}processes/reports/types`;
 
 const ProcessControlChart = () => {
   const chartRef = useRef(null);

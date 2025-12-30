@@ -171,53 +171,53 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/categories`,
+      `${API_URL}categories`,
       setCategorias
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/cycles`, setCiclo);
+    fetchData(`${API_URL}cycles`, setCiclo);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setRespondentes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsaveis
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsaveisAv
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/treatments`,
+      `${API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/causes`,
+      `${API_URL}risks/causes`,
       setCausa
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/impacts`,
+      `${API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks/kris`, setKris);
+    fetchData(`${API_URL}risks/kris`, setKris);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${API_URL}controls`,
       setControle
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks/strategic-guidelines`,
+      `${API_URL}risks/strategic-guidelines`,
       setDiretriz
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/incidents`,
+      `${API_URL}incidents`,
       setIncidente
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/risks?onlyWithAnalisysProfile=true`,
+      `${API_URL}risks?onlyWithAnalisysProfile=true`,
       setRiscos
     );
     window.scrollTo(0, 0);
@@ -229,7 +229,7 @@ function ColumnsLayouts() {
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/assessments/${dadosApi.idAssessment}`,
+            `${API_URL}assessments/${dadosApi.idAssessment}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -243,7 +243,7 @@ function ColumnsLayouts() {
 
           const [resUsers] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+              `${API_URL}collaborators/responsibles`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -253,7 +253,7 @@ function ColumnsLayouts() {
 
           const [resRisco] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/risks/${data.idRisk}`,
+              `${API_URL}risks/${data.idRisk}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -262,7 +262,7 @@ function ColumnsLayouts() {
 
           const [resCategoria] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/categories/${dataRisk.idCategory}`,
+              `${API_URL}categories/${dataRisk.idCategory}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -271,7 +271,7 @@ function ColumnsLayouts() {
 
           const [resPerfil] = await Promise.all([
             fetch(
-              `https://api.egrc.homologacao.com.br/api/v1/analisys-profile/${dataCategory.idAnalysisProfile}`,
+              `${API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -280,7 +280,7 @@ function ColumnsLayouts() {
 
           const [resQuestionario] = await Promise.all([
             fetch(
-              ` https://api.egrc.homologacao.com.br/api/v1/quiz/${dadosApi.idQuiz}`,
+              ` ${API_URL}quiz/${dadosApi.idQuiz}`,
               { headers: { Authorization: `Bearer ${token}` } }
             ),
           ]);
@@ -723,7 +723,7 @@ function ColumnsLayouts() {
 
       // 1) Responde ao quiz
       await axios.put(
-        "https://api.egrc.homologacao.com.br/api/v1/quiz/answer",
+        `${API_URL}quiz/answer`,
         payloadAnswer,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -733,7 +733,7 @@ function ColumnsLayouts() {
 
       // 2) Atualiza o quiz (ativa + mantém todas as outras infos)
       await axios.put(
-        "https://api.egrc.homologacao.com.br/api/v1/quiz",
+        `${API_URL}quiz`,
         payloadUpdate,
         { headers: { Authorization: `Bearer ${token}` } }
       );

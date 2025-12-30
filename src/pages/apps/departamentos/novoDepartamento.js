@@ -88,7 +88,7 @@ function ColumnsLayouts() {
       const fetchDepartamentosDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/departments/${dadosApi.idDepartment}`,
+            `${API_URL}departments/${dadosApi.idDepartment}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -145,48 +145,48 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentosInferiores
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentosLaterais
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
+      `${API_URL}departments`,
       setDepartamentosSuperiores
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/risks`, setRiscos);
+    fetchData(`${API_URL}risks`, setRiscos);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments/responsability-types`,
+      `${API_URL}departments/responsability-types`,
       setTiposResponsabilidades
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments/unit-formats`,
+      `${API_URL}departments/unit-formats`,
       setFormatoUnidades
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/incidents`,
+      `${API_URL}incidents`,
       setIncidentes
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/datas`,
+      `${API_URL}datas`,
       setDados
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
+      `${API_URL}normatives`,
       setNormativas
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
+      `${API_URL}action-plans`,
       setPlanosAcao
     );
     window.scrollTo(0, 0);
@@ -596,7 +596,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+        `${API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -621,14 +621,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/departments";
+      url = `${API_URL}departments`;
       method = "POST";
       payload = {
         name: nomeDepartamento,
         code: codigo,
       };
     } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/departments`;
+      url = `${API_URL}departments`;
       method = "PUT";
       payload = {
         idDepartment: departamentoDados?.idDepartment,

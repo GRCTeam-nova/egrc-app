@@ -60,7 +60,7 @@ function ColumnsLayoutsModal({ buttonSx }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/companies";
+      url = `${API_URL}companies`;
       method = "POST";
       payload = {
         name: nomeEmpresa,

@@ -91,7 +91,7 @@ function ColumnsLayouts() {
       { id: 1, nome: "Media" },
       { id: 2, nome: "Pior avaliação" },
     ]);
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/cycles`, setCiclosAnteiores);
+    fetchData(`${API_URL}cycles`, setCiclosAnteiores);
     window.scrollTo(0, 0);
   }, []);
 
@@ -101,7 +101,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/cycles/${dadosApi.idCycle}`,
+            `${API_URL}cycles/${dadosApi.idCycle}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -258,7 +258,7 @@ function ColumnsLayouts() {
   
     // Verifica se é para criar ou atualizar
     if (requisicao === 'Criar') {
-      url = 'https://api.egrc.homologacao.com.br/api/v1/cycles';
+      url = '${API_URL}cycles';
       method = 'POST';
       payload = {
         code: codigo,
@@ -267,7 +267,7 @@ function ColumnsLayouts() {
         typeConsolidation: formData.tipoConsolidacao
       };
     } else if (requisicao === 'Editar') {
-      url = `https://api.egrc.homologacao.com.br/api/v1/cycles`;
+      url = `${API_URL}cycles`;
       method = 'PUT';
       payload = {
         idCycle: cicloDados?.idCycle,

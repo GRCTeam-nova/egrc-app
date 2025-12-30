@@ -12,7 +12,7 @@ import DepartmentActionPlanChart from './DepartmentActionPlanChart';
 import DepartmentRiskChart from './DepartmentRiskChart';
 import DepartmentNormativeChart from './DepartmentNormativeChart';
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/departments/reports/types";
+const API_ENDPOINT = `${API_URL}departments/reports/types`;
 
 const DepartmentOrgChartAdvanced = () => {
   const containerRef = useRef(null);

@@ -29,7 +29,7 @@ import ApexCharts from 'apexcharts';
 import { useToken } from "../../../api/TokenContext";
 
 // Endpoint de Dados (O mesmo do cenário anterior, pois estamos analisando a lista de dados)
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/datas/reports";
+const API_ENDPOINT = `${API_URL}datas/reports`;
 
 const useDataReports = (url, token) => {
   const [data, setData] = useState(null);

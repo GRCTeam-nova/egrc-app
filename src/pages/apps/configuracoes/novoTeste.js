@@ -180,20 +180,20 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/projects`,
+      `${API_URL}projects`,
       setProjetos
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/projects/types`,
+      `${API_URL}projects/types`,
       setTipoProjetos
     );
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/ipe`, setIpes);
+    fetchData(`${API_URL}ipe`, setIpes);
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/controls`,
+      `${API_URL}controls`,
       setControles
     );
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsavelTeste
     );
     const frequencias = [
@@ -221,7 +221,7 @@ function ColumnsLayouts() {
       try {
         // 1) Busca dados do teste existente
         const resTest = await axios.get(
-          `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}`,
+          `${API_URL}projects/tests/${dadosApi.idTest}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = resTest.data;
@@ -259,7 +259,7 @@ function ColumnsLayouts() {
 
         // 2) Busca fases do teste e calcula status principal
         const resPhases = await axios.get(
-          `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}/phases`,
+          `${API_URL}projects/tests/${dadosApi.idTest}/phases`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const mainStatus = computeMainStatus(resPhases.data);
@@ -458,7 +458,7 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
       if (requisicao === "Criar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
+        url = `${API_URL}projects/tests`;
         method = "POST";
         payload = {
           description: descricaoTeste,
@@ -467,7 +467,7 @@ function ColumnsLayouts() {
           idControl: formData.controle,
         };
       } else if (requisicao === "Editar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
+        url = `${API_URL}projects/tests`;
         method = "PUT";
         payload = {
           idTest: controleDados?.idTest,

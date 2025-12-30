@@ -13,7 +13,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'; // Ícone para o Ac
 import ApexCharts from 'apexcharts';
 import { useProcessRisks } from './useProcessRisks';
 
-const API_ENDPOINT = "https://api.egrc.homologacao.com.br/api/v1/processes/reports/types";
+const API_ENDPOINT = `${API_URL}processes/reports/types`;
 
 const ProcessRiskChart = () => {
   const chartRef = useRef(null);

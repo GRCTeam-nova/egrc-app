@@ -10,6 +10,10 @@ if (ambiente === 'dev') {
   API_COMMAND = 'http://10.0.72.13:5030';
   API_QUERY = 'http://10.0.72.13:5020';
 }
+export const API_URL =
+  process.env.REACT_APP_API_URL || process.env.EGRC_API_URL_URL || 'https://api.egrc.homologacao.com.br/api/v1/';
+export const EGRC_COLLABORA_URL =
+  process.env.REACT_APP_EGRC_COLLABORA_URL || process.env.EGRC_COLLABORA_URL || 'https://clbr.egrc.homologacao.com.br';
 export { API_COMMAND, API_QUERY };
 
 // ==============================|| CONFIGURAÇÕES DO MANTIS (TEMPLATE) ||============================== //

@@ -15,7 +15,7 @@ export function useGetContas(formData = {}) {
       return;
     }
 
-    let url = "https://api.egrc.homologacao.com.br/api/v1/ledger-accounts/reports";
+    let url = `${API_URL}ledger-accounts/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

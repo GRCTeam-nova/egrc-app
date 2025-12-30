@@ -756,7 +756,7 @@ const ListagemResultado = ({ amostras, canEdit, novoOrgao }) => {
 
       const token = localStorage.getItem("access_token");
       const url =
-        "https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/attributes/result";
+        `${API_URL}projects/tests/phases/attributes/result`;
 
       const headers = {
         Authorization: `Bearer ${token}`,

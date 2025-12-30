@@ -66,7 +66,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onIncidentCreated }) {
       });
       setHasChanges(false);
       fetchData(
-        `https://api.egrc.homologacao.com.br/api/v1/incidents/types`,
+        `${API_URL}incidents/types`,
         setTipoIncidentes
       );
     }
@@ -130,7 +130,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onIncidentCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/incidents";
+      url = `${API_URL}incidents`;
       method = "POST";
       payload = {
         name: nome,

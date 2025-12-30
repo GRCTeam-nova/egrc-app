@@ -161,7 +161,7 @@ function ReactTable({
 
   useEffect(() => {
     fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/projects`,
+      `${API_URL}projects`,
       setProjectOptions
     );
     window.scrollTo(0, 0);
@@ -635,7 +635,7 @@ function ActionCell({ row, refreshData }) {
     try {
       // Buscar os dados do departamento pelo ID
       const getResponse = await axios.get(
-        `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${idTest}`,
+        `${API_URL}projects/tests/${idTest}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -653,7 +653,7 @@ function ActionCell({ row, refreshData }) {
 
       // Enviar os dados atualizados via PUT
       await axios.put(
-        "https://api.egrc.homologacao.com.br/api/v1/projects/tests",
+        `${API_URL}projects/tests`,
         dadosAtualizados,
         {
           headers: {

@@ -17,7 +17,7 @@ export function useGetEmpresa(formData, atributo) {
         const token = localStorage.getItem('access_token');
 
         // Define o endpoint de acordo com a existência de projectId
-        const url = `https://api.egrc.homologacao.com.br/api/v1/normatives/${atributo}/parts`
+        const url = `${API_URL}normatives/${atributo}/parts`
          
         const response = await fetch(url, {
           headers: {

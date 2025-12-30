@@ -62,7 +62,7 @@ const UserDetails = ({ onClose }) => {
           return;
         }
 
-        const response = await fetch(`https://api.egrc.homologacao.com.br/api/v1/collaborators/${userId}`, {
+        const response = await fetch(`${API_URL}collaborators/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

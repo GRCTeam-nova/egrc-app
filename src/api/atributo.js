@@ -17,7 +17,7 @@ export function useGetTeste(formData, atributo) {
         const token = localStorage.getItem('access_token');
 
         // Define o endpoint de acordo com a existência de projectId
-        const url = `https://api.egrc.homologacao.com.br/api/v1/projects/tests/phases/${atributo}/attributes`
+        const url = `${API_URL}projects/tests/phases/${atributo}/attributes`
          
         const response = await fetch(url, {
           headers: {

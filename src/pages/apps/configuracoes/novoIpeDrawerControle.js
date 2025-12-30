@@ -79,7 +79,7 @@ function ColumnsLayoutsDrawer({ buttonSx, onIpeCreated }) {
     }
 
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/ipe";
+      url = `${API_URL}ipe`;
       method = "POST";
       payload = {
         name: nomeIpe,

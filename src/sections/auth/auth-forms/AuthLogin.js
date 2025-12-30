@@ -102,7 +102,7 @@ const AuthLogin = ({ isDemo = false }) => {
   
       // 2) Solicitar token do tenant selecionado
       const tokenResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/accounts/token",
+        `${API_URL}accounts/token`,
         { id_tenant: idTenant },
         {
           headers: {
@@ -117,7 +117,7 @@ const AuthLogin = ({ isDemo = false }) => {
   
       // 3) Login com o novo token
       const loginResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/accounts/login",
+        `${API_URL}accounts/login`,
         {},
         {
           headers: {
@@ -136,7 +136,7 @@ const AuthLogin = ({ isDemo = false }) => {
 
       // 4) Buscar dados do colaborador e salvar nome no localStorage
       const collaboratorResponse = await axios.get(
-        `https://api.egrc.homologacao.com.br/api/v1/collaborators/${idUser}`,
+        `${API_URL}collaborators/${idUser}`,
         {
           headers: {
             Authorization: `Bearer ${finalToken}`,
@@ -243,7 +243,7 @@ const AuthLogin = ({ isDemo = false }) => {
                 onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
                   try {
                     const { data } = await axios.post(
-                      'https://api.egrc.homologacao.com.br/api/v1/accounts/tenants',
+                      '${API_URL}accounts/tenants',
                       values
                     );
                     localStorage.setItem('access_token', data.access_token);

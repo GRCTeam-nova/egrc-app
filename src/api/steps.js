@@ -22,7 +22,7 @@ export function useAvaliacoesMock(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `https://api.egrc.homologacao.com.br/api/v1/action-plans/${dadosApi.idActionPlan}/steps`,
+          `${API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

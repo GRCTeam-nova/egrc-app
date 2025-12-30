@@ -17,7 +17,7 @@ export function useGetProjetos(formData) {
         const token = localStorage.getItem('access_token');
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          "https://api.egrc.homologacao.com.br/api/v1/projects",
+          `${API_URL}projects`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

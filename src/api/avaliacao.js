@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const authenticateAndGetToken = async () => {
   try {
     const tenantResponse = await fetch(
-      "https://api.egrc.homologacao.com.br/api/v1/accounts/tenants",
+      `${API_URL}accounts/tenants`,
       {
         method: "POST",
         headers: {
@@ -27,7 +27,7 @@ const authenticateAndGetToken = async () => {
     const tenantId = tenantData.tenants[0]?.idTenant;
 
     const tokenResponse = await fetch(
-      "https://api.egrc.homologacao.com.br/api/v1/accounts/token",
+      `${API_URL}accounts/token`,
       {
         method: "POST",
         headers: {
@@ -67,7 +67,7 @@ export function useGetAvaliacao(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          "https://api.egrc.homologacao.com.br/api/v1/cycles",
+          `${API_URL}cycles`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

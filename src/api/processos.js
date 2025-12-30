@@ -15,7 +15,7 @@ export function useGetProcessos(formData = {}) {
       return;
     }
 
-    let url = "https://api.egrc.homologacao.com.br/api/v1/processes/reports";
+    let url = `${API_URL}processes/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)

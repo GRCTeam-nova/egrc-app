@@ -146,7 +146,7 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`https://api.egrc.homologacao.com.br/api/v1/indexs`, setIndices);
+    fetchData(`${API_URL}indexs`, setIndices);
 
     const niveisAvaliacaoLocal = [
       { id: 1, nome: "Inerente" },
@@ -168,7 +168,7 @@ function ColumnsLayouts() {
       const fetchPerfilDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/analisys-profile/${dadosApi.idAnalysisProfile}`,
+            `${API_URL}analisys-profile/${dadosApi.idAnalysisProfile}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -413,11 +413,11 @@ function ColumnsLayouts() {
     let url = "";
     let method = "";
     if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/analisys-profile";
+      url = `${API_URL}analisys-profile`;
       method = "POST";
     } else if (requisicao === "Editar") {
       // Caso seja edição, ajuste a URL e método conforme necessário (exemplo com PUT)
-      url = `https://api.egrc.homologacao.com.br/api/v1/analisys-profile/${dadosApi.idAnalysisProfile}`;
+      url = `${API_URL}analisys-profile/${dadosApi.idAnalysisProfile}`;
       method = "PUT";
     }
 
