@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";

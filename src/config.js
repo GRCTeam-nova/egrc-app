@@ -1,6 +1,5 @@
 // Defina manualmente a variável para alternar entre os ambientes, sendo eles 'dev' ou 'hom'
 const ambiente = 'hom';
-
 let API_COMMAND, API_QUERY;
 
 if (ambiente === 'dev') {

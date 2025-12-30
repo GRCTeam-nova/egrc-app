@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import PropTypes from "prop-types";
 import React from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";

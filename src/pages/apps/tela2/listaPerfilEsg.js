@@ -1,6 +1,6 @@
+import { API_URL, API_COMMAND} from 'config';
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";

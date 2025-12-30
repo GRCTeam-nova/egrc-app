@@ -1,3 +1,4 @@
+import { API_URL} from 'config';
 import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Box, 
