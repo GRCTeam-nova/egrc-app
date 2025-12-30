@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from 'config';
 import { useToken } from "./TokenContext";
 
 // Hook para buscar os dados de empresas

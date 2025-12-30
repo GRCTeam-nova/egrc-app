@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_URL } from 'config';
 
-const axiosServices = axios.create({ baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8010/' });
+const axiosServices = axios.create({ baseURL: API_URL || 'http://localhost:8010/' });
 
 // ==============================|| AXIOS - FOR MOCK SERVICES ||============================== //
 

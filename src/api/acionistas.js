@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useToken } from "./TokenContext";
 import { useLocation } from "react-router-dom";
+import { API_URL } from 'config';
 
 // Hook para buscar os dados de empresas
 export function useGetEmpresa(formData) {

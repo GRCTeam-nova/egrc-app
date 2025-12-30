@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useToken } from "./TokenContext";
+import { API_URL } from 'config';
 
 // Hook para buscar os dados de empresas
 export function useGetTeste(formData, atributo) {
