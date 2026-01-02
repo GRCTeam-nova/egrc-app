@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import { API_URL } from 'config';
 
 // Função para realizar o fluxo de autenticação e obter o token final
 const authenticateAndGetToken = async () => {
   try {
     const tenantResponse = await fetch(
-      `${process.env.REACT_APP_API_URL}accounts/tenants`,
+      `${API_URL}accounts/tenants`,
       {
         method: "POST",
         headers: {
@@ -27,7 +28,7 @@ const authenticateAndGetToken = async () => {
     const tenantId = tenantData.tenants[0]?.idTenant;
 
     const tokenResponse = await fetch(
-      `${process.env.REACT_APP_API_URL}accounts/token`,
+      `${API_URL}accounts/token`,
       {
         method: "POST",
         headers: {
@@ -67,7 +68,7 @@ export function useGetAvaliacao(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}cycles`,
+          `${API_URL}cycles`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

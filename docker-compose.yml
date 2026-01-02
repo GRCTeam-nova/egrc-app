@@ -1,0 +1,11 @@
+services:
+  egrc-app:
+    build: .
+    image: egrc-app:latest
+    container_name: egrc-app
+    ports:
+      - "8080:80"
+    environment:
+      - EGRC_API_URL_URL=https://api.egrc.homologacao.com.br/api/v1/
+      - EGRC_COLLABORA_URL=https://clbr.egrc.homologacao.com.br
+    restart: unless-stopped

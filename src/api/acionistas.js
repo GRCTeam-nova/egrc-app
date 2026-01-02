@@ -23,7 +23,7 @@ export function useGetEmpresa(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}companies/${dadosApi.idCompany}/shared-holders`,
+          `${API_URL}companies/${dadosApi.idCompany}/shared-holders`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

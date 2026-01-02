@@ -26,7 +26,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import ApexCharts from 'apexcharts';
 import { useDepartmentActionPlans } from './useDepartmentActionPlans';
 
-const API_ENDPOINT = `${process.env.REACT_APP_API_URL}departments/reports/action-plans`;
+const API_ENDPOINT = `${API_URL}departments/reports/action-plans`;
 
 const getStatusConfig = (status) => {
   switch (status) {

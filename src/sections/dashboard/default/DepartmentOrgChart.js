@@ -13,7 +13,7 @@ import DepartmentActionPlanChart from './DepartmentActionPlanChart';
 import DepartmentRiskChart from './DepartmentRiskChart';
 import DepartmentNormativeChart from './DepartmentNormativeChart';
 
-const API_ENDPOINT = `${process.env.REACT_APP_API_URL}departments/reports/types`;
+const API_ENDPOINT = `${API_URL}departments/reports/types`;
 
 const DepartmentOrgChartAdvanced = () => {
   const containerRef = useRef(null);

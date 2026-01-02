@@ -11,6 +11,7 @@ import throttle from 'lodash/throttle';
 
 // project import
 import { EnvironmentOutlined } from '@ant-design/icons';
+import { getGoogleMapsApiKey } from '../../../../runtimeEnv';
 
 function loadScript(src, position, id) {
   if (!position) {
@@ -37,7 +38,7 @@ const GoogleMaps = ({ formik, disabled }) => {
   if (typeof window !== 'undefined' && !loaded.current) {
     if (!document.querySelector('#google-maps')) {
       loadScript(
-        `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}&libraries=places`,
+        `https://maps.googleapis.com/maps/api/js?key=${getGoogleMapsApiKey()}&libraries=places`,
         document.querySelector('head'),
         'google-maps'
       );

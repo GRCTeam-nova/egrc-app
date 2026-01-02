@@ -30,7 +30,7 @@ import ApexCharts from 'apexcharts';
 import { useToken } from "../../../api/TokenContext";
 
 // Endpoint de Dados (O mesmo do cenário anterior, pois estamos analisando a lista de dados)
-const API_ENDPOINT = `${process.env.REACT_APP_API_URL}datas/reports`;
+const API_ENDPOINT = `${API_URL}datas/reports`;
 
 const useDataReports = (url, token) => {
   const [data, setData] = useState(null);

@@ -14,7 +14,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'; // Ícone para o Ac
 import ApexCharts from 'apexcharts';
 import { useProcessRisks } from './useProcessRisks';
 
-const API_ENDPOINT = `${process.env.REACT_APP_API_URL}processes/reports/types`;
+const API_ENDPOINT = `${API_URL}processes/reports/types`;
 
 const ProcessRiskChart = () => {
   const chartRef = useRef(null);

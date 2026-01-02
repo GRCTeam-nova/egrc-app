@@ -19,7 +19,7 @@ export function useGetDeficiencias(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}deficiencies`,
+          `${API_URL}deficiencies`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

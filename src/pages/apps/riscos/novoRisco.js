@@ -45,6 +45,7 @@ import DrawerControle from "../configuracoes/novoControleDrawerRiscos";
 import DrawerCategoria from "../configuracoes/novaCategoriaDrawerRiscos";
 import FileUploader from "../configuracoes/FileUploader";
 import DrawerPlanos from "../configuracoes/novoPlanoDrawerRisco";
+import { API_URL } from "../../../config";
 
 // Componente para seções organizadas
 function SectionCard({ title, icon, children, ...props }) {
@@ -172,68 +173,68 @@ function ColumnsLayoutsCorrigido() {
   useEffect(() => {
     if (!authToken) return;
     fetchData(
-      `${process.env.REACT_APP_API_URL}categories`,
+      `${API_URL}categories`,
       setCategorias
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}action-plans`,
+      `${API_URL}action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
+      `${API_URL}departments`,
       setDepartamentos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks`,
+      `${API_URL}risks`,
       setRiscoAssociados
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/frameworks`,
+      `${API_URL}risks/frameworks`,
       setFrameworks
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/treatments`,
+      `${API_URL}risks/treatments`,
       setTratamentos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
+      `${API_URL}risks/strategic-guidelines`,
       setDiretrizes
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/factors`,
+      `${API_URL}risks/factors`,
       setFatores
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/causes`,
+      `${API_URL}risks/causes`,
       setCausas
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/impacts`,
+      `${API_URL}risks/impacts`,
       setImpactos
     );
-    fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
+    fetchData(`${API_URL}risks/kris`, setKris);
     fetchData(
-      `${process.env.REACT_APP_API_URL}risks/threats`,
+      `${API_URL}risks/threats`,
       setAmeacas
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives`,
+      `${API_URL}normatives`,
       setNormativas
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
+      `${API_URL}controls`,
       setControles
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
+      `${API_URL}processes`,
       setProcessos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}incidents`,
+      `${API_URL}incidents`,
       setIncidentes
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      `${API_URL}collaborators/responsibles`,
       setResponsavel
     );
     window.scrollTo(0, 0);
@@ -253,7 +254,7 @@ function ColumnsLayoutsCorrigido() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}risks/${dadosApi.id}`,
+            `${API_URL}risks/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${authToken}`,
@@ -781,7 +782,7 @@ function ColumnsLayoutsCorrigido() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          `${API_URL}files/uploads`,
           formDataUpload,
           {
             headers: {
@@ -806,7 +807,7 @@ function ColumnsLayoutsCorrigido() {
 
       // --- Configuração do payload e endpoint para riscos ---
       if (requisicao === "Criar") {
-        url = `${process.env.REACT_APP_API_URL}risks`;
+        url = `${API_URL}risks`;
         method = "POST";
         payload = {
           code: codigo,
@@ -814,7 +815,7 @@ function ColumnsLayoutsCorrigido() {
           idCategory: formData.categoria || null,
         };
       } else if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}risks`;
+        url = `${API_URL}risks`;
         method = "PUT";
         payload = {
           idRisk: riscoDados?.idRisk,

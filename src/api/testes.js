@@ -19,8 +19,8 @@ export function useGetTeste(formData, projectId) {
 
         // Define o endpoint de acordo com a existência de projectId
         const url = formData.projectId 
-          ? `${process.env.REACT_APP_API_URL}projects/${formData.projectId}/tests`
-          : `${process.env.REACT_APP_API_URL}projects`;
+          ? `${API_URL}projects/${formData.projectId}/tests`
+          : `${API_URL}projects`;
         const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,

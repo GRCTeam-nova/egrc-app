@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Grid, Button, Box, Typography } from "@mui/material";
+import { getLibreOfficeBaseUrl } from '../../runtimeEnv';
 
 // URL base do seu servidor Collabora/LibreOffice Online.
 // Configure em .env como REACT_APP_LO_BASE_URL
-const LO_BASE_URL =
-  process.env.REACT_APP_LO_BASE_URL || "https://collabora.seuservidor.com";
+const LO_BASE_URL = getLibreOfficeBaseUrl();
 
 function ColumnsLayouts() {
   const [htmlContent, setHtmlContent] = useState("");

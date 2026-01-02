@@ -19,6 +19,7 @@ import ViewportAnimation from '../sections/maps/viewport-animation';
 
 import { cities, countries } from '../data/location';
 import { ThemeMode } from '../config';
+import { getMapboxAccessToken } from '../runtimeEnv';
 
 const MAPBOX_THEMES = {
   light: 'mapbox://styles/mapbox/light-v10',
@@ -30,7 +31,7 @@ const MAPBOX_THEMES = {
 };
 
 const mapConfiguration = {
-  mapboxAccessToken: process.env.REACT_APP_MAPBOX_ACCESS_TOKEN,
+  mapboxAccessToken: getMapboxAccessToken(),
   minZoom: 1
 };
 

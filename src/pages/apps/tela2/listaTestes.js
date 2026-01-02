@@ -162,7 +162,7 @@ function ReactTable({
 
   useEffect(() => {
     fetchData(
-      `${process.env.REACT_APP_API_URL}projects`,
+      `${API_URL}projects`,
       setProjectOptions
     );
     window.scrollTo(0, 0);
@@ -636,7 +636,7 @@ function ActionCell({ row, refreshData }) {
     try {
       // Buscar os dados do departamento pelo ID
       const getResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}projects/tests/${idTest}`,
+        `${API_URL}projects/tests/${idTest}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -654,7 +654,7 @@ function ActionCell({ row, refreshData }) {
 
       // Enviar os dados atualizados via PUT
       await axios.put(
-        `${process.env.REACT_APP_API_URL}projects/tests`,
+        `${API_URL}projects/tests`,
         dadosAtualizados,
         {
           headers: {

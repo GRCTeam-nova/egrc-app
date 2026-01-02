@@ -16,7 +16,7 @@ export function useGetEmpresa(formData) {
       try {
         const token = localStorage.getItem('access_token');
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}companies`,
+          `${API_URL}companies`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
