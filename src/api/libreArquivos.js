@@ -19,7 +19,7 @@ export function useGetNormativos(formData) {
 
         // Usar o token para acessar a API de empresas
         const response = await fetch(
-          `${process.env.REACT_APP_API_URL}integrations`,
+          `${API_URL}integrations`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

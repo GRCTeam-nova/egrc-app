@@ -18,7 +18,7 @@ export function useGetEmpresa(formData, atributo) {
         const token = localStorage.getItem('access_token');
 
         // Define o endpoint de acordo com a existência de projectId
-        const url = `${process.env.REACT_APP_API_URL}normatives/${atributo}/parts`
+        const url = `${API_URL}normatives/${atributo}/parts`
          
         const response = await fetch(url, {
           headers: {

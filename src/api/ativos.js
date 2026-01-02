@@ -16,7 +16,7 @@ export function useGetAtivos(formData = {}) {
       return;
     }
 
-    let url = `${process.env.REACT_APP_API_URL}actives/reports`;
+    let url = `${API_URL}actives/reports`;
     const params = [];
 
     // ✅ Só adiciona GenerateExcel quando for true (não manda false para a API)
