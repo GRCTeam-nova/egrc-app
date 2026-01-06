@@ -55,10 +55,8 @@ function ColumnsLayouts() {
   );
   const [tipoDeficiencias, setTipoDeficiencias] = useState([]);
   const [statuss] = useState([
-    { id: 1, nome: "Não iniciada" },
-    { id: 2, nome: "Em andamento" },
-    { id: 3, nome: "Em revisão" },
-    { id: 4, nome: "Remediada" },
+    { id: 1, nome: "Ativa" },
+    { id: 2, nome: "solucionada" },
   ]);
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
@@ -135,23 +133,23 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${process.env.REACT_APP_API_URL}deficiencies/types`,
+      `https://api.egrc.homologacao.com.br/api/v1/deficiencies/types`,
       setTipoDeficiencias
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}deficiencies/classifications`,
+      `https://api.egrc.homologacao.com.br/api/v1/deficiencies/classifications`,
       setClassificacaoDeficiencias
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
+      `https://api.egrc.homologacao.com.br/api/v1/controls`,
       setControles
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
+      `https://api.egrc.homologacao.com.br/api/v1/processes`,
       setProcessos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}action-plans`,
+      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
       setPlanoAcao
     );
     window.scrollTo(0, 0);
@@ -179,7 +177,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}deficiencies/${dadosApi.idDeficiency}`,
+            `https://api.egrc.homologacao.com.br/api/v1/deficiencies/${dadosApi.idDeficiency}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -371,14 +369,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${process.env.REACT_APP_API_URL}deficiencies`;
+      url = "https://api.egrc.homologacao.com.br/api/v1/deficiencies";
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `${process.env.REACT_APP_API_URL}deficiencies`;
+      url = `https://api.egrc.homologacao.com.br/api/v1/deficiencies`;
       method = "PUT";
       payload = {
         idDeficiency: deficienciaDados?.idDeficiency,
