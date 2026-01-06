@@ -58,7 +58,7 @@ function ColumnsLayouts() {
   const [descricao, setDescricao] = useState("");
   const [conclusaoRevisao, setConclusaoRevisao] = useState("");
   const idUser = localStorage.getItem("id_user");
-  const userName = localStorage.getItem("user_name");
+  const userName = localStorage.getItem("username");
   const [motivoRevogacao, setMotivoRevogacao] = useState("");
   const [diasDaRevisao, setDiasDaRevisao] = useState("");
   const [codigo, setCodigo] = useState("");
