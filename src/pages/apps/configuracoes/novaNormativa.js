@@ -108,6 +108,9 @@ function ColumnsLayouts() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
+  const [confirmRevisorOpen, setConfirmRevisorOpen] = useState(false);
+const [tempResponsavelId, setTempResponsavelId] = useState(null);
+
   const [formData, setFormData] = useState({
     statusNorma: "",
     tipoNorma: "",
@@ -132,6 +135,7 @@ function ColumnsLayouts() {
     normaOrigem: [],
     conta: [],
     responsavel: "",
+    revisor: "",
     aprovador: [],
     dataPublicacao: null,
     dataCadastro: new Date(),
@@ -187,43 +191,43 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
+      `https://api.egrc.homologacao.com.br/api/v1/departments`,
       setDepartamentos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives/types`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives/types`,
       setTipoNormas
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives/regulatories`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives/regulatories`,
       setReguladores
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
       setNormaOrigem
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
       setNormaDestino
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}companies`,
+      `https://api.egrc.homologacao.com.br/api/v1/companies`,
       setEmpresa
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
+      `https://api.egrc.homologacao.com.br/api/v1/processes`,
       setProcessos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}action-plans`,
+      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
       setAprovador
     );
     window.scrollTo(0, 0);
@@ -235,7 +239,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}normatives/${dadosApi.idNormative}`,
+            `https://api.egrc.homologacao.com.br/api/v1/normatives/${dadosApi.idNormative}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -297,7 +301,7 @@ function ColumnsLayouts() {
             tipoNorma: data.idNormativeType,
             regulador: data.idRegulatory,
             responsavel: data.idResponsible,
-            // Preenche os arrays com os IDs retornados
+            revisor: data.idReviewer,
             normaOrigem: data.idOrigins,
             normaDestino: data.idDestinies,
             planoAcao: data.idActionPlans,
@@ -408,7 +412,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -437,7 +441,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -458,7 +462,7 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
@@ -470,6 +474,7 @@ function ColumnsLayouts() {
           publishDate: formData.dataPublicacao,
           initialVigency: formData.vigenciaInicial,
           lastRevision: formData.ultimaRevisao,
+          idReviewer: formData.revisor || null,
           conclusion: conclusaoRevisao,
           frequencyRevision:
             formData.periodicidadeRevisao === undefined ||
@@ -620,6 +625,40 @@ function ColumnsLayouts() {
       empresa: [...prev.empresa, newEmpresa.id],
     }));
   };
+
+  // Função chamada quando o usuário seleciona um Responsável no Autocomplete
+const handleResponsavelChange = (event, newValue) => {
+  const newId = newValue ? newValue.id : "";
+  
+  // Atualiza o Responsável imediatamente
+  setFormData((prev) => ({
+    ...prev,
+    responsavel: newId,
+  }));
+
+  // Se houve uma seleção válida, pergunta se quer replicar para o Revisor
+  if (newId) {
+    setTempResponsavelId(newId);
+    setConfirmRevisorOpen(true);
+  }
+};
+
+// Usuário clicou em "Sim"
+const handleConfirmReplication = () => {
+  setFormData((prev) => ({
+    ...prev,
+    revisor: tempResponsavelId, // Copia o ID para o campo revisor
+  }));
+  setConfirmRevisorOpen(false);
+  setTempResponsavelId(null);
+};
+
+// Usuário clicou em "Não"
+const handleDenyReplication = () => {
+  setConfirmRevisorOpen(false);
+  setTempResponsavelId(null);
+  // Não faz nada com o campo revisor, ele permanece como estava
+};
 
   const handleDepartmentCreated = (newDepartamento) => {
     setDepartamentos((prevDepartamentos) => [
@@ -886,7 +925,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -915,7 +954,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -943,7 +982,7 @@ function ColumnsLayouts() {
           : formData.statusNorma;
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
@@ -1097,7 +1136,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1126,7 +1165,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -1147,7 +1186,7 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
@@ -1303,7 +1342,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1332,7 +1371,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -1353,7 +1392,7 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
@@ -1504,7 +1543,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1533,7 +1572,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -1554,7 +1593,7 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
@@ -1704,7 +1743,7 @@ function ColumnsLayouts() {
     if (deletedFiles.length > 0) {
       const deletedFilesPayload = deletedFiles.map((file) => file.name);
 
-      await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+      await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1734,7 +1773,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        `${process.env.REACT_APP_API_URL}files/uploads`,
+        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
         formDataUpload,
         {
           headers: {
@@ -1758,14 +1797,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${process.env.REACT_APP_API_URL}normatives`;
+      url = "https://api.egrc.homologacao.com.br/api/v1/normatives";
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `${process.env.REACT_APP_API_URL}normatives`;
+      url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
       method = "PUT";
       payload = {
         idNormative: normativaDados.idNormative,
@@ -2869,36 +2908,30 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsavel: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
+<Grid item xs={4} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={1}>
+    <InputLabel>Responsável</InputLabel>
+    <Autocomplete
+      options={responsaveis}
+      getOptionLabel={(option) => option.nome}
+      // Valor vinculado ao formData.responsavel
+      value={
+        responsaveis.find(
+          (r) => r.id === formData.responsavel
+        ) || null
+      }
+      // Chama a função customizada
+      onChange={handleResponsavelChange}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          error={!formData.responsavel && formValidation.responsavel === false}
+        />
+      )}
+      disabled={isFormLocked}
+    />
+  </Stack>
+</Grid>
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -2953,36 +2986,35 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Revisor</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsavel: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
+              {/* Localize o Grid do Revisor (aprox. linha 1418) */}
+<Grid item xs={4} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={1}>
+    <InputLabel>Revisor</InputLabel>
+    <Autocomplete
+      options={responsaveis} // Assumindo que a lista de pessoas é a mesma
+      getOptionLabel={(option) => option.nome}
+      // AGORA vinculado ao formData.revisor
+      value={
+        responsaveis.find(
+          (r) => r.id === formData.revisor
+        ) || null
+      }
+      onChange={(event, newValue) => {
+        setFormData((prev) => ({
+          ...prev,
+          revisor: newValue ? newValue.id : "",
+        }));
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          // Adicione validação aqui se o campo Revisor for obrigatório
+        />
+      )}
+      disabled={isFormLocked}
+    />
+  </Stack>
+</Grid>
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -3124,6 +3156,27 @@ function ColumnsLayouts() {
               </Button>
             </DialogActions>
           </Dialog>
+          <Dialog
+  open={confirmRevisorOpen}
+  onClose={handleDenyReplication}
+  aria-labelledby="alert-dialog-title"
+  aria-describedby="alert-dialog-description"
+>
+  <DialogTitle id="alert-dialog-title">
+    {"Definir Revisor?"}
+  </DialogTitle>
+  <DialogContent>
+    <DialogContentText id="alert-dialog-description">
+      Deseja que o responsável selecionado também seja atribuído como revisor desta normativa?
+    </DialogContentText>
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={handleDenyReplication}>Não</Button>
+    <Button onClick={handleConfirmReplication} autoFocus variant="contained">
+      Sim
+    </Button>
+  </DialogActions>
+</Dialog>
           <Dialog
             open={confirmRevogOpen}
             onClose={handleCancelRevog}
