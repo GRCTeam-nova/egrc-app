@@ -1,5 +1,4 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { API_URL} from 'config';
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
@@ -878,36 +877,55 @@ function ActionCell({ row, refreshData }) {
     handleClose();
   };
 
-  const toggleStatus = async () => {
-    const idPlatform = row.original.idPlatform;
-    const newStatus = status === true ? "Inativo" : "Ativo";
+ const toggleStatus = async () => {
+    const idPlatform = row.original.id;
+    // Define o novo estado (inverso do atual)
+    const newActiveState = !status; 
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}actives/${idPlatform}`, {
+      // 1. Buscar os dados atuais do ativo
+      const getResponse = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/actives/${idPlatform}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
   
-      const dadosEndpoint = getResponse.data;
+      const data = getResponse.data;
   
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
+      // 2. Montar o payload conforme padrão do novoAtivo.js
+      // A API retorna objetos completos em 'environments' e 'processes', 
+      // mas no PUT ela espera arrays de IDs ('idEnvironments', 'idProcesses').
+      const payload = {
+        idPlatform: data.idPlatform,
+        active: newActiveState, // Aqui aplicamos a mudança de status
+        name: data.name,
+        code: data.code,
+        description: data.description,
+        idPlatformType: data.idPlatformType || null,
+        idInformationActivities: data.idInformationActivities || null,
+        idDepartments: data.idDepartments || null,
+        // Tratamento para extrair apenas os IDs, caso existam
+        idEnvironments: Array.isArray(data.environments)
+          ? data.environments.map((u) => u.idEnvironment)
+          : null,
+        idProcesses: Array.isArray(data.processes)
+          ? data.processes.map((u) => u.idProcess)
+          : null,
+      };
   
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}actives`, dadosAtualizados, {
+      // 3. Enviar a atualização (PUT)
+      await axios.put("https://api.egrc.homologacao.com.br/api/v1/actives", payload, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
   
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Ativo ${row.original.name} ${newStatus.toLowerCase()}.`;
-  
-      enqueueSnackbar(message, {
+      // 4. Feedback visual e atualização da lista
+      setStatus(newActiveState);
+      const actionText = newActiveState ? "ativado" : "inativado";
+      
+      enqueueSnackbar(`Ativo ${row.original.name} ${actionText} com sucesso!`, {
         variant: "success",
         autoHideDuration: 3000,
         anchorOrigin: {
@@ -919,7 +937,7 @@ function ActionCell({ row, refreshData }) {
       refreshData();
     } catch (error) {
       console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, { variant: "error" });
+      enqueueSnackbar(`Erro ao alterar status: ${error.response?.data?.message || error.message}`, { variant: "error" });
     }
   
     handleDialogClose();
