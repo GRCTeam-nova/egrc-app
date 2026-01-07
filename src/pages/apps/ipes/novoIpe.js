@@ -3,6 +3,7 @@ import * as React from "react";
 import {
   Button,
   Box,
+  Chip,
   TextField,
   Autocomplete,
   Grid,
@@ -49,6 +50,11 @@ function ColumnsLayouts() {
   const [localInformacao, setLocalInformacao] = useState("");
   const [financeira, setFinanceira] = useState(false);
   const [critica, setCritica] = useState(false);
+  const [processoOrigemMap, setProcessoOrigemMap] = useState({}); // Mapeia ID do Processo -> Array de Nomes de Ativos
+  const [processosFiltrados, setProcessosFiltrados] = useState([]); // Lista final para exibir no Autocomplete
+  // Estados para o Dialog de Aviso de Mudança de Contexto
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+  const [pendingAtivos, setPendingAtivos] = useState([]); // Guarda a seleção temporariamente
   const [editavel, setEditavel] = useState(false);
   const [status, setStatus] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -134,13 +140,13 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(`${process.env.REACT_APP_API_URL}actives`, setAtivos);
+    fetchData(`https://api.egrc.homologacao.com.br/api/v1/actives`, setAtivos);
     fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
+      `https://api.egrc.homologacao.com.br/api/v1/processes`,
       setProcessos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}ipe/types`,
+      `https://api.egrc.homologacao.com.br/api/v1/ipe/types`,
       setTipoInformacoes
     );
     window.scrollTo(0, 0);
@@ -152,7 +158,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}ipe/${dadosApi.idInformationActivity}`,
+            `https://api.egrc.homologacao.com.br/api/v1/ipe/${dadosApi.idInformationActivity}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -218,47 +224,149 @@ function ColumnsLayouts() {
     }));
   };
 
-  const handleProcessCreated = (newProcesso) => {
+ const handleProcessCreated = (newProcesso) => {
+    // 1. Adiciona à lista global
     setProcessos((prevProcessos) => [...prevProcessos, newProcesso]);
 
-    setFormData((prev) => ({
-      ...prev,
-      processo: [...prev.processo, newProcesso.id],
-    }));
-  };
-  const handleSelectAllAtivos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.ativo.length === ativos.length) {
-        // Deselect all
-        setFormData({ ...formData, ativo: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, ativo: ativos.map((ativo) => ativo.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "ativo",
-        newValue.map((item) => item.id)
-      );
+    // 2. Se NÃO tiver ativos selecionados (Modo mostrar todos), seleciona automaticamente
+    if (formData.ativo.length === 0) {
+      setFormData((prev) => ({
+        ...prev,
+        processo: [...prev.processo, newProcesso.id],
+      }));
     }
   };
 
-  const handleSelectAllProcessos = (event, newValue) => {
+const handleSelectAllAtivos = (event, newValue) => {
+    let novosAtivosIds = [];
+
+    // Verifica se clicou na opção "Selecionar todos"
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
+      
+      // Se todos os ativos ATIVOS já estiverem selecionados...
+      if (allSelectedAtivos) {
+        // Desmarcar tudo (Opcional: você pode querer manter os inativos selecionados. 
+        // Aqui, vou limpar tudo para ser consistente com o padrão "Toggle")
+        novosAtivosIds = []; 
+        
+        // OPÇÃO ALTERNATIVA: Se quiser manter os inativos selecionados ao desmarcar o "Todos":
+        // novosAtivosIds = formData.ativo.filter(id => !ativosAtivosDisponiveis.find(a => a.id === id));
       } else {
-        // Select all
-        setFormData({ ...formData, processo: processos.map((processo) => processo.id) });
+        // Selecionar todos os ativos ATIVOS + Manter os que já estavam selecionados (inclusive inativos)
+        const idsAtivos = ativosAtivosDisponiveis.map((ativo) => ativo.id);
+        // Cria um Set para unir os novos com os que já existiam (sem duplicar)
+        novosAtivosIds = [...new Set([...formData.ativo, ...idsAtivos])];
       }
     } else {
+      // Seleção manual item a item
+      novosAtivosIds = newValue.map((item) => item.id);
+    }
+
+    // --- LÓGICA DE INTERCEPTAÇÃO (Mesma lógica que criamos antes) ---
+    if (formData.ativo.length === 0 && novosAtivosIds.length > 0 && formData.processo.length > 0) {
+      setPendingAtivos(novosAtivosIds);
+      setWarningDialogOpen(true);
+      return;
+    }
+
+    tratarMudancaInputGeral("ativo", novosAtivosIds);
+  };
+
+  const confirmarMudancaDeAtivo = () => {
+    // CORREÇÃO: Usamos o callback (prev) para garantir que atualizamos 
+    // o ativo E limpamos o processo simultaneamente, sem conflitos de estado.
+    setFormData((prev) => ({
+      ...prev,
+      ativo: pendingAtivos, // Aplica o ID do ativo que estava "na espera"
+      processo: [],         // Limpa a lista de processos
+    }));
+
+    // Fecha o modal e limpa o estado temporário
+    setWarningDialogOpen(false);
+    setPendingAtivos([]);
+  };
+
+ const handleSelectAllProcessos = (event, newValue) => {
+    // Verifica se clicou na opção "Selecionar todos"
+    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
+      
+      // Se já estiverem todos os filtrados selecionados, limpa a seleção
+      if (formData.processo.length === processosFiltrados.length) {
+        setFormData({ ...formData, processo: [] });
+      } else {
+        // Caso contrário, seleciona APENAS os processos que estão na lista filtrada
+        const idsFiltrados = processosFiltrados.map((processo) => processo.id);
+        setFormData({ ...formData, processo: idsFiltrados });
+      }
+    } else {
+      // Seleção individual normal
       tratarMudancaInputGeral(
         "processo",
         newValue.map((item) => item.id)
       );
     }
   };
+
+// Efeito para buscar e filtrar processos (Regra de Negócio: Apenas Active = true)
+  useEffect(() => {
+    const atualizarProcessosPorAtivo = async () => {
+      
+      // 1. FILTRO GLOBAL: Remove qualquer processo inativo da jogada imediatamente.
+      // Isso garante que 'processosFiltrados' nunca contenha itens com active: false.
+      const processosAtivosGlobais = processos.filter(p => p.active === true);
+
+      // CENÁRIO 1: Nenhum ativo selecionado -> Mostra TODOS os processos ATIVOS
+      if (formData.ativo.length === 0) {
+        setProcessosFiltrados(processosAtivosGlobais); 
+        setProcessoOrigemMap({});
+        return;
+      }
+
+      // CENÁRIO 2: Ativos selecionados -> Busca na API e cruza com a lista de ativos
+      const novoMapaOrigem = {};
+      const idsProcessosPermitidos = new Set();
+
+      const promises = formData.ativo.map((ativoId) =>
+        axios.get(`https://api.egrc.homologacao.com.br/api/v1/actives/${ativoId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      );
+
+      try {
+        const results = await Promise.all(promises);
+
+        results.forEach((response) => {
+          const dadosAtivo = response.data;
+          const nomeAtivo = dadosAtivo.name;
+          const processosDoAtivo = dadosAtivo.processes || [];
+
+          processosDoAtivo.forEach((proc) => {
+            const idProc = proc.idProcess;
+            idsProcessosPermitidos.add(idProc);
+
+            if (!novoMapaOrigem[idProc]) {
+              novoMapaOrigem[idProc] = [];
+            }
+            if (!novoMapaOrigem[idProc].includes(nomeAtivo)) {
+              novoMapaOrigem[idProc].push(nomeAtivo);
+            }
+          });
+        });
+
+        // Cruza os IDs retornados pela API dos ativos com a nossa lista global de processos ATIVOS
+        const listaFiltrada = processosAtivosGlobais.filter((p) => idsProcessosPermitidos.has(p.id));
+        
+        setProcessosFiltrados(listaFiltrada);
+        setProcessoOrigemMap(novoMapaOrigem);
+
+      } catch (error) {
+        console.error("Erro ao buscar detalhes dos ativos:", error);
+        enqueueSnackbar("Erro ao carregar processos dos ativos selecionados.", { variant: "error" });
+      }
+    };
+
+    atualizarProcessosPorAtivo();
+  }, [formData.ativo, processos, token]);
 
   const voltarParaCadastroMenu = () => {
     navigate(-1);
@@ -282,10 +390,18 @@ function ColumnsLayouts() {
     nome: true,
   });
 
+// Filtra apenas os ativos que estão com active: true para exibir na lista de opções
+  const ativosAtivosDisponiveis = ativos.filter((ativo) => ativo.active);
   
-  const allSelectedAtivos = formData.ativo.length === ativos.length && ativos.length > 0;
-  const allSelectedProcessos = formData.processo.length === processos.length && processos.length > 0;
-
+  // Verifica se todos os ativos DISPONÍVEIS estão selecionados (para o checkbox do Select All)
+  // Nota: Isso ignora se há ativos inativos selecionados no cálculo do "All"
+  const allSelectedAtivos = 
+    ativosAtivosDisponiveis.length > 0 && 
+    ativosAtivosDisponiveis.every(a => formData.ativo.includes(a.id));
+// Verifica se todos os processos DISPONÍVEIS (Filtrados/Ativos) estão selecionados
+  const allSelectedProcessos = 
+    processosFiltrados.length > 0 && 
+    processosFiltrados.every(p => formData.processo.includes(p.id));
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
   const tratarSubmit = async () => {
@@ -316,14 +432,14 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${process.env.REACT_APP_API_URL}ipe`;
+      url = "https://api.egrc.homologacao.com.br/api/v1/ipe";
       method = "POST";
       payload = {
         code: codigo,
         name: nome
       };
     } else if (requisicao === "Editar") {
-      url = `${process.env.REACT_APP_API_URL}ipe`;
+      url = `https://api.egrc.homologacao.com.br/api/v1/ipe`;
       method = "PUT";
       payload = {
         idInformationActivity: dadosApi?.idInformationActivity,
@@ -528,11 +644,13 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
+                    // OPÇÕES: Apenas os ativos com active: true
                     options={[
                       { id: "all", nome: "Selecionar todos" },
-                      ...ativos,
+                      ...ativosAtivosDisponiveis,
                     ]}
                     getOptionLabel={(option) => option.nome}
+                    // VALUE: Busca na lista COMPLETA 'ativos' para garantir que encontra o objeto mesmo se for inativo
                     value={formData.ativo.map(
                       (id) => ativos.find((ativo) => ativo.id === id) || id
                     )}
@@ -540,6 +658,31 @@ function ColumnsLayouts() {
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
+                    // --- NOVA PROP: RENDER TAGS ---
+                    // Customiza a exibição dos chips selecionados
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => {
+                        // Verifica se o ativo selecionado está inativo
+                        // (Nota: 'option' aqui vem do value, ou seja, da lista completa 'ativos')
+                        const isInativo = option.active === false;
+                        
+                        return (
+                          <Chip
+                            label={
+                              isInativo 
+                                ? `${option.nome} (Inativo)` // Texto informativo
+                                : option.nome
+                            }
+                            {...getTagProps({ index })}
+                            // Estilização visual para diferenciar
+                            color={isInativo ? "error" : "default"} 
+                            variant={isInativo ? "outlined" : "filled"}
+                            sx={isInativo ? { borderColor: 'error.main', color: 'error.main' } : {}}
+                          />
+                        );
+                      })
+                    }
+                    // -----------------------------
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
@@ -575,60 +718,101 @@ function ColumnsLayouts() {
               <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
                   <InputLabel>
-                Processos {" "}
-                <DrawerProcesso
-                  buttonSx={{
-                    marginLeft: 1.5,
-                    height: "20px",
-                    minWidth: "20px",
-                  }}
-                  onProcessCreated={handleProcessCreated}
-                />
-              </InputLabel>
+                    Processos{" "}
+                    <DrawerProcesso
+                      buttonSx={{
+                        marginLeft: 1.5,
+                        height: "20px",
+                        minWidth: "20px",
+                      }}
+                      onProcessCreated={handleProcessCreated}
+                    />
+                  </InputLabel>
                   <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...processos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processo.map(
-                      (id) => processos.find((processo) => processo.id === id) || id
-                    )}
-                    onChange={handleSelectAllProcessos}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedProcessos
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.processo.length === 0 ||
-                            formData.processo.every((val) => val === 0)) &&
-                          formValidation.processo === false
+                multiple
+                disableCloseOnSelect
+                options={
+                  processosFiltrados.length > 0
+                    ? [{ id: "all", nome: "Selecionar todos" }, ...processosFiltrados]
+                    : []
+                }
+                noOptionsText="Nenhum processo encontrado"
+                getOptionLabel={(option) => option.nome}
+                // VALUE: Busca na lista GLOBAL 'processos' para encontrar o objeto, mesmo se for inativo
+                value={formData.processo.map(
+                  (id) => processos.find((processo) => processo.id === id) || id
+                )}
+                onChange={handleSelectAllProcessos}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                
+                // --- NOVA PROP: RENDER TAGS (IGUAL AO ATIVO) ---
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    // Verifica se o processo é inativo
+                    const isInativo = option.active === false;
+
+                    return (
+                      <Chip
+                        label={
+                          isInativo 
+                            ? `${option.nome} (Inativo)` 
+                            : option.nome
                         }
+                        {...getTagProps({ index })}
+                        color={isInativo ? "error" : "default"}
+                        variant={isInativo ? "outlined" : "filled"}
+                        sx={isInativo ? { borderColor: 'error.main', color: 'error.main' } : {}}
                       />
-                    )}
+                    );
+                  })
+                }
+                // -----------------------------------------------
+
+                renderOption={(props, option, { selected }) => {
+                  const origens = processoOrigemMap[option.id]
+                    ? processoOrigemMap[option.id].join(", ")
+                    : "";
+
+                  return (
+                    <li {...props}>
+                      <Grid container alignItems="center">
+                        <Grid item>
+                          <Checkbox
+                            checked={
+                              option.id === "all"
+                                ? allSelectedProcessos
+                                : selected
+                            }
+                          />
+                        </Grid>
+                        <Grid item xs>
+                          <Typography variant="body1">{option.nome}</Typography>
+                          
+                          {option.id !== "all" && origens && (
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              sx={{ color: "text.secondary", fontSize: "0.75rem" }}
+                            >
+                              Ativo(s): {origens}
+                            </Typography>
+                          )}
+                        </Grid>
+                      </Grid>
+                    </li>
+                  );
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    error={
+                      (formData.processo.length === 0 ||
+                        formData.processo.every((val) => val === 0)) &&
+                      formValidation.processo === false
+                    }
                   />
+                )}
+              />
                 </Stack>
               </Grid>
 
@@ -729,6 +913,42 @@ function ColumnsLayouts() {
               </Button>
             </Box>
           </Grid>
+          {/* Dialog de Aviso de Filtro */}
+          <Dialog
+            open={warningDialogOpen}
+            onClose={() => setWarningDialogOpen(false)}
+            aria-labelledby="alert-dialog-title"
+            aria-describedby="alert-dialog-description"
+          >
+            <DialogTitle id="alert-dialog-title" sx={{ fontWeight: 600 }}>
+              {"Alteração de filtro de Ativos"}
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText id="alert-dialog-description">
+                Ao selecionar um Ativo, a lista de Processos será filtrada para exibir apenas aqueles pertencentes ao Ativo escolhido.
+                <br /><br />
+                <strong>Os processos selecionados anteriormente serão removidos.</strong>
+                <br /><br />
+                Deseja continuar?
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button 
+                onClick={() => setWarningDialogOpen(false)} 
+                color="primary"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={confirmarMudancaDeAtivo} 
+                color="error" 
+                variant="contained" 
+                autoFocus
+              >
+                Limpar Processos
+              </Button>
+            </DialogActions>
+          </Dialog>
           <Dialog
             open={successDialogOpen}
             onClose={voltarParaListagem}
