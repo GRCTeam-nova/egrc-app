@@ -55,7 +55,10 @@ function ColumnsLayouts() {
   const [planosAcoes, setPlanoAcao] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
   const [processos, setProcessos] = useState([]);
-  const [descricao, setDescricao] = useState("");
+  // ... seus outros estados
+const [descricao, setDescricao] = useState(""); // Mantém o histórico vindo do banco
+const [novoComentario, setNovoComentario] = useState(""); // Novo estado para o input atual
+// ...
   const [conclusaoRevisao, setConclusaoRevisao] = useState("");
   const idUser = localStorage.getItem("id_user");
   const userName = localStorage.getItem("username");
@@ -324,6 +327,21 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
     }
   }, [dadosApi, token, reload]);
 
+// Função para gerar a string final do comentário
+   const getDescricaoAtualizada = () => {
+    // Se não escreveu nada novo, retorna a descrição original
+    if (!novoComentario || !novoComentario.trim()) {
+      return descricao;
+    }
+
+    const dataHora = new Date().toLocaleString("pt-BR");
+    // Formato: [Usuario]: Comentario - dd/mm/aaaa hh:mm:ss
+    const entradaLog = `[${userName}]: ${novoComentario} - ${dataHora}`;
+
+    // Se já existia descrição, pula duas linhas e adiciona a nova. Se não, é a primeira.
+    return descricao ? `${descricao}\n\n${entradaLog}` : entradaLog;
+  };
+
   // 1) Sempre que mudar últimaRevisão ou periodicidade, recalcula diasDaRevisao e dataLimiteRevisao
   useEffect(() => {
     const { ultimaRevisao, periodicidadeRevisao } = formData;
@@ -369,6 +387,95 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
     } else {
       // Se usuário limpar a data, só atualiza sem confirmação
       setFormData((prev) => ({ ...prev, dataRevogacao: null }));
+    }
+  };
+
+  // Função para salvar APENAS o comentário, ignorando outras alterações na tela
+  const handleSalvarComentarioRapido = async () => {
+    if (!novoComentario || !novoComentario.trim()) {
+      enqueueSnackbar("Escreva um comentário antes de salvar.", {
+        variant: "warning",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Gera o texto final (Histórico + Novo Comentário)
+      const novaDescricaoCompleta = getDescricaoAtualizada();
+
+      // 2. Prepara o Payload usando 'normativaDados' (dados do banco)
+      // e NÃO o 'formData' (dados da tela), para não salvar alterações pendentes acidentalmente.
+      const payload = {
+        idNormative: normativaDados.idNormative,
+        code: normativaDados.code,
+        name: normativaDados.name,
+        description: novaDescricaoCompleta, // <-- Único campo alterado
+        registerDate: normativaDados.registerDate,
+        publishDate: normativaDados.publishDate,
+        initialVigency: normativaDados.initialVigency,
+        lastRevision: normativaDados.lastRevision,
+        idReviewer: normativaDados.idReviewer,
+        conclusion: normativaDados.conclusion,
+        frequencyRevision: normativaDados.frequencyRevision,
+        limitDateRevision: normativaDados.limitDateRevision,
+        // daysRevision: normativaDados.daysRevision,
+        revocationDate: normativaDados.revocationDate,
+        revocationReason: normativaDados.revocationReason,
+        normativeStatus: normativaDados.normativeStatus,
+        normativeRisk: normativaDados.normativeRisk,
+        active: normativaDados.active,
+        idNormativeType: normativaDados.idNormativeType,
+        idRegulatory: normativaDados.idRegulatory,
+        idResponsible: normativaDados.idResponsible,
+        idOrigins: normativaDados.idOrigins,
+        idDestinies: normativaDados.idDestinies,
+        idActionPlans: normativaDados.idActionPlans,
+        idApprovers: normativaDados.idApprovers,
+        idCompanies: normativaDados.idCompanies,
+        idDepartments: normativaDados.idDepartments,
+        idProcesses: normativaDados.idProcess, // Note: confirme se a API retorna idProcess ou idProcesses no GET
+        
+        // Tratamento simples de arquivos para manter o que já existe sem upload novo
+        files: normativaDados.files ? normativaDados.files.map(f => typeof f === 'string' ? f : f.path) : [],
+      };
+
+      const url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
+      
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao salvar comentário.");
+      }
+
+      // 3. Atualiza os estados locais para refletir o salvamento
+      setDescricao(novaDescricaoCompleta); // Atualiza o histórico visual
+      setNovoComentario(""); // Limpa o campo de novo comentário
+      
+      // Atualiza o objeto de referência para o novo estado do banco
+      setNormativaDados((prev) => ({
+        ...prev,
+        description: novaDescricaoCompleta
+      }));
+
+      enqueueSnackbar("Comentário adicionado com sucesso!", {
+        variant: "success",
+      });
+
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Não foi possível salvar o comentário.", {
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -468,7 +575,7 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
@@ -988,7 +1095,7 @@ const handleDenyReplication = () => {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
           idReviewer: formData.revisor || null,
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
@@ -1193,7 +1300,7 @@ const handleDenyReplication = () => {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
           idReviewer: formData.revisor || null,
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
@@ -1400,7 +1507,7 @@ const handleDenyReplication = () => {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
           idReviewer: formData.revisor || null,
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
@@ -1603,7 +1710,7 @@ const handleDenyReplication = () => {
           code: codigo,
           name: nome,
           idReviewer: formData.revisor || null,
-          description: descricao,
+          description: getDescricaoAtualizada(),
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
@@ -1814,7 +1921,7 @@ const handleDenyReplication = () => {
         idNormative: normativaDados.idNormative,
         code: codigo,
         name: nome,
-        description: descricao,
+        description: getDescricaoAtualizada(),
         registerDate: formData.dataCadastro,
         //normativeInternType: formData.tipoNorma,
         publishDate: formData.dataPublicacao,
@@ -2139,20 +2246,95 @@ const handleDenyReplication = () => {
 
           {requisicao === "Editar" && (
             <>
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Descrição</InputLabel>
-                  <TextField
-                    onChange={(event) => setDescricao(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={descricao}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
+          {/* ... (dentro do return) ... */}
 
+<Grid item xs={12} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={2}>
+    
+    {/* 1. CAMPO DE HISTÓRICO (Visual Melhorado) */}
+    {descricao && (
+      <>
+        {/* 2. CAMPO DE NOVA ENTRADA COM BOTÃO AO LADO */}
+        <Stack 
+          direction="row" 
+          justifyContent="space-between" 
+          alignItems="center" 
+          spacing={2}
+          sx={{ mb: 1, mt: 2 }} // Margem para espaçamento
+        >
+          <InputLabel sx={{ m: 0 }}>
+            {descricao ? "Adicionar novo comentário" : "Comentário"}
+          </InputLabel>
+          
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleSalvarComentarioRapido}
+            disabled={isFormLocked || loading}
+            sx={{ 
+              fontWeight: 600,
+              textTransform: "none",
+              height: "30px"
+            }}
+          >
+            Salvar Comentário
+          </Button>
+        </Stack>
+
+        <TextField
+          onChange={(event) => setNovoComentario(event.target.value)}
+          fullWidth
+          multiline
+          rows={4}
+          value={novoComentario}
+          placeholder="Digite aqui seu comentário ou observação..."
+          disabled={isFormLocked}
+          sx={{
+            backgroundColor: "#fff",
+            marginBottom: 2 // Espaço antes do histórico
+          }}
+        />
+    
+        <InputLabel sx={{ fontWeight: "bold", color: "#333" }}>
+          Histórico de Comentários
+        </InputLabel>
+        <TextField
+          fullWidth
+          multiline
+          minRows={3}
+          maxRows={8} // Permite crescer um pouco mais se tiver muito texto
+          value={descricao}
+          // Usamos readOnly ao invés de disabled para controlar melhor as cores
+          InputProps={{
+            readOnly: true,
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              backgroundColor: "#f0f7ff", // Um azul bem clarinho (mais agradável que cinza)
+              "& fieldset": {
+                borderColor: "#b3d9ff", // Borda suave
+              },
+              "&:hover fieldset": {
+                borderColor: "#b3d9ff", // Mantém a borda ao passar o mouse
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: "#b3d9ff", // Mantém a borda ao focar (clicar)
+              },
+            },
+            "& .MuiInputBase-input": {
+              color: "#0d0d0d !important", // Força a cor PRETA (quase preta)
+              WebkitTextFillColor: "#0d0d0d !important", // Garante contraste no Chrome/Safari
+              fontSize: "0.95rem",
+              fontWeight: 500, // Um pouco mais de peso na fonte
+            },
+          }}
+        />
+      </>
+    )}
+
+
+  </Stack>
+</Grid>
               <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Data de cadastro</InputLabel>
