@@ -1,1925 +1,1822 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import PropTypes from "prop-types";
+import { Fragment, useMemo, useState, useEffect, useRef } from "react";
+import Popover from "@mui/material/Popover";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { useNavigate } from "react-router";
+import CustomerModal from "../../../sections/apps/customer/CustomerModal";
+import { enqueueSnackbar } from "notistack";
+import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
+import { useGetControles } from "../../../api/controles";
+import { useLocation } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import emitter from "../tela2/eventEmitter";
+import MainCard from "../../../components/MainCard";
+
+import { useTheme } from "@mui/material/styles";
+
 import {
-  Button,
   Box,
-  TextField,
-  Autocomplete,
   Grid,
-  Switch,
-  Stack,
-  Typography,
+  Button,
+  FormControl,
+  FormControlLabel,
   Checkbox,
-  InputLabel,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
+  Chip,
+  Divider,
+  Stack,
+  Table,
+  InputLabel,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { enqueueSnackbar } from "notistack";
-import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
-import LoadingOverlay from "../configuracoes/LoadingOverlay";
-import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from "react-router-dom";
-import axios from "axios";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import ScrollX from "../../../components/ScrollX";
+import IconButton from "../../../components/@extended/IconButton";
+import CircularProgress from "@mui/material/CircularProgress";
+import Drawer from "@mui/material/Drawer";
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
+import CloseIcon from "@mui/icons-material/Close";
+import Mark from "mark.js";
+import { faXmark, faBan } from "@fortawesome/free-solid-svg-icons";
+
+import {
+  DebouncedInput,
+  HeaderSort,
+  EmptyTable,
+  RowSelection,
+  TablePagination,
+  SelectColumnVisibility,
+} from "../../../components/third-party/react-table";
 import { useToken } from "../../../api/TokenContext";
-import DrawerProcesso from "../configuracoes/novoProcessoDrawerControles";
-import DrawerConta from "../configuracoes/novaContaDrawerControles";
-import DrawerRisco from "../configuracoes/novoRiscoDrawerControles";
-import DrawerAtivo from "../configuracoes/novoAtivoDrawerControles";
-import DrawerDeficiencia from "../configuracoes/novaDeficienciaDrawerControles";
-import DrawerObjetivo from "../configuracoes/novoObjetivoDrawerControle";
-import DrawerIpe from "../configuracoes/novoIpeDrawerControle";
-import FileUploader from "../configuracoes/FileUploader";
 
-// ==============================|| LAYOUTS - COLUMNS ||============================== //
-function ColumnsLayouts() {
-  const { token } = useToken();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { dadosApi } = location.state || {};
-  const [objetivoControles, setObjetivoControle] = useState([]);
-  const [contas, setContas] = useState([]);
-  const [tiposControles, setTiposControles] = useState([]);
-  const [carvs, setCarvs] = useState([]);
-  const [frequencias, setFrequencias] = useState([]);
-  const [classificacoes, setClassificacoes] = useState([]);
-  const [execucoes, setExecucoes] = useState([]);
-  const [ativos, setAtivos] = useState([]);
-  const [ipes, setIpes] = useState([]);
-  const [riscos, setRiscoAssociados] = useState([]);
-  const [assertions, setAssertions] = useState([]);
-  const [deficiencias, setDeficiencias] = useState([]);
-  const [elementos, setElementos] = useState([]);
-  const [compensadoControles, setCompensadosControles] = useState([]);
-  const [compensaControles, setCompensaControles] = useState([]);
-  const [processos, setProcessos] = useState([]);
-  const [descricao, setDescricao] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [nome, setNome] = useState("");
-  const [responsaveis, setResponsavel] = useState([]);
-  const [chave, setChave] = useState(false);
-  const [revisao, setRevisao] = useState(false);
-  const [preventivo, setPreventivo] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [requisicao, setRequisicao] = useState("Criar");
-  const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
-  const [controleDados, setControleDados] = useState(null);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [deletedFiles, setDeletedFiles] = useState([]);
-  window.hasChanges = hasChanges;
-  window.setHasChanges = setHasChanges;
+import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
+import { faFilter } from "@fortawesome/free-solid-svg-icons";
 
-  const [formData, setFormData] = useState({
-    empresaInferior: [],
-    ativo: [],
-    ipe: [],
-    compensadoControle: [],
-    compensaControle: [],
-    objetivoControle: [],
-    kri: [],
-    elemento: [],
-    carv: [],
-    plano: [],
-    deficiencia: [],
-    ameaca: [],
-    normativa: [],
-    assertion: [],
-    departamento: [],
-    categoria: "",
-    frequencia: "",
-    execucao: "",
-    classificacao: "",
-    tiposControle: "",
-    processo: "",
-    files: [],
-    risco: [],
-    conta: [],
-    responsavel: "",
-    dataInicioOperacao: null,
-  });
+export const fuzzyFilter = (row, columnId, value) => {
+  let cellValue = row.getValue(columnId);
+  if (cellValue === undefined || value === undefined) return false;
 
-  const fetchData = async (url, setState) => {
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      // Transformando os dados para alterar idControl, idLedgerAccount e idProcess -> id, e name -> nome
-      const transformedData = response.data.map((item) => ({
-        id:
-          item.idControl ||
-          item.idLedgerAccount ||
-          item.idProcess ||
-          item.id_responsible ||
-          item.idCategory ||
-          item.idControl ||
-          item.idFramework ||
-          item.idTreatment ||
-          item.idStrategicGuideline ||
-          item.idFactor ||
-          item.idIncident ||
-          item.idCause ||
-          item.idImpact ||
-          item.idNormative ||
-          item.idControlType ||
-          item.idDepartment ||
-          item.idExecution ||
-          item.idKri ||
-          item.idControl ||
-          item.idElementCoso ||
-          item.idThreat ||
-          item.idObjective ||
-          item.idLedgerAccount ||
-          item.idInformationActivity ||
-          item.idAssertion ||
-          item.idCvar ||
-          item.idClassification ||
-          item.idRisk ||
-          item.idDeficiency ||
-          item.idCollaborator ||
-          item.idPlatform,
-        nome: item.name,
-        ...item, // Mantém os outros campos intactos
-      }));
-
-      setState(transformedData);
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-    }
+  const normalizeText = (text) => {
+    return text
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
   };
 
+  cellValue = normalizeText(cellValue);
+  const valueStr = normalizeText(value);
+  return cellValue.includes(valueStr);
+};
+
+function ReactTable({
+  data,
+  columns,
+  processosTotal,
+  isLoading,
+  onApplyFilters,
+  onExportExcel,
+}) {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === "dark";
+  const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
+  const [columnVisibility, setColumnVisibility] = useState({});
+  const recordType = "Controles";
+  const tableRef = useRef(null);
+  const [sorting, setSorting] = useState([{ id: "name", asc: true }]);
+  const [rowSelection, setRowSelection] = useState({});
+  const [globalFilter, setGlobalFilter] = useState("");
+  const navigation = useNavigate();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [controlesOptions, setControlesOptions] = useState([]);
+  const [responsibleOptions, setResponsibleOptions] = useState([]);
+  const [typeOptions, setTypeOptions] = useState([]);
+  const [processOptions, setProcessOptions] = useState([]);
+  const [executionOptions, setExecutionOptions] = useState([]);
+  const [classificationOptions, setClassificationOptions] = useState([]);
+  const [risksOptions, setRisksOptions] = useState([]);
+  const [platformsOptions, setPlatformsOptions] = useState([]);
+  const [informationActivitiesOptions, setInformationActivitiesOptions] =
+    useState([]);
+  const [assertionsOptions, setAssertionsOptions] = useState([]);
+  const [cvarsOptions, setCvarsOptions] = useState([]);
+  const [deficienciesOptions, setDeficienciesOptions] = useState([]);
+  const [ledgerAccountsOptions, setLedgerAccountsOptions] = useState([]);
+  const [elementCososOptions, setElementCososOptions] = useState([]);
+  const [draftFilters, setDraftFilters] = useState({
+    controle: [],
+    responsible: [],
+    type: [],
+    process: [],
+    execution: [],
+    classification: [],
+    risks: [],
+    platforms: [],
+    informationActivities: [],
+    assertions: [],
+    cvars: [],
+    deficiencies: [],
+    ledgerAccounts: [],
+    elementCosos: [],
+    startDate: null,
+    endDate: null,
+    hasRisks: false,
+  });
+
+  const toggleDrawer = () => setDrawerOpen(!drawerOpen);
+
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}risks`,
-      setRiscoAssociados
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}objective`,
-      setObjetivoControle
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}ledger-accounts`,
-      setContas
-    );
-    fetchData(`${process.env.REACT_APP_API_URL}actives`, setAtivos);
-    fetchData(`${process.env.REACT_APP_API_URL}ipe`, setIpes);
-    fetchData(
-      `${process.env.REACT_APP_API_URL}deficiencies`,
-      setDeficiencias
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
-      setCompensadosControles
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
-      setCompensaControles
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}ledger-accounts/assertions`,
-      setAssertions
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls/types`,
-      setTiposControles
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls/classifications`,
-      setClassificacoes
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls/cvars`,
-      setCarvs
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls/element-cosos`,
-      setElementos
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls/executions`,
-      setExecucoes
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsavel
-    );
-    const frequencias = [
-      { id: 1, nome: "Várias vezes ao dia" },
-      { id: 2, nome: "Diário" },
-      { id: 3, nome: "Semanal" },
-      { id: 4, nome: "Quinzenal" },
-      { id: 5, nome: "Mensal" },
-      { id: 6, nome: "Bimestral" },
-      { id: 7, nome: "Trimestral" },
-      { id: 8, nome: "Semestral" },
-      { id: 9, nome: "Anual" },
-      { id: 10, nome: "Bienal" },
-      { id: 11, nome: "Quinquenal" },
-    ];
-    setFrequencias(frequencias);
-    window.scrollTo(0, 0);
-  }, []);
-
-  // Em caso de edição
-  useEffect(() => {
-    if (dadosApi) {
-      const fetchEmpresaDados = async () => {
-        try {
-          const response = await fetch(
-            `${process.env.REACT_APP_API_URL}controls/${dadosApi.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error("Erro ao buscar os dados de empresas");
-          }
-
-          const data = await response.json();
-          setRequisicao("Editar");
-          setMensagemFeedback("editado");
-          setNome(data.name);
-          setCodigo(data.code);
-          setDescricao(data.description);
-          setChave(data.meaningfulness);
-          setPreventivo(data.preventiveDetective);
-          setRevisao(data.revisionControl);
-          setFormData((prev) => ({
-            ...prev,
-            deficiencia: data.idDeficiencies || null,
-            ipe: data.idInformationActivities || null,
-            elemento: data.idControlElementCosos || null,
-            risco: data.idRisks || null,
-            ativo: data.idPlatforms || null,
-            compensaControle: data.idControlCompensatings || null,
-            compensadoControle: data.idControlCompensateds || null,
-            objetivoControle: data.idControlObjectives || null,
-            processo: data.idProcess || null,
-            responsavel: data.idResponsible || null,
-            conta: data.idControlLedgerAccounts || null,
-            frequencia: data.frequency || null,
-            files: data.files || [],
-            tiposControle: data.idControlType || null,
-            execucao: data.idControlExecution || null,
-            classificacao: data.idClassification || null,
-            assertion: data.idAssertions || null,
-            carv: data.idCvars || null,
-          }));
-
-          setControleDados(data);
-        } catch (err) {
-          console.error("Erro ao buscar os dados:", err.message);
-        } finally {
-          console.log("Requisição finalizada");
+    const getUniqueValues = (key, isArray = false) => {
+      const values = data.flatMap((item) => {
+        const value = item[key];
+        if (isArray && Array.isArray(value)) {
+          return value.filter((v) => v !== null && v !== undefined);
         }
-      };
-
-      if (dadosApi.id) {
-        fetchEmpresaDados();
-      }
-    }
-  }, [dadosApi]);
-
-  const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
-
-  useEffect(() => {
-    const nomeDigitado = formatarNome(nome);
-
-    // Atualiza os departamentos inferiores removendo os que conflitam
-    const inferioresAtualizadas = formData.compensaControle.filter((id) => {
-      const compensaControle = compensaControles.find(
-        (departamento) => departamento.id === id
-      );
-      if (!compensaControle) return false;
-      return formatarNome(compensaControle.nome) !== nomeDigitado;
-    });
-    if (inferioresAtualizadas.length !== formData.compensaControle.length) {
-      setFormData((prev) => ({
-        ...prev,
-        compensaControle: inferioresAtualizadas,
-      }));
-    }
-
-    // **Novo bloco: Atualiza os departamentos laterais**
-    const lateraisAtualizadas = formData.compensadoControle.filter((id) => {
-      const compensadoControle = compensadoControles.find(
-        (departamento) => departamento.id === id
-      );
-      if (!compensadoControle) return false;
-      return formatarNome(compensadoControle.nome) !== nomeDigitado;
-    });
-    if (lateraisAtualizadas.length !== formData.compensadoControle.length) {
-      setFormData((prev) => ({
-        ...prev,
-        compensadoControle: lateraisAtualizadas,
-      }));
-    }
-  }, [
-    nome,
-    compensaControles,
-    compensadoControles,
-    formData.compensaControle,
-    formData.compensadoControle,
-  ]);
-
-  const handleProcessCreated = (newProcesso) => {
-    setProcessos((prevProcessos) => [...prevProcessos, newProcesso]);
-
-    setFormData((prev) => ({
-      ...prev,
-      processo: newProcesso.id, // Define o novo processo como o único selecionado
-    }));
-  };
-
-  const handleAccountCreated = (newConta) => {
-    setContas((prevContas) => [...prevContas, newConta]);
-    setFormData((prev) => ({
-      ...prev,
-      conta: [...prev.conta, newConta.id],
-    }));
-  };
-
-  const handleRiskCreated = (newRisco) => {
-    setRiscoAssociados((prevRiscos) => [...prevRiscos, newRisco]);
-    setFormData((prev) => ({
-      ...prev,
-      risco: [...prev.risco, newRisco.id],
-    }));
-  };
-
-  const handleActiveCreated = (newAtivo) => {
-    setAtivos((prevAtivos) => [...prevAtivos, newAtivo]);
-    setFormData((prev) => ({
-      ...prev,
-      ativo: [...prev.ativo, newAtivo.id],
-    }));
-  };
-
-  const handleDeficiencyCreated = (newDeficiencia) => {
-    setDeficiencias((prevDeficiencias) => [
-      ...prevDeficiencias,
-      newDeficiencia,
-    ]);
-    setFormData((prev) => ({
-      ...prev,
-      deficiencia: [...prev.deficiencia, newDeficiencia.id],
-    }));
-  };
-
-  const handleObjetiveCreated = (newObjetivo) => {
-    setObjetivoControle((prevObjetivos) => [...prevObjetivos, newObjetivo]);
-    setFormData((prev) => ({
-      ...prev,
-      objetivoControle: [...prev.objetivoControle, newObjetivo.id],
-    }));
-  };
-  
-  const handleIpeCreated = (newIpe) => {
-    setIpes((prevIpes) => [...prevIpes, newIpe]);
-    setFormData((prev) => ({
-      ...prev,
-      ipe: [...prev.ipe, newIpe.id],
-    }));
-  };
-
-  const tratarMudancaInputGeral = (field, value) => {
-    if (field === "categoria") {
-      // Guarde apenas o ID do item selecionado
-      setFormData({ ...formData, [field]: value ? value.id : null });
-    } else {
-      // Para outros campos
-      setFormData({ ...formData, [field]: value });
-    }
-  };
-
-  const handleSelectAll = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.risco.length === riscos.length) {
-        // Deselect all
-        setFormData({ ...formData, risco: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, risco: riscos.map((risco) => risco.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "risco",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllDeficiencias = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.deficiencia.length === deficiencias.length) {
-        // Deselect all
-        setFormData({ ...formData, deficiencia: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          deficiencia: deficiencias.map((deficiencia) => deficiencia.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "deficiencia",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllCarvs = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.carv.length === carvs.length) {
-        // Deselect all
-        setFormData({ ...formData, carv: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, carv: carvs.map((carv) => carv.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "carv",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAlloObjetivoControles = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.objetivoControle.length === objetivoControles.length) {
-        // Deselect all
-        setFormData({ ...formData, objetivoControle: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          objetivoControle: objetivoControles.map(
-            (objetivoControle) => objetivoControle.id
-          ),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "objetivoControle",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllElementos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.elemento.length === elementos.length) {
-        // Deselect all
-        setFormData({ ...formData, elemento: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          elemento: elementos.map((elemento) => elemento.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "elemento",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllContas = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.conta.length === contas.length) {
-        // Deselect all
-        setFormData({ ...formData, conta: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, conta: contas.map((conta) => conta.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "conta",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllCompensadoControles = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      // Aplica o filtro usado no Autocomplete para este campo
-      const filteredOptions = compensadoControles.filter((item) => {
-        const superiorId = formData.departamentoSuperior; // ou outro campo se necessário
-        const inferiorIds = formData.compensaControle || [];
-        return (
-          item.id !== superiorId &&
-          !inferiorIds.includes(item.id) &&
-          formatarNome(item.nome) !== formatarNome(nome)
-        );
+        return value !== null && value !== undefined ? [value] : [];
       });
-      if (formData.compensadoControle.length === filteredOptions.length) {
-        setFormData({ ...formData, compensadoControle: [] });
-      } else {
-        setFormData({
-          ...formData,
-          compensadoControle: filteredOptions.map((item) => item.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "compensadoControle",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+      return [...new Set(values)].sort();
+    };
 
-  const handleSelectAllCompensaControles = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      // Aplica o mesmo filtro usado no Autocomplete
-      const filteredOptions = compensaControles.filter((item) => {
-        const superiorId = formData.departamentoSuperior; // ou outro campo se necessário
-        const lateralIds = formData.compensadoControle || [];
-        return (
-          item.id !== superiorId &&
-          !lateralIds.includes(item.id) &&
-          formatarNome(item.nome) !== formatarNome(nome)
-        );
+    setControlesOptions(getUniqueValues("name"));
+    setResponsibleOptions(getUniqueValues("responsible"));
+    setTypeOptions(getUniqueValues("type"));
+    setProcessOptions(getUniqueValues("process"));
+    setExecutionOptions(getUniqueValues("execution"));
+    setClassificationOptions(getUniqueValues("classification"));
+    setRisksOptions(getUniqueValues("risks", true));
+    setPlatformsOptions(getUniqueValues("platforms", true));
+    setInformationActivitiesOptions(
+      getUniqueValues("informationActivities", true)
+    );
+    setAssertionsOptions(getUniqueValues("assertions", true));
+    setCvarsOptions(getUniqueValues("cvars", true));
+    setDeficienciesOptions(getUniqueValues("deficiencies", true));
+    setLedgerAccountsOptions(getUniqueValues("ledgerAccounts", true));
+    setElementCososOptions(getUniqueValues("elementCosos", true));
+  }, [data]);
+
+  const applyFilters = () => {
+    const newFilters = [];
+    if (draftFilters.controle.length > 0)
+      newFilters.push({ type: "Controle", values: draftFilters.controle });
+    if (draftFilters.responsible.length > 0)
+      newFilters.push({
+        type: "Responsável",
+        values: draftFilters.responsible,
       });
-      if (formData.compensaControle.length === filteredOptions.length) {
-        // Se já estiverem todos selecionados, deseleciona todos
-        setFormData({ ...formData, compensaControle: [] });
-      } else {
-        // Seleciona somente os itens filtrados
-        setFormData({
-          ...formData,
-          compensaControle: filteredOptions.map((item) => item.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "compensaControle",
-        newValue.map((item) => item.id)
-      );
+    if (draftFilters.type.length > 0)
+      newFilters.push({ type: "Tipo", values: draftFilters.type });
+    if (draftFilters.process.length > 0)
+      newFilters.push({ type: "Processo", values: draftFilters.process });
+    if (draftFilters.execution.length > 0)
+      newFilters.push({ type: "Execução", values: draftFilters.execution });
+    if (draftFilters.classification.length > 0)
+      newFilters.push({
+        type: "Classificação",
+        values: draftFilters.classification,
+      });
+    if (draftFilters.risks.length > 0)
+      newFilters.push({ type: "Riscos", values: draftFilters.risks });
+    if (draftFilters.platforms.length > 0)
+      newFilters.push({ type: "Plataformas", values: draftFilters.platforms });
+    if (draftFilters.informationActivities.length > 0)
+      newFilters.push({
+        type: "Atividades de Informação",
+        values: draftFilters.informationActivities,
+      });
+    if (draftFilters.assertions.length > 0)
+      newFilters.push({ type: "Asserções", values: draftFilters.assertions });
+    if (draftFilters.cvars.length > 0)
+      newFilters.push({ type: "CVARs", values: draftFilters.cvars });
+    if (draftFilters.deficiencies.length > 0)
+      newFilters.push({
+        type: "Deficiências",
+        values: draftFilters.deficiencies,
+      });
+    if (draftFilters.ledgerAccounts.length > 0)
+      newFilters.push({
+        type: "Contas Contábeis",
+        values: draftFilters.ledgerAccounts,
+      });
+    if (draftFilters.elementCosos.length > 0)
+      newFilters.push({
+        type: "Elementos COSO",
+        values: draftFilters.elementCosos,
+      });
+    setSelectedFilters(newFilters);
+
+    if (draftFilters.startDate)
+      newFilters.push({
+        type: "Data Inicial",
+        values: [draftFilters.startDate],
+      });
+    if (draftFilters.endDate)
+      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
+    if (draftFilters.hasRisks)
+      newFilters.push({ type: "Com Riscos", values: [draftFilters.hasRisks] });
+
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: draftFilters.startDate,
+        EndDate: draftFilters.endDate,
+        HasRisks: draftFilters.hasRisks,
+      });
+    }
+
+    toggleDrawer();
+  };
+
+  const removeFilter = (index) => {
+    setSelectedFilters((prev) => {
+      const filterToRemove = prev[index];
+
+      setDraftFilters((prevDraft) => {
+        const updatedDraft = { ...prevDraft };
+        const filterType = filterToRemove.type;
+        const filterKey = {
+          Controle: "controle",
+          Responsável: "responsible",
+          Tipo: "type",
+          Processo: "process",
+          Execução: "execution",
+          Classificação: "classification",
+          Riscos: "risks",
+          Plataformas: "platforms",
+          "Atividades de Informação": "informationActivities",
+          Asserções: "assertions",
+          CVARs: "cvars",
+          Deficiências: "deficiencies",
+          "Contas Contábeis": "ledgerAccounts",
+          "Elementos COSO": "elementCosos",
+        }[filterType];
+
+        if (filterKey) {
+          updatedDraft[filterKey] = updatedDraft[filterKey].filter(
+            (value) => !filterToRemove.values.includes(value)
+          );
+        }
+        return updatedDraft;
+      });
+
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleRemoveAllFilters = () => {
+    setSelectedFilters([]);
+    setGlobalFilter("");
+    setDraftFilters({
+      controle: [],
+      responsible: [],
+      type: [],
+      process: [],
+      execution: [],
+      classification: [],
+      risks: [],
+      platforms: [],
+      informationActivities: [],
+      assertions: [],
+      cvars: [],
+      deficiencies: [],
+      ledgerAccounts: [],
+      elementCosos: [],
+      startDate: null,
+      endDate: null,
+      hasRisks: false,
+    });
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: null,
+        EndDate: null,
+        HasRisks: false,
+      });
     }
   };
 
-  const handleSelectAllAssertions = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.assertion.length === assertions.length) {
-        // Deselect all
-        setFormData({ ...formData, assertion: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          assertion: assertions.map((assertion) => assertion.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "assertion",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      return selectedFilters.every((filter) => {
+        const filterType = filter.type;
+        const filterValues = filter.values;
 
-  const handleSelectAllAtivos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.ativo.length === ativos.length) {
-        // Deselect all
-        setFormData({ ...formData, ativo: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, ativo: ativos.map((ativo) => ativo.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "ativo",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        if (filterType === "Controle") return filterValues.includes(item.name);
+        if (filterType === "Responsável")
+          return filterValues.includes(item.responsible);
+        if (filterType === "Tipo") return filterValues.includes(item.type);
+        if (filterType === "Processo")
+          return filterValues.includes(item.process);
+        if (filterType === "Execução")
+          return filterValues.includes(item.execution);
+        if (filterType === "Classificação")
+          return filterValues.includes(item.classification);
 
-  const handleSelectAllIpes = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.ipe.length === ipes.length) {
-        // Deselect all
-        setFormData({ ...formData, ipe: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, ipe: ipes.map((ipe) => ipe.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "ipe",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        const arrayFilters = {
+          Riscos: item.risks,
+          Plataformas: item.platforms,
+          "Atividades de Informação": item.informationActivities,
+          Asserções: item.assertions,
+          CVARs: item.cvars,
+          Deficiências: item.deficiencies,
+          "Contas Contábeis": item.ledgerAccounts,
+          "Elementos COSO": item.elementCosos,
+        };
 
-  const voltarParaCadastroMenu = () => {
-    navigate(-1);
-    window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
-  };
+        if (arrayFilters[filterType]) {
+          return filterValues.some((val) =>
+            (arrayFilters[filterType] || []).includes(val)
+          );
+        }
 
-  const continuarEdicao = () => {
-    setRequisicao("Editar");
-    setSuccessDialogOpen(false);
-  };
+        return true;
+      });
+    });
+  }, [data, selectedFilters]);
 
-  // Função para voltar para a listagem
-  const voltarParaListagem = () => {
-    setSuccessDialogOpen(false);
-    voltarParaCadastroMenu();
-  };
-
-  const [formValidation, setFormValidation] = useState({
-    codigo: true,
-    nome: true,
-    processo: true,
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    state: { sorting, rowSelection, globalFilter, columnVisibility },
+    enableRowSelection: true,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    globalFilterFn: fuzzyFilter,
+    debugTable: true,
   });
 
-  const allSelected =
-    formData.risco.length === riscos.length && riscos.length > 0;
-  const allSelectedAtivos =
-    formData.ativo.length === ativos.length && ativos.length > 0;
-  const allSelectedIpes =
-    formData.ipe.length === ipes.length && ipes.length > 0;
-  const allSelectedAssertions =
-    formData.assertion.length === assertions.length && assertions.length > 0;
-  const allSelectedDeficiencias =
-    formData.deficiencia.length === deficiencias.length &&
-    deficiencias.length > 0;
-  const allSelectedElementos =
-    formData.elemento.length === elementos.length && elementos.length > 0;
-  const allSelectedCompensadoControles =
-    formData.compensadoControle.length === compensadoControles.length &&
-    compensadoControles.length > 0;
-  const allSelectedCompensaControles =
-    formData.compensaControle.length === compensaControles.length &&
-    compensaControles.length > 0;
-  const allSelectedContas =
-    formData.conta.length === contas.length && contas.length > 0;
-  const allSelectedObjetivoControles =
-    formData.objetivoControle.length === objetivoControles.length &&
-    objetivoControles.length > 0;
-  const allSelectedCarvs =
-    formData.carv.length === carvs.length && carvs.length > 0;
+  useEffect(
+    () =>
+      setColumnVisibility({
+        name: true,
+        code: true,
+        responsible: true,
+        type: true,
+        process: true,
+        execution: true,
+        classification: true,
 
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+        risks: false,
+        platforms: false,
+        informationActivities: false,
+        assertions: false,
+        cvars: false,
+        deficiencies: false,
+        ledgerAccounts: false,
+        elementCosos: false,
+        frequency: false,
+        meaningfulness: false,
+        preventiveDetective: false,
+        revisionControl: false,
+        objectives: false,
+        causes: false,
+        impacts: false,
+        date: false,
+        actions: true,
+      }),
+    []
+  );
 
-  const tratarSubmit = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
+  const verticalDividerStyle = {
+    width: "0.5px",
+    height: "37px",
+    backgroundColor: "#98B3C3",
+    opacity: "0.75",
+    flexShrink: "0",
+    marginRight: "0px",
+    marginLeft: "7px",
+  };
 
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!nome.trim()) {
-      setFormValidation((prev) => ({ ...prev, nome: false }));
-      missingFields.push("Nome");
-    }
-    if (!codigo.trim()) {
-      setFormValidation((prev) => ({ ...prev, codigo: false }));
-      missingFields.push("Código");
-    }
-    if (!formData.processo) {
-      setFormValidation((prev) => ({ ...prev, processo: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
+  let headers = [];
+  table.getVisibleLeafColumns().map((columns) =>
+    headers.push({
+      label:
+        typeof columns.columnDef.header === "string"
+          ? columns.columnDef.header
+          : "#",
+      key: columns.columnDef.accessorKey,
+    })
+  );
 
-    try {
-      setLoading(true);
-
-      if (deletedFiles.length > 0) {
-        // Supondo que deletedFilesPayload deva conter dados relevantes e não apenas o resultado de file instanceof File
-        const deletedFilesPayload = deletedFiles.map((file) => file.name); // ajuste conforme a necessidade
-        
-        await axios.delete(
-          `${process.env.REACT_APP_API_URL}files`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            data: {
-              containerFolder: 4,
-              files: deletedFilesPayload,
-            },
-          }
-        );
-      }
-      
-      const newFiles = formData.files.filter((file) => file instanceof File);
-      const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
-      );
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 4); 
-
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? controleDados?.idControl : ""
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-        uploadFilesResult = uploadResponse.data; 
-      }
-
-      // Combina os arquivos já existentes com os novos enviados (retornados pelo endpoint)
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-
-      // Transforma cada item para que o payload contenha somente a URL (string)
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      // --- Configuração do payload e endpoint para CONTROLES ---
-      if (requisicao === "Criar") {
-        url = `${process.env.REACT_APP_API_URL}controls`;
-        method = "POST";
-        payload = {
-          code: codigo,
-          name: nome,
-          idProcess: formData.processo,
-        };
-      } else if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}controls`;
-        method = "PUT";
-        payload = {
-          idControl: controleDados?.idControl,
-          code: codigo,
-          name: nome,
-          description: descricao,
-          preventiveDetective: preventivo,
-          revisionControl: revisao,
-          idPlatforms: formData.ativo,
-          frequency: formData.frequencia === null || formData.frequencia === '' ? 0 : formData.frequencia,
-          idResponsible: formData.responsavel === null || formData.responsavel === '' ? null : formData.responsavel,
-          active: true,
-          idControlType: formData.tiposControle === null || formData.tiposControle === '' ? null : formData.tiposControle,
-          idProcess: formData.processo,
-          idControlExecution: formData.execucao === null || formData.execucao === '' ? null : formData.execucao,
-          idClassification: formData.classificacao === null || formData.classificacao === '' ? null : formData.classificacao,
-          idRisks: formData.risco,
-          idInformationActivities: formData.ipe,
-          idAssertions: formData.assertion,
-          idCvars: formData.carv,
-          idDeficiencies: formData.deficiencia,
-          idControlCompensatings: formData.compensaControle,
-          idControlCompensateds: formData.compensadoControle,
-          idControlLedgerAccounts: formData.conta,
-          idControlElementCosos: formData.elemento,
-          idControlObjectives: formData.objetivoControle,
-          files: finalFilesPayload,
-          meaningfulness: chave,
-        };
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+  useEffect(() => {
+    const markInstance = new Mark(tableRef.current);
+    if (globalFilter) {
+      markInstance.unmark({
+        done: () => {
+          markInstance.mark(globalFilter);
         },
-        body: JSON.stringify(payload),
       });
-
-      let data = null;
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      } else {
-        enqueueSnackbar(`Controle ${mensagemFeedback} com sucesso!`, {
-          variant: "success",
-          anchorOrigin: { vertical: "top", horizontal: "right" },
-        });
-      }
-
-      if (requisicao === "Criar" && data.data.idControl) {
-        setControleDados(data.data);
-        setSuccessDialogOpen(true);
-      } else {
-        voltarParaCadastroMenu();
-      }
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-    } finally {
-      setLoading(false);
+    } else {
+      markInstance.unmark();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalFilter, table.getRowModel().rows]);
+
+  const getAllColumnsFiltered = () => {
+    return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
   };
 
   return (
     <>
-      <LoadingOverlay isActive={loading} />
-      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
-        <Grid container spacing={1} marginTop={2}>
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Código *</InputLabel>
-              <TextField
-                onChange={(event) => setCodigo(event.target.value)}
-                fullWidth
-                value={codigo}
-                error={!codigo && formValidation.codigo === false}
-              />
-            </Stack>
-          </Grid>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{
+          backgroundColor: "#F1F1F1E5",
+          paddingBottom: 2,
+          paddingTop: 2,
+          paddingRight: 2,
+          paddingLeft: 2,
+          marginBottom: 3,
+          ...(matchDownSM && {
+            "& .MuiOutlinedInput-root, & .MuiFormControl-root": {
+              width: "110%",
+            },
+          }),
+        }}
+      >
+        <Stack direction="row" spacing={1} alignItems="center">
+          <SelectColumnVisibility
+            {...{
+              getVisibleLeafColumns: table.getVisibleLeafColumns,
+              getIsAllColumnsVisible: table.getIsAllColumnsVisible,
+              getToggleAllColumnsVisibilityHandler:
+                table.getToggleAllColumnsVisibilityHandler,
+              getAllColumns: getAllColumnsFiltered,
+            }}
+          />
+          <DebouncedInput
+            value={globalFilter ?? ""}
+            onFilterChange={(value) => setGlobalFilter(String(value))}
+            placeholder={`Pesquise pelo nome`}
+            style={{
+              width: "350px",
+              height: "33px",
+              borderRadius: "8px",
+              border: "0.3px solid #00000010",
+              backgroundColor: "#FFFFFF",
+            }}
+          />
+          <Button
+            onClick={() => toggleDrawer(true)}
+            startIcon={
+              <FontAwesomeIcon icon={faFilter} style={{ color: "#00000080" }} />
+            }
+            style={{
+              width: "90px",
+              color: "#00000080",
+              backgroundColor: "white",
+              fontSize: "13px",
+              marginLeft: 24,
+              fontWeight: 400,
+              height: "33px",
+              borderRadius: "8px",
+              border: "0.6px solid #00000040 ",
+            }}
+          >
+            Filtros
+          </Button>
+        </Stack>
 
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Nome *</InputLabel>
-              <TextField
-                onChange={(event) => setNome(event.target.value)}
-                fullWidth
-                value={nome}
-                error={!nome && formValidation.nome === false}
-              />
-            </Stack>
-          </Grid>
-
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>
-                Processos *{" "}
-                <DrawerProcesso
-                  buttonSx={{
-                    marginLeft: 1.5,
-                    height: "20px",
-                    minWidth: "20px",
-                  }}
-                  onProcessCreated={handleProcessCreated}
-                />
-              </InputLabel>
-              <Autocomplete
-                options={processos}
-                getOptionLabel={(option) => option.nome}
-                value={
-                  processos.find(
-                    (processo) => processo.id === formData.processo
-                  ) || null
-                }
-                onChange={(event, newValue) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    processo: newValue ? newValue.id : "",
-                  }));
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    error={
-                      !formData.processo && formValidation.processo === false
-                    }
-                  />
-                )}
-              />
-            </Stack>
-          </Grid>
-
-          {requisicao === "Editar" && (
-            <>
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Descrição</InputLabel>
-                  <TextField
-                    onChange={(event) => setDescricao(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={descricao}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Tipo de controle</InputLabel>
-                  <Autocomplete
-                    options={tiposControles}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      tiposControles.find(
-                        (tiposControle) =>
-                          tiposControle.id === formData.tiposControle
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        tiposControle: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.tiposControle &&
-                          formValidation.tiposControle === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>Compensa os controles</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...compensaControles.filter((departamento) => {
-                        // IDs já selecionados em outros autocompletes:
-                        const superiorId = formData.departamentoSuperior;
-                        const lateralIds = formData.compensadoControle || [];
-
-                        // Se o departamento estiver selecionado neste campo, mantenha-o
-                        if (formData.compensaControle.includes(departamento.id))
-                          return true;
-
-                        return (
-                          departamento.id !== superiorId &&
-                          !lateralIds.includes(departamento.id) &&
-                          formatarNome(departamento.nome) !== formatarNome(nome)
-                        );
-                      }),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.compensaControle.map(
-                      (id) =>
-                        compensaControles.find(
-                          (departamento) => departamento.id === id
-                        ) || id
-                    )}
-                    onChange={handleSelectAllCompensaControles}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedCompensaControles
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.compensaControle.length === 0 ||
-                            formData.compensaControle.every(
-                              (val) => val === 0
-                            )) &&
-                          formValidation.compensaControle === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>Compensado pelos controles</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...compensadoControles.filter((departamento) => {
-                        const superiorId = formData.departamentoSuperior;
-                        const inferiorIds = formData.compensaControle || [];
-
-                        if (
-                          formData.compensadoControle.includes(departamento.id)
-                        )
-                          return true;
-
-                        return (
-                          departamento.id !== superiorId &&
-                          !inferiorIds.includes(departamento.id) &&
-                          formatarNome(departamento.nome) !== formatarNome(nome)
-                        );
-                      }),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.compensadoControle.map(
-                      (id) =>
-                        compensadoControles.find(
-                          (departamento) => departamento.id === id
-                        ) || id
-                    )}
-                    onChange={handleSelectAllCompensadoControles}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedCompensadoControles
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.compensadoControle.length === 0 ||
-                            formData.compensadoControle.every(
-                              (val) => val === 0
-                            )) &&
-                          formValidation.compensaControle === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Objetivo de controle{" "}
-                    <DrawerObjetivo
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onObjetivoCreated={handleObjetiveCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", description: "Selecionar todos" },
-                      ...objetivoControles,
-                    ]}
-                    getOptionLabel={(option) => option.description}
-                    value={formData.objetivoControle.map(
-                      (id) =>
-                        objetivoControles.find(
-                          (objetivoControle) => objetivoControle.id === id
-                        ) || id
-                    )}
-                    onChange={handleSelectAlloObjetivoControles}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedObjetivoControles
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.description}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.objetivoControle.length === 0 ||
-                            formData.objetivoControle.every(
-                              (val) => val === 0
-                            )) &&
-                          formValidation.objetivoControle === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Contas{" "}
-                    <DrawerConta
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onAccountCreated={handleAccountCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...contas,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.conta.map(
-                      (id) => contas.find((conta) => conta.id === id) || id
-                    )}
-                    onChange={handleSelectAllContas}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedContas
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.conta.length === 0 ||
-                            formData.conta.every((val) => val === 0)) &&
-                          formValidation.conta === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Frequência</InputLabel>
-                  <Autocomplete
-                    options={frequencias}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      frequencias.find(
-                        (frequencia) => frequencia.id === formData.frequencia
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        frequencia: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.frequencia &&
-                          formValidation.frequencia === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Execução</InputLabel>
-                  <Autocomplete
-                    options={execucoes}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      execucoes.find(
-                        (execucao) => execucao.id === formData.execucao
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        execucao: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.execucao &&
-                          formValidation.execucao === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Classificação</InputLabel>
-                  <Autocomplete
-                    options={classificacoes}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      classificacoes.find(
-                        (classificacao) =>
-                          classificacao.id === formData.classificacao
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        classificacao: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.classificacao &&
-                          formValidation.classificacao === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Riscos{" "}
-                    <DrawerRisco
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onRiscoCreated={handleRiskCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...riscos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.risco.map(
-                      (id) => riscos.find((risco) => risco.id === id) || id
-                    )}
-                    onChange={handleSelectAll}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelected : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.risco.length === 0 ||
-                            formData.risco.every((val) => val === 0)) &&
-                          formValidation.risco === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Ativo{" "}
-                    <DrawerAtivo
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onActiveCreated={handleActiveCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...ativos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.ativo.map(
-                      (id) => ativos.find((ativo) => ativo.id === id) || id
-                    )}
-                    onChange={handleSelectAllAtivos}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedAtivos
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.ativo.length === 0 ||
-                            formData.ativo.every((val) => val === 0)) &&
-                          formValidation.ativo === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                  Informação da atividade (IPE) {" "}
-                    <DrawerIpe
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onIpeCreated={handleIpeCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...ipes]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.ipe.map(
-                      (id) => ipes.find((ipe) => ipe.id === id) || id
-                    )}
-                    onChange={handleSelectAllIpes}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelectedIpes : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.ipe.length === 0 ||
-                            formData.ipe.every((val) => val === 0)) &&
-                          formValidation.ipe === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Assertions</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...assertions,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.assertion.map(
-                      (id) =>
-                        assertions.find((assertion) => assertion.id === id) ||
-                        id
-                    )}
-                    onChange={handleSelectAllAssertions}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedAssertions
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.assertion.length === 0 ||
-                            formData.assertion.every((val) => val === 0)) &&
-                          formValidation.assertion === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>CAVR</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...carvs,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.carv.map(
-                      (id) => carvs.find((carv) => carv.id === id) || id
-                    )}
-                    onChange={handleSelectAllCarvs}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedCarvs
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.carv.length === 0 ||
-                            formData.carv.every((val) => val === 0)) &&
-                          formValidation.carv === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Deficiências{" "}
-                    <DrawerDeficiencia
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onDeficienciaCreated={handleDeficiencyCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...deficiencias,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.deficiencia.map(
-                      (id) =>
-                        deficiencias.find(
-                          (deficiencia) => deficiencia.id === id
-                        ) || id
-                    )}
-                    onChange={handleSelectAllDeficiencias}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedDeficiencias
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.deficiencia.length === 0 ||
-                            formData.deficiencia.every((val) => val === 0)) &&
-                          formValidation.deficiencia === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Elemento COSO</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...elementos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.elemento.map(
-                      (id) =>
-                        elementos.find((elemento) => elemento.id === id) || id
-                    )}
-                    onChange={handleSelectAllElementos}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedElementos
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.elemento.length === 0 ||
-                            formData.elemento.every((val) => val === 0)) &&
-                          formValidation.elemento === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsavel: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={1.5}>
-                <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                  >
-                    <Switch
-                      checked={chave}
-                      onChange={(event) => setChave(event.target.checked)}
-                    />
-                    <Typography>Chave</Typography>
-                  </Stack>
-                </Stack>
-              </Grid>
-
-              <Grid item xs={1.5}>
-                <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                  >
-                    <Switch
-                      checked={revisao}
-                      onChange={(event) => setRevisao(event.target.checked)}
-                    />
-                    <Typography>Revisão</Typography>
-                  </Stack>
-                </Stack>
-              </Grid>
-
-              <Grid item xs={1.5} mb={5}>
-                <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                  >
-                    <Switch
-                      checked={preventivo}
-                      onChange={(event) => setPreventivo(event.target.checked)}
-                    />
-                    <Typography>Preventivo</Typography>
-                  </Stack>
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Anexo</InputLabel>
-                  <FileUploader
-                    containerFolder={1}
-                    initialFiles={formData.files}
-                    onFilesChange={(files) =>
-                      setFormData((prev) => ({ ...prev, files }))
-                    }
-                    onFileDelete={(file) => setDeletedFiles((prev) => [...prev, file])}
-                  />
-                </Stack>
-              </Grid>
-
-              {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                              <Accordion>
-                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                  <Typography variant="h6">Testes</Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                  <ListagemTestes />
-                                </AccordionDetails>
-                              </Accordion>
-                            </Grid> */}
-            </>
-          )}
-
-          {/* Botões de ação */}
-          <Grid item xs={12} mt={-5}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems="center"
+          sx={{ width: { xs: "100%", sm: "auto" } }}
+        >
+          <div style={{ verticalDividerStyle }}></div>
+          <Stack direction="row" spacing={2} alignItems="center">
             <Box
               sx={{
                 display: "flex",
-                justifyContent: "flex-start",
-                gap: "8px",
-                marginRight: "20px",
-                marginTop: 5,
+                alignItems: "center",
+                flexShrink: 0,
+                ml: 0.75,
               }}
             >
               <Button
                 variant="contained"
-                color="primary"
-                style={{
-                  width: "91px",
-                  height: "32px",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: 600,
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigation(`/controles/criar`, {
+                    state: { indoPara: "NovoControle" },
+                  });
                 }}
-                onClick={tratarSubmit}
+                startIcon={<PlusOutlined />}
+                style={{ borderRadius: "20px", height: "32px" }}
               >
-                Atualizar
+                Novo
               </Button>
             </Box>
-          </Grid>
-          <Dialog
-            open={successDialogOpen}
-            onClose={voltarParaListagem}
-            sx={{
-              "& .MuiDialog-paper": {
-                padding: "24px",
-                borderRadius: "12px",
-                width: "400px",
-                textAlign: "center",
-              },
-            }}
-          >
-            {/* Ícone de Sucesso */}
-            <Box display="flex" justifyContent="center" mt={2}>
-              <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
-            </Box>
-
-            {/* Título Centralizado */}
-            <DialogTitle
-              sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
-            >
-              Controle Criado com Sucesso!
-            </DialogTitle>
-
-            {/* Mensagem */}
-            <DialogContent>
-              <DialogContentText
-                sx={{ fontSize: "16px", color: "#555", px: 2 }}
-              >
-                O controle foi cadastrado com sucesso. Você pode voltar para a
-                listagem ou adicionar mais informações a esse controle.
-              </DialogContentText>
-            </DialogContent>
-
-            {/* Botões */}
-            <DialogActions
-              sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
+          </Stack>
+          <Stack>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+                ml: 0.75,
+              }}
             >
               <Button
-                onClick={voltarParaListagem}
                 variant="outlined"
-                sx={{
-                  borderColor: "#007bff",
-                  color: "#007bff",
-                  fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "rgba(0, 123, 255, 0.1)",
-                  },
-                }}
+                onClick={onExportExcel}
+                startIcon={<DownloadOutlined />}
+                disabled={isLoading}
+                style={{ borderRadius: "20px", height: "32px" }}
               >
-                Voltar para a listagem
+                Exportar Excel
               </Button>
-              <Button
-                onClick={continuarEdicao}
-                variant="contained"
-                sx={{
-                  backgroundColor: "#007bff",
-                  fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "#0056b3",
-                  },
-                }}
-                autoFocus
-              >
-                Adicionar mais informações
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </Grid>
-      </LocalizationProvider>
+            </Box>
+          </Stack>
+        </Stack>
+      </Stack>
+
+      <Box mb={2}>
+        {selectedFilters.map((filter, index) => (
+          <Chip
+            key={index}
+            label={
+              <Box display="flex" alignItems="center">
+                <Typography
+                  sx={{ color: "#1C5297", fontWeight: 600, marginRight: "4px" }}
+                >
+                  {filter.type}:
+                </Typography>
+                <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
+                  {filter.values
+                    .map((v) =>
+                      v === true ? "Controle" : v === false ? "Inativo" : v
+                    )
+                    .join(", ")}
+                </Typography>
+              </Box>
+            }
+            onDelete={() => removeFilter(index)}
+            sx={{
+              margin: 0.5,
+              backgroundColor: "#1C52971A",
+              border: "0.7px solid #1C529733",
+            }}
+          />
+        ))}
+        {selectedFilters.length > 0 && (
+          <Chip
+            label="Limpar Filtros"
+            onClick={handleRemoveAllFilters}
+            sx={{
+              margin: 0.5,
+              backgroundColor: "transparent",
+              color: "#1C5297",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+            }}
+          />
+        )}
+      </Box>
+
+      {}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 670 } }}
+      >
+        <Box sx={{ width: 650, p: 3 }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box
+              component="h2"
+              sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
+            >
+              Filtros
+            </Box>
+            <IconButton onClick={toggleDrawer}>
+              <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
+            </IconButton>
+          </Stack>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Controle
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={controlesOptions}
+                  value={draftFilters.controle}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, controle: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Responsável
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={responsibleOptions}
+                  value={draftFilters.responsible}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, responsible: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Tipo
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={typeOptions}
+                  value={draftFilters.type}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, type: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Processo
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={processOptions}
+                  value={draftFilters.process}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, process: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Execução
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={executionOptions}
+                  value={draftFilters.execution}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, execution: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Classificação
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={classificationOptions}
+                  value={draftFilters.classification}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      classification: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Riscos
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={risksOptions}
+                  value={draftFilters.risks}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, risks: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Plataformas
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={platformsOptions}
+                  value={draftFilters.platforms}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, platforms: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Atividades de Informação
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={informationActivitiesOptions}
+                  value={draftFilters.informationActivities}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      informationActivities: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Asserções
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={assertionsOptions}
+                  value={draftFilters.assertions}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, assertions: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                CVARs
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={cvarsOptions}
+                  value={draftFilters.cvars}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, cvars: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Deficiências
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={deficienciesOptions}
+                  value={draftFilters.deficiencies}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      deficiencies: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Contas Contábeis
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={ledgerAccountsOptions}
+                  value={draftFilters.ledgerAccounts}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      ledgerAccounts: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Elementos COSO
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={elementCososOptions}
+                  value={draftFilters.elementCosos}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      elementCosos: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Inicial
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.startDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Final
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.endDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={draftFilters.hasRisks}
+                    onChange={(e) =>
+                      setDraftFilters((prev) => ({
+                        ...prev,
+                        hasRisks: e.target.checked,
+                      }))
+                    }
+                    name="hasRisks"
+                    color="primary"
+                  />
+                }
+                label="Apenas Controles com Riscos"
+              />
+            </Grid>
+          </Grid>
+
+          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
+          </Stack>
+        </Box>
+      </Drawer>
+
+      <MainCard content={false}>
+        <ScrollX>
+          <div ref={tableRef}>
+            <Stack>
+              <RowSelection selected={Object.keys(rowSelection).length} />
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow
+                        key={headerGroup.id}
+                        sx={{
+                          backgroundColor: isDarkMode ? "#14141" : "#F4F4F4",
+                          color: isDarkMode
+                            ? "rgba(0, 0, 0, 0.6)"
+                            : "rgba(255, 255, 255, 0.87)",
+                        }}
+                      >
+                        {headerGroup.headers.map((header) => {
+                          if (
+                            header.column.columnDef.meta !== undefined &&
+                            header.column.getCanSort()
+                          ) {
+                            Object.assign(header.column.columnDef.meta, {
+                              className:
+                                header.column.columnDef.meta.className +
+                                " cursor-pointer prevent-select",
+                            });
+                          }
+
+                          return (
+                            <TableCell
+                              sx={{
+                                fontSize: "11px",
+                                color: isDarkMode
+                                  ? "rgba(255, 255, 255, 0.87)"
+                                  : "rgba(0, 0, 0, 0.6)",
+                              }}
+                              key={header.id}
+                              {...header.column.columnDef.meta}
+                              onClick={header.column.getToggleSortingHandler()}
+                              {...(header.column.getCanSort() &&
+                                header.column.columnDef.meta === undefined && {
+                                  className: "cursor-pointer prevent-select",
+                                })}
+                            >
+                              {header.isPlaceholder ? null : (
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                >
+                                  <Box>
+                                    {flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext()
+                                    )}
+                                  </Box>
+                                  {header.column.getCanSort() && (
+                                    <HeaderSort column={header.column} />
+                                  )}
+                                </Stack>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableHead>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          sx={{ textAlign: "center" }}
+                        >
+                          <CircularProgress />
+                        </TableCell>
+                      </TableRow>
+                    ) : data ? (
+                      data.length > 0 ? (
+                        table.getRowModel().rows.map((row) => (
+                          <Fragment key={row.id}>
+                            <TableRow
+                              sx={{
+                                "&:last-child td": { borderBottom: "none" },
+                                backgroundColor: isDarkMode ? "#14141" : "#fff",
+                              }}
+                            >
+                              {row.getVisibleCells().map((cell) => (
+                                <TableCell
+                                  key={cell.id}
+                                  {...cell.column.columnDef.meta}
+                                  sx={{
+                                    overflow: "hidden",
+                                    color: isDarkMode
+                                      ? "rgba(255, 255, 255, 0.87)"
+                                      : "rgba(0, 0, 0, 0.65)",
+                                    textOverflow: "ellipsis",
+                                    fontFamily:
+                                      '"Open Sans", Helvetica, sans-serif',
+                                    fontSize: "13px",
+                                    fontStyle: "normal",
+                                    fontWeight: 400,
+                                    lineHeight: "normal",
+                                  }}
+                                >
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext()
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          </Fragment>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={columns.length}>
+                            <EmptyTable msg="Controles não encontrados" />
+                          </TableCell>
+                        </TableRow>
+                      )
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          sx={{ textAlign: "left" }}
+                        >
+                          <CircularProgress />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <>
+                <Divider />
+                <Box sx={{ p: 2 }}>
+                  <TablePagination
+                    {...{
+                      setPageSize: table.setPageSize,
+                      setPageIndex: table.setPageIndex,
+                      getState: table.getState,
+                      getPageCount: table.getPageCount,
+                      totalItems: processosTotal,
+                      recordType: recordType,
+                    }}
+                  />
+                </Box>
+              </>
+            </Stack>
+          </div>
+        </ScrollX>
+      </MainCard>
     </>
   );
 }
 
-export default ColumnsLayouts;
+ReactTable.propTypes = {
+  columns: PropTypes.array,
+  data: PropTypes.array,
+  getHeaderProps: PropTypes.func,
+  handleAdd: PropTypes.func,
+  modalToggler: PropTypes.func,
+  renderRowSubComponent: PropTypes.any,
+  refreshData: PropTypes.func,
+  onExportExcel: PropTypes.func,
+};
+
+function ActionCell({ row, refreshData }) {
+  const navigation = useNavigate();
+  const { token } = useToken();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openErrorDialog, setOpenErrorDialog] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleDialogOpen = () => {
+    setOpenDialog(true);
+  };
+
+  const handleDialogClose = () => {
+    setOpenDialog(false);
+    handleClose();
+  };
+
+  const handleToggleActive = async () => {
+    handleClose();
+    if (openDialog) setOpenDialog(false);
+
+    setLoadingStatus(true);
+    const authToken = token || localStorage.getItem("access_token");
+
+    try {
+      const responseGet = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/controls/${row.original.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!responseGet.ok) throw new Error("Erro ao buscar dados do controle.");
+      const data = await responseGet.json();
+
+      const payload = {
+        idControl: data.idControl,
+        active: !data.active,
+
+        code: data.code,
+        name: data.name,
+        description: data.description,
+        preventiveDetective: data.preventiveDetective,
+        revisionControl: data.revisionControl,
+        meaningfulness: data.meaningfulness,
+        frequency: data.frequency || 0,
+
+        idResponsible: data.idResponsible || null,
+        idControlType: data.idControlType || null,
+        idProcess: data.idProcess || null,
+        idControlExecution: data.idControlExecution || null,
+        idClassification: data.idClassification || null,
+
+        idPlatforms: data.idPlatforms || [],
+        idRisks: data.idRisks || [],
+        idInformationActivities: data.idInformationActivities || [],
+        idAssertions: data.idAssertions || [],
+        idCvars: data.idCvars || [],
+        idDeficiencies: data.idDeficiencies || [],
+        idControlCompensatings: data.idControlCompensatings || [],
+        idControlCompensateds: data.idControlCompensateds || [],
+        idControlLedgerAccounts: data.idControlLedgerAccounts || [],
+        idControlElementCosos: data.idControlElementCosos || [],
+        idControlObjectives: data.idControlObjectives || [],
+
+        files: Array.isArray(data.files)
+          ? data.files.map((f) => (typeof f === "string" ? f : f.path))
+          : [],
+      };
+
+      const responsePut = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/controls`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!responsePut.ok) {
+        throw new Error("Erro ao atualizar status do controle.");
+      }
+
+      enqueueSnackbar(
+        `Controle ${data.active ? "inativado" : "ativado"} com sucesso!`,
+        { variant: "success" }
+      );
+
+      refreshData();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar(`Erro ao alterar o status: ${error.message}`, {
+        variant: "error",
+      });
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+
+  const handleDeleteDialogClose = () => {
+    setOpenDeleteDialog(false);
+    handleClose();
+  };
+
+  const buttonStyle = {
+    borderRadius: 8,
+    backgroundColor: "#1C52970D",
+    width: "30px",
+    height: "30px",
+  };
+
+  const open = Boolean(anchorEl);
+  const id = open ? "simple-popover" : undefined;
+
+  const isActive = row.original.active !== false;
+
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="center"
+      spacing={0}
+    >
+      {loadingStatus ? (
+        <CircularProgress size={20} />
+      ) : (
+        <IconButton
+          aria-describedby={id}
+          color="primary"
+          onClick={handleClick}
+          style={buttonStyle}
+        >
+          <MoreVertIcon />
+        </IconButton>
+      )}
+
+      <Popover
+        id={id}
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "left",
+        }}
+      >
+        <Stack>
+          <Button
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/controles/criar`, {
+                state: {
+                  indoPara: "NovoControle",
+                  dadosApi,
+                },
+              });
+              handleClose();
+            }}
+            color="primary"
+            style={{ color: "#707070", fontWeight: 400 }}
+          >
+            Editar
+          </Button>
+
+          <Button
+            onClick={() => {
+              if (isActive) handleDialogOpen();
+              else handleToggleActive();
+            }}
+            style={{ color: "#707070", fontWeight: 400 }}
+          >
+            {isActive ? "Inativar" : "Ativar"}
+          </Button>
+        </Stack>
+      </Popover>
+
+      {}
+      <Dialog
+        open={openDialog}
+        onClose={handleDialogClose}
+        sx={{
+          "& .MuiPaper-root": {
+            width: "547px",
+            height: "290px",
+            maxWidth: "none",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: "#ED5565",
+            width: "auto",
+            height: "42px",
+            borderRadius: "4px 4px 0px 0px",
+            display: "flex",
+            alignItems: "center",
+            padding: "10px",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <IconButton
+              aria-label="delete"
+              sx={{
+                fontSize: "16px",
+                marginRight: "2px",
+                color: "rgba(255, 255, 255, 1)",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  boxShadow: "none",
+                  color: "white",
+                  cursor: "default",
+                },
+              }}
+            >
+              <FontAwesomeIcon icon={faBan} />
+            </IconButton>
+
+            <Typography
+              variant="body1"
+              sx={{
+                fontFamily: '"Open Sans", Helvetica, sans-serif',
+                fontSize: "16px",
+                fontWeight: 500,
+                lineHeight: "21px",
+                letterSpacing: "0em",
+                textAlign: "left",
+                color: "rgba(255, 255, 255, 1)",
+                flexGrow: 1,
+              }}
+            >
+              Inativar
+            </Typography>
+          </div>
+          <IconButton
+            aria-label="close"
+            onClick={handleDialogClose}
+            sx={{
+              color: "rgba(255, 255, 255, 1)",
+              "&:hover": {
+                backgroundColor: "transparent",
+                boxShadow: "none",
+                color: "white",
+              },
+            }}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            component="div"
+            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
+          >
+            Tem certeza que deseja inativar o controle "{row.original.name}"?
+          </Typography>
+          <Typography
+            component="div"
+            style={{ marginTop: "20px", color: "#717171" }}
+          >
+            Ao inativar, esse controle não aparecerá mais no cadastro manual.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleToggleActive}
+            color="primary"
+            autoFocus
+            style={{
+              marginTop: "-55px",
+              width: "162px",
+              height: "32px",
+              padding: "8px 16px",
+              borderRadius: "4px",
+              background: "#ED5565",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#fff",
+              textTransform: "none",
+            }}
+          >
+            Sim, inativar
+          </Button>
+          <Button
+            onClick={handleDialogClose}
+            style={{
+              marginTop: "-55px",
+              padding: "8px 16px",
+              width: "91px",
+              height: "32px",
+              borderRadius: "4px",
+              border: "1px solid rgba(0, 0, 0, 0.40)",
+              background: "#FFF",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
+            }}
+          >
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {}
+      <Dialog open={openDeleteDialog} onClose={handleDeleteDialogClose}>
+        {}
+      </Dialog>
+      <Dialog open={openErrorDialog} onClose={() => setOpenErrorDialog(false)}>
+        {}
+      </Dialog>
+    </Stack>
+  );
+}
+
+ActionCell.propTypes = {
+  row: PropTypes.object.isRequired,
+  refreshData: PropTypes.func.isRequired,
+};
+
+const ListagemControles = () => {
+  const theme = useTheme();
+  const location = useLocation();
+  const navigation = useNavigate();
+  const { processoSelecionadoId } = location.state || {};
+  const [formData, setFormData] = useState({ refreshCount: 0 });
+  const [backendFilters, setBackendFilters] = useState({});
+  const { acoesJudiciais: lists, isLoading } = useGetControles(
+    { ...formData, ...backendFilters },
+    processoSelecionadoId
+  );
+
+  const handleBackendFiltersChange = (newFilters) => {
+    setBackendFilters(newFilters);
+  };
+  const processosTotal = lists ? lists.length : 0;
+  const [open, setOpen] = useState(false);
+  const [customerModal, setCustomerModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerDeleteId] = useState("");
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const refreshOrgaos = () => {
+    setFormData((currentData) => ({
+      ...currentData,
+      refreshCount: currentData.refreshCount + 1,
+    }));
+  };
+
+  useEffect(() => {
+    const refreshHandler = () => {
+      refreshOrgaos();
+    };
+
+    emitter.on("refreshCustomers", refreshHandler);
+
+    return () => {
+      emitter.off("refreshCustomers", refreshHandler);
+    };
+  }, []);
+
+  const handleClose = () => {
+    setOpen(!open);
+  };
+
+  const handleFormDataChange = (newFormData) => {
+    setFormData(newFormData);
+  };
+
+  const handleExportExcel = () => {
+    setFormData((prev) => ({
+      ...prev,
+      ...backendFilters,
+      GenerateExcel: true,
+      refreshCount: prev.refreshCount + 1,
+    }));
+  };
+
+  const columns = useMemo(
+    () => [
+      {
+        header: "Controles",
+        accessorKey: "name",
+        cell: ({ row }) => (
+          <Typography
+            sx={{ fontSize: "13px", cursor: "pointer" }}
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/controles/criar`, {
+                state: { indoPara: "NovoControle", dadosApi },
+              });
+            }}
+          >
+            {row.original.name}
+          </Typography>
+        ),
+      },
+      {
+        header: "Código",
+        accessorKey: "code",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
+        ),
+      },
+      {
+        header: "Responsável",
+        accessorKey: "responsible",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.responsible}
+          </Typography>
+        ),
+      },
+      {
+        header: "Tipo",
+        accessorKey: "type",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.type}</Typography>
+        ),
+      },
+      {
+        header: "Processo",
+        accessorKey: "process",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.process}
+          </Typography>
+        ),
+      },
+      {
+        header: "Execução",
+        accessorKey: "execution",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.execution}
+          </Typography>
+        ),
+      },
+      {
+        header: "Classificação",
+        accessorKey: "classification",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.classification}
+          </Typography>
+        ),
+      },
+
+      {
+        header: "Significância",
+        accessorKey: "meaningfulness",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.meaningfulness ? "Sim" : "Não"}
+          </Typography>
+        ),
+      },
+      {
+        header: "Preventivo/Detectivo",
+        accessorKey: "preventiveDetective",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.preventiveDetective ? "Sim" : "Não"}
+          </Typography>
+        ),
+      },
+      {
+        header: "Controle de Revisão",
+        accessorKey: "revisionControl",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.revisionControl ? "Sim" : "Não"}
+          </Typography>
+        ),
+      },
+      {
+        header: "Frequência",
+        accessorKey: "frequency",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.frequency}
+          </Typography>
+        ),
+      },
+      {
+        header: "Riscos",
+        accessorKey: "risks",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.risks || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Plataformas",
+        accessorKey: "platforms",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.platforms || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Atividades de Informação",
+        accessorKey: "informationActivities",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.informationActivities || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Asserções",
+        accessorKey: "assertions",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.assertions || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "CVARs",
+        accessorKey: "cvars",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.cvars || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Deficiências",
+        accessorKey: "deficiencies",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.deficiencies || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Contas Contábeis",
+        accessorKey: "ledgerAccounts",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.ledgerAccounts || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Elementos COSO",
+        accessorKey: "elementCosos",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.elementCosos || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Objetivos",
+        accessorKey: "objectives",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.objectives || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Causas",
+        accessorKey: "causes",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.causes || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Impactos",
+        accessorKey: "impacts",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.impacts || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Data",
+        accessorKey: "date",
+        cell: ({ row }) => {
+          try {
+            return (
+              <Typography sx={{ fontSize: "13px" }}>
+                {new Date(row.original.date).toLocaleDateString()}
+              </Typography>
+            );
+          } catch {
+            return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
+          }
+        },
+      },
+
+      {
+        id: "actions",
+        header: " ",
+        enableHiding: false,
+        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
+      },
+    ],
+    [theme]
+  );
+
+  useEffect(() => {
+    if (isInitialLoad && !isLoading) {
+      setIsInitialLoad(false);
+    }
+  }, [isLoading, isInitialLoad]);
+
+  useEffect(() => {
+    if (!isLoading && formData.GenerateExcel) {
+      setFormData((prev) => ({ ...prev, GenerateExcel: false }));
+    }
+  }, [isLoading, formData.GenerateExcel]);
+
+  return (
+    <>
+      {isInitialLoad && isLoading ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "50vh",
+          }}
+        >
+          <CircularProgress />
+        </div>
+      ) : (
+        <Box>
+          {lists && (
+            <ReactTable
+              {...{
+                data: lists,
+                columns,
+                modalToggler: () => {
+                  setCustomerModal(true);
+                  setSelectedCustomer(null);
+                },
+                processosTotal,
+                onFormDataChange: handleFormDataChange,
+                isLoading,
+                refreshData: refreshOrgaos,
+                onApplyFilters: handleBackendFiltersChange,
+                onExportExcel: handleExportExcel,
+              }}
+            />
+          )}
+        </Box>
+      )}
+      <AlertCustomerDelete
+        id={customerDeleteId}
+        title={customerDeleteId}
+        open={open}
+        handleClose={handleClose}
+      />
+      <CustomerModal
+        open={customerModal}
+        modalToggler={setCustomerModal}
+        customer={selectedCustomer}
+      />
+    </>
+  );
+};
+
+export default ListagemControles;
