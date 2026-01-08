@@ -180,20 +180,20 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${process.env.REACT_APP_API_URL}projects`,
+      `https://api.egrc.homologacao.com.br/api/v1/projects`,
       setProjetos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}projects/types`,
+      `https://api.egrc.homologacao.com.br/api/v1/projects/types`,
       setTipoProjetos
     );
-    fetchData(`${process.env.REACT_APP_API_URL}ipe`, setIpes);
+    fetchData(`https://api.egrc.homologacao.com.br/api/v1/ipe`, setIpes);
     fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
+      `https://api.egrc.homologacao.com.br/api/v1/controls`,
       setControles
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
       setResponsavelTeste
     );
     const frequencias = [
@@ -221,7 +221,7 @@ function ColumnsLayouts() {
       try {
         // 1) Busca dados do teste existente
         const resTest = await axios.get(
-          `${process.env.REACT_APP_API_URL}projects/tests/${dadosApi.idTest}`,
+          `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = resTest.data;
@@ -259,7 +259,7 @@ function ColumnsLayouts() {
 
         // 2) Busca fases do teste e calcula status principal
         const resPhases = await axios.get(
-          `${process.env.REACT_APP_API_URL}projects/tests/${dadosApi.idTest}/phases`,
+          `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}/phases`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const mainStatus = computeMainStatus(resPhases.data);
@@ -271,6 +271,40 @@ function ColumnsLayouts() {
 
     fetchAll();
   }, [dadosApi, token]);
+
+  // NOVO: Busca o Tipo de Projeto automaticamente sempre que o Projeto mudar
+  // (Funciona tanto ao carregar a tela em edição quanto ao selecionar manualmente)
+  useEffect(() => {
+    const fetchTipoProjeto = async () => {
+      // Se não houver projeto selecionado, não faz a busca
+      if (!formData.projeto) return;
+
+      try {
+        const response = await axios.get(
+          `https://api.egrc.homologacao.com.br/api/v1/projects/${formData.projeto}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const dadosProjeto = response.data;
+
+        // Se a API retornar o idProjectType, atualiza o formulário
+        if (dadosProjeto && dadosProjeto.idProjectType) {
+          setFormData((prev) => ({
+            ...prev,
+            tipoProjeto: dadosProjeto.idProjectType,
+          }));
+        }
+      } catch (error) {
+        console.error("Erro ao buscar detalhes do projeto para preencher o tipo:", error);
+      }
+    };
+
+    fetchTipoProjeto();
+  }, [formData.projeto, token]); // Executa sempre que o ID do projeto mudar
 
   function computeMainStatus(phases) {
     // Se não veio nenhuma fase
@@ -337,6 +371,43 @@ function ColumnsLayouts() {
     } else {
       // Para outros campos
       setFormData({ ...formData, [field]: value });
+    }
+  };
+
+  // Função para lidar com a mudança do Projeto e buscar o Tipo automaticamente
+  const handleChangeProjeto = async (event, newValue) => {
+    // 1. Atualiza o estado do projeto selecionado
+    setFormData((prev) => ({
+      ...prev,
+      projeto: newValue ? newValue.id : "",
+      tipoProjeto: "", // Limpa o tipo enquanto busca o novo
+    }));
+
+    // 2. Se houver um projeto selecionado, busca os detalhes na API
+    if (newValue?.id) {
+      try {
+        const response = await axios.get(
+          `https://api.egrc.homologacao.com.br/api/v1/projects/${newValue.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        const dadosProjeto = response.data;
+
+        // 3. Define o Tipo de Projeto automaticamente baseado no retorno (idProjectType)
+        if (dadosProjeto && dadosProjeto.idProjectType) {
+          setFormData((prev) => ({
+            ...prev,
+            tipoProjeto: dadosProjeto.idProjectType,
+          }));
+        }
+      } catch (error) {
+        console.error("Erro ao buscar detalhes do projeto:", error);
+        enqueueSnackbar("Erro ao buscar o tipo do projeto.", { variant: "error" });
+      }
     }
   };
 
@@ -458,7 +529,7 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
       if (requisicao === "Criar") {
-        url = `${process.env.REACT_APP_API_URL}projects/tests`;
+        url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
         method = "POST";
         payload = {
           description: descricaoTeste,
@@ -467,7 +538,7 @@ function ColumnsLayouts() {
           idControl: formData.controle,
         };
       } else if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}projects/tests`;
+        url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
         method = "PUT";
         payload = {
           idTest: controleDados?.idTest,
@@ -544,12 +615,8 @@ function ColumnsLayouts() {
                   projetos.find((projeto) => projeto.id === formData.projeto) ||
                   null
                 }
-                onChange={(event, newValue) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    projeto: newValue ? newValue.id : "",
-                  }));
-                }}
+                // ALTERAÇÃO AQUI: Chama a função criada acima
+                onChange={handleChangeProjeto} 
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -696,6 +763,7 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Tipo de projeto</InputLabel>
                   <Autocomplete
+                    disabled // ALTERAÇÃO AQUI: Desabilita o campo para o usuário
                     options={tipoProjetos}
                     getOptionLabel={(option) => option.nome}
                     value={
@@ -703,6 +771,8 @@ function ColumnsLayouts() {
                         (tipoProjeto) => tipoProjeto.id === formData.tipoProjeto
                       ) || null
                     }
+                    // O onChange pode ser mantido ou removido, pois está disabled, 
+                    // mas é bom manter caso precise reabilitar no futuro.
                     onChange={(event, newValue) => {
                       setFormData((prev) => ({
                         ...prev,

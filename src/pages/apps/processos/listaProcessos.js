@@ -1064,6 +1064,92 @@ function ActionCell({ row, refreshData }) {
     handleClose();
   };
 
+  const handleToggleActive = async () => {
+    handleClose(); // Fecha o menu
+    const authToken = token || localStorage.getItem("access_token");
+
+    try {
+      // 1. GET: Busca os dados completos do processo
+      // Precisamos disso pois o PUT exige o objeto completo, não apenas o status
+      const responseGet = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/processes/${row.original.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!responseGet.ok) throw new Error("Erro ao buscar dados do processo.");
+      const data = await responseGet.json();
+
+      // 2. PREPARAR PAYLOAD: Mapeamento idêntico ao novoProcesso.js
+      // O GET retorna objetos (ex: companies: [{idCompany...}]), mas o PUT pede IDs (idCompanies: [1...])
+      const payload = {
+        idProcess: data.idProcess,
+        active: !data.active, // << AQUI ESTÁ A ALTERAÇÃO DO STATUS >>
+        name: data.name,
+        code: data.code,
+        description: data.description,
+        files: data.files || [], // Mantém arquivos existentes
+        idProcessType: data.idProcessType || null,
+        idProcessSuperior: data.idProcessSuperior || null,
+        
+        // Mapeamentos de Arrays de Objetos para Arrays de IDs
+        idCompanies: Array.isArray(data.companies) ? data.companies.map((u) => u.idCompany) : [],
+        idDepartments: Array.isArray(data.departments) ? data.departments.map((u) => u.idDepartment) : [],
+        idProcessBottoms: Array.isArray(data.processBottoms) ? data.processBottoms.map((u) => u.idProcessBottom) : [],
+        
+        // Processos Anterior/Posterior (novoProcesso.js envia apenas o primeiro ID ou null)
+        idProcessPrevious: Array.isArray(data.idProcessPrevious) && data.idProcessPrevious.length > 0 
+            ? data.idProcessPrevious[0].idProcess 
+            : null,
+        idProcessNext: Array.isArray(data.idProcessNext) && data.idProcessNext.length > 0 
+            ? data.idProcessNext[0].idProcess 
+            : null,
+
+        // Campos que já vêm como IDs ou null no GET (baseado no novoProcesso.js)
+        idLgpds: data.idLgpds || [],
+        idKri: data.idKri || null,
+        idResponsible: data.idResponsible || null,
+        idDeficiencies: data.idDeficiencies || [],
+        idIncidents: data.idIncidents || [],
+        idActionPlans: data.idActionPlans || [],
+        idRisks: data.idRisks || [],
+        idLedgerAccounts: data.idLedgerAccounts || [],
+      };
+
+      // 3. PUT: Envia a atualização
+      const responsePut = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/processes`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!responsePut.ok) {
+        throw new Error("Erro ao atualizar status do processo.");
+      }
+
+      enqueueSnackbar(
+        `Processo ${data.active ? "inativado" : "ativado"} com sucesso!`,
+        { variant: "success" }
+      );
+      
+      // Atualiza a tabela
+      refreshData();
+
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao alterar o status do processo.", { variant: "error" });
+    } 
+  };
+
   const handleDelete = async () => {
     try {
       // Endpoint ajustado para Processos
@@ -1109,6 +1195,8 @@ function ActionCell({ row, refreshData }) {
   const open = Boolean(anchorEl);
   const id = open ? "simple-popover" : undefined;
 
+  const isActive = row.original.active !== false;
+
   return (
     <Stack
       direction="row"
@@ -1150,6 +1238,14 @@ function ActionCell({ row, refreshData }) {
             style={{ color: "#707070", fontWeight: 400 }}
           >
             Editar
+          </Button>
+
+          {/* Botão de Ativar/Inativar */}
+          <Button
+            onClick={handleToggleActive}
+            style={{ color: "#707070", fontWeight: 400 }}
+          >
+            {isActive ? "Inativar" : "Ativar"}
           </Button>
 
           {/* <Button

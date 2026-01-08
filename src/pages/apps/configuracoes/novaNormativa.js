@@ -55,10 +55,13 @@ function ColumnsLayouts() {
   const [planosAcoes, setPlanoAcao] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
   const [processos, setProcessos] = useState([]);
-  const [descricao, setDescricao] = useState("");
+  // ... seus outros estados
+const [descricao, setDescricao] = useState(""); // Mantém o histórico vindo do banco
+const [novoComentario, setNovoComentario] = useState(""); // Novo estado para o input atual
+// ...
   const [conclusaoRevisao, setConclusaoRevisao] = useState("");
   const idUser = localStorage.getItem("id_user");
-  const userName = localStorage.getItem("user_name");
+  const userName = localStorage.getItem("username");
   const [motivoRevogacao, setMotivoRevogacao] = useState("");
   const [diasDaRevisao, setDiasDaRevisao] = useState("");
   const [codigo, setCodigo] = useState("");
@@ -108,6 +111,9 @@ function ColumnsLayouts() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
+  const [confirmRevisorOpen, setConfirmRevisorOpen] = useState(false);
+const [tempResponsavelId, setTempResponsavelId] = useState(null);
+
   const [formData, setFormData] = useState({
     statusNorma: "",
     tipoNorma: "",
@@ -132,6 +138,7 @@ function ColumnsLayouts() {
     normaOrigem: [],
     conta: [],
     responsavel: "",
+    revisor: "",
     aprovador: [],
     dataPublicacao: null,
     dataCadastro: new Date(),
@@ -187,43 +194,43 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
+      `https://api.egrc.homologacao.com.br/api/v1/departments`,
       setDepartamentos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives/types`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives/types`,
       setTipoNormas
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives/regulatories`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives/regulatories`,
       setReguladores
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
       setNormaOrigem
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}normatives`,
+      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
       setNormaDestino
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}companies`,
+      `https://api.egrc.homologacao.com.br/api/v1/companies`,
       setEmpresa
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
+      `https://api.egrc.homologacao.com.br/api/v1/processes`,
       setProcessos
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}action-plans`,
+      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
       setPlanoAcao
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
       setResponsavel
     );
     fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
       setAprovador
     );
     window.scrollTo(0, 0);
@@ -235,7 +242,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}normatives/${dadosApi.idNormative}`,
+            `https://api.egrc.homologacao.com.br/api/v1/normatives/${dadosApi.idNormative}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -297,7 +304,7 @@ function ColumnsLayouts() {
             tipoNorma: data.idNormativeType,
             regulador: data.idRegulatory,
             responsavel: data.idResponsible,
-            // Preenche os arrays com os IDs retornados
+            revisor: data.idReviewer,
             normaOrigem: data.idOrigins,
             normaDestino: data.idDestinies,
             planoAcao: data.idActionPlans,
@@ -319,6 +326,21 @@ function ColumnsLayouts() {
       }
     }
   }, [dadosApi, token, reload]);
+
+// Função para gerar a string final do comentário
+   const getDescricaoAtualizada = () => {
+    // Se não escreveu nada novo, retorna a descrição original
+    if (!novoComentario || !novoComentario.trim()) {
+      return descricao;
+    }
+
+    const dataHora = new Date().toLocaleString("pt-BR");
+    // Formato: [Usuario]: Comentario - dd/mm/aaaa hh:mm:ss
+    const entradaLog = `[${userName}]: ${novoComentario} - ${dataHora}`;
+
+    // Se já existia descrição, pula duas linhas e adiciona a nova. Se não, é a primeira.
+    return descricao ? `${descricao}\n\n${entradaLog}` : entradaLog;
+  };
 
   // 1) Sempre que mudar últimaRevisão ou periodicidade, recalcula diasDaRevisao e dataLimiteRevisao
   useEffect(() => {
@@ -368,6 +390,95 @@ function ColumnsLayouts() {
     }
   };
 
+  // Função para salvar APENAS o comentário, ignorando outras alterações na tela
+  const handleSalvarComentarioRapido = async () => {
+    if (!novoComentario || !novoComentario.trim()) {
+      enqueueSnackbar("Escreva um comentário antes de salvar.", {
+        variant: "warning",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Gera o texto final (Histórico + Novo Comentário)
+      const novaDescricaoCompleta = getDescricaoAtualizada();
+
+      // 2. Prepara o Payload usando 'normativaDados' (dados do banco)
+      // e NÃO o 'formData' (dados da tela), para não salvar alterações pendentes acidentalmente.
+      const payload = {
+        idNormative: normativaDados.idNormative,
+        code: normativaDados.code,
+        name: normativaDados.name,
+        description: novaDescricaoCompleta, // <-- Único campo alterado
+        registerDate: normativaDados.registerDate,
+        publishDate: normativaDados.publishDate,
+        initialVigency: normativaDados.initialVigency,
+        lastRevision: normativaDados.lastRevision,
+        idReviewer: normativaDados.idReviewer,
+        conclusion: normativaDados.conclusion,
+        frequencyRevision: normativaDados.frequencyRevision,
+        limitDateRevision: normativaDados.limitDateRevision,
+        // daysRevision: normativaDados.daysRevision,
+        revocationDate: normativaDados.revocationDate,
+        revocationReason: normativaDados.revocationReason,
+        normativeStatus: normativaDados.normativeStatus,
+        normativeRisk: normativaDados.normativeRisk,
+        active: normativaDados.active,
+        idNormativeType: normativaDados.idNormativeType,
+        idRegulatory: normativaDados.idRegulatory,
+        idResponsible: normativaDados.idResponsible,
+        idOrigins: normativaDados.idOrigins,
+        idDestinies: normativaDados.idDestinies,
+        idActionPlans: normativaDados.idActionPlans,
+        idApprovers: normativaDados.idApprovers,
+        idCompanies: normativaDados.idCompanies,
+        idDepartments: normativaDados.idDepartments,
+        idProcesses: normativaDados.idProcess, // Note: confirme se a API retorna idProcess ou idProcesses no GET
+        
+        // Tratamento simples de arquivos para manter o que já existe sem upload novo
+        files: normativaDados.files ? normativaDados.files.map(f => typeof f === 'string' ? f : f.path) : [],
+      };
+
+      const url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
+      
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao salvar comentário.");
+      }
+
+      // 3. Atualiza os estados locais para refletir o salvamento
+      setDescricao(novaDescricaoCompleta); // Atualiza o histórico visual
+      setNovoComentario(""); // Limpa o campo de novo comentário
+      
+      // Atualiza o objeto de referência para o novo estado do banco
+      setNormativaDados((prev) => ({
+        ...prev,
+        description: novaDescricaoCompleta
+      }));
+
+      enqueueSnackbar("Comentário adicionado com sucesso!", {
+        variant: "success",
+      });
+
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Não foi possível salvar o comentário.", {
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Usuário confirma a revogação
   const handleConfirmRevog = async () => {
     // Verifica se a justificativa está preenchida
@@ -408,7 +519,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -437,7 +548,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -458,18 +569,19 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
           initialVigency: formData.vigenciaInicial,
           lastRevision: formData.ultimaRevisao,
+          idReviewer: formData.revisor || null,
           conclusion: conclusaoRevisao,
           frequencyRevision:
             formData.periodicidadeRevisao === undefined ||
@@ -620,6 +732,40 @@ function ColumnsLayouts() {
       empresa: [...prev.empresa, newEmpresa.id],
     }));
   };
+
+  // Função chamada quando o usuário seleciona um Responsável no Autocomplete
+const handleResponsavelChange = (event, newValue) => {
+  const newId = newValue ? newValue.id : "";
+  
+  // Atualiza o Responsável imediatamente
+  setFormData((prev) => ({
+    ...prev,
+    responsavel: newId,
+  }));
+
+  // Se houve uma seleção válida, pergunta se quer replicar para o Revisor
+  if (newId) {
+    setTempResponsavelId(newId);
+    setConfirmRevisorOpen(true);
+  }
+};
+
+// Usuário clicou em "Sim"
+const handleConfirmReplication = () => {
+  setFormData((prev) => ({
+    ...prev,
+    revisor: tempResponsavelId, // Copia o ID para o campo revisor
+  }));
+  setConfirmRevisorOpen(false);
+  setTempResponsavelId(null);
+};
+
+// Usuário clicou em "Não"
+const handleDenyReplication = () => {
+  setConfirmRevisorOpen(false);
+  setTempResponsavelId(null);
+  // Não faz nada com o campo revisor, ele permanece como estava
+};
 
   const handleDepartmentCreated = (newDepartamento) => {
     setDepartamentos((prevDepartamentos) => [
@@ -886,7 +1032,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -915,7 +1061,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -943,13 +1089,14 @@ function ColumnsLayouts() {
           : formData.statusNorma;
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
+          idReviewer: formData.revisor || null,
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
@@ -1097,7 +1244,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1126,7 +1273,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -1147,13 +1294,14 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
+          idReviewer: formData.revisor || null,
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
@@ -1303,7 +1451,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1332,7 +1480,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -1353,13 +1501,14 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          description: getDescricaoAtualizada(),
+          idReviewer: formData.revisor || null,
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
@@ -1504,7 +1653,7 @@ function ColumnsLayouts() {
       // Exclusão de arquivos, se necessário
       if (deletedFiles.length > 0) {
         const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -1533,7 +1682,7 @@ function ColumnsLayouts() {
         });
 
         const uploadResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL}files/uploads`,
+          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
           formDataUpload,
           {
             headers: {
@@ -1554,13 +1703,14 @@ function ColumnsLayouts() {
       });
 
       if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}normatives`;
+        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
         method = "PUT";
         payload = {
           idNormative: normativaDados.idNormative,
           code: codigo,
           name: nome,
-          description: descricao,
+          idReviewer: formData.revisor || null,
+          description: getDescricaoAtualizada(),
           registerDate: formData.dataCadastro,
           //normativeInternType: formData.tipoNorma,
           publishDate: formData.dataPublicacao,
@@ -1704,7 +1854,7 @@ function ColumnsLayouts() {
     if (deletedFiles.length > 0) {
       const deletedFilesPayload = deletedFiles.map((file) => file.name);
 
-      await axios.delete(`${process.env.REACT_APP_API_URL}files`, {
+      await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1734,7 +1884,7 @@ function ColumnsLayouts() {
       });
 
       const uploadResponse = await axios.post(
-        `${process.env.REACT_APP_API_URL}files/uploads`,
+        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
         formDataUpload,
         {
           headers: {
@@ -1758,20 +1908,20 @@ function ColumnsLayouts() {
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
-      url = `${process.env.REACT_APP_API_URL}normatives`;
+      url = "https://api.egrc.homologacao.com.br/api/v1/normatives";
       method = "POST";
       payload = {
         code: codigo,
         name: nome,
       };
     } else if (requisicao === "Editar") {
-      url = `${process.env.REACT_APP_API_URL}normatives`;
+      url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
       method = "PUT";
       payload = {
         idNormative: normativaDados.idNormative,
         code: codigo,
         name: nome,
-        description: descricao,
+        description: getDescricaoAtualizada(),
         registerDate: formData.dataCadastro,
         //normativeInternType: formData.tipoNorma,
         publishDate: formData.dataPublicacao,
@@ -2096,20 +2246,95 @@ function ColumnsLayouts() {
 
           {requisicao === "Editar" && (
             <>
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Descrição</InputLabel>
-                  <TextField
-                    onChange={(event) => setDescricao(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={descricao}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
+          {/* ... (dentro do return) ... */}
 
+<Grid item xs={12} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={2}>
+    
+    {/* 1. CAMPO DE HISTÓRICO (Visual Melhorado) */}
+    {descricao && (
+      <>
+        {/* 2. CAMPO DE NOVA ENTRADA COM BOTÃO AO LADO */}
+        <Stack 
+          direction="row" 
+          justifyContent="space-between" 
+          alignItems="center" 
+          spacing={2}
+          sx={{ mb: 1, mt: 2 }} // Margem para espaçamento
+        >
+          <InputLabel sx={{ m: 0 }}>
+            {descricao ? "Adicionar novo comentário" : "Comentário"}
+          </InputLabel>
+          
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleSalvarComentarioRapido}
+            disabled={isFormLocked || loading}
+            sx={{ 
+              fontWeight: 600,
+              textTransform: "none",
+              height: "30px"
+            }}
+          >
+            Salvar Comentário
+          </Button>
+        </Stack>
+
+        <TextField
+          onChange={(event) => setNovoComentario(event.target.value)}
+          fullWidth
+          multiline
+          rows={4}
+          value={novoComentario}
+          placeholder="Digite aqui seu comentário ou observação..."
+          disabled={isFormLocked}
+          sx={{
+            backgroundColor: "#fff",
+            marginBottom: 2 // Espaço antes do histórico
+          }}
+        />
+    
+        <InputLabel sx={{ fontWeight: "bold", color: "#333" }}>
+          Histórico de Comentários
+        </InputLabel>
+        <TextField
+          fullWidth
+          multiline
+          minRows={3}
+          maxRows={8} // Permite crescer um pouco mais se tiver muito texto
+          value={descricao}
+          // Usamos readOnly ao invés de disabled para controlar melhor as cores
+          InputProps={{
+            readOnly: true,
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              backgroundColor: "#f0f7ff", // Um azul bem clarinho (mais agradável que cinza)
+              "& fieldset": {
+                borderColor: "#b3d9ff", // Borda suave
+              },
+              "&:hover fieldset": {
+                borderColor: "#b3d9ff", // Mantém a borda ao passar o mouse
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: "#b3d9ff", // Mantém a borda ao focar (clicar)
+              },
+            },
+            "& .MuiInputBase-input": {
+              color: "#0d0d0d !important", // Força a cor PRETA (quase preta)
+              WebkitTextFillColor: "#0d0d0d !important", // Garante contraste no Chrome/Safari
+              fontSize: "0.95rem",
+              fontWeight: 500, // Um pouco mais de peso na fonte
+            },
+          }}
+        />
+      </>
+    )}
+
+
+  </Stack>
+</Grid>
               <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Data de cadastro</InputLabel>
@@ -2869,36 +3094,30 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsavel: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
+<Grid item xs={4} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={1}>
+    <InputLabel>Responsável</InputLabel>
+    <Autocomplete
+      options={responsaveis}
+      getOptionLabel={(option) => option.nome}
+      // Valor vinculado ao formData.responsavel
+      value={
+        responsaveis.find(
+          (r) => r.id === formData.responsavel
+        ) || null
+      }
+      // Chama a função customizada
+      onChange={handleResponsavelChange}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          error={!formData.responsavel && formValidation.responsavel === false}
+        />
+      )}
+      disabled={isFormLocked}
+    />
+  </Stack>
+</Grid>
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -2953,36 +3172,35 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Revisor</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsavel: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
+              {/* Localize o Grid do Revisor (aprox. linha 1418) */}
+<Grid item xs={4} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={1}>
+    <InputLabel>Revisor</InputLabel>
+    <Autocomplete
+      options={responsaveis} // Assumindo que a lista de pessoas é a mesma
+      getOptionLabel={(option) => option.nome}
+      // AGORA vinculado ao formData.revisor
+      value={
+        responsaveis.find(
+          (r) => r.id === formData.revisor
+        ) || null
+      }
+      onChange={(event, newValue) => {
+        setFormData((prev) => ({
+          ...prev,
+          revisor: newValue ? newValue.id : "",
+        }));
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          // Adicione validação aqui se o campo Revisor for obrigatório
+        />
+      )}
+      disabled={isFormLocked}
+    />
+  </Stack>
+</Grid>
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -3124,6 +3342,27 @@ function ColumnsLayouts() {
               </Button>
             </DialogActions>
           </Dialog>
+          <Dialog
+  open={confirmRevisorOpen}
+  onClose={handleDenyReplication}
+  aria-labelledby="alert-dialog-title"
+  aria-describedby="alert-dialog-description"
+>
+  <DialogTitle id="alert-dialog-title">
+    {"Definir Revisor?"}
+  </DialogTitle>
+  <DialogContent>
+    <DialogContentText id="alert-dialog-description">
+      Deseja que o responsável selecionado também seja atribuído como revisor desta normativa?
+    </DialogContentText>
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={handleDenyReplication}>Não</Button>
+    <Button onClick={handleConfirmReplication} autoFocus variant="contained">
+      Sim
+    </Button>
+  </DialogActions>
+</Dialog>
           <Dialog
             open={confirmRevogOpen}
             onClose={handleCancelRevog}

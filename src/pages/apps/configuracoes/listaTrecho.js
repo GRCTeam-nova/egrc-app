@@ -336,16 +336,6 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                   {header.column.getCanSort() && (
                                     <HeaderSort column={header.column} />
                                   )}
-                                  {header.id === "ativo" && (
-                                    <Tooltip
-                                      title="Mostrar/Esconder Ativos e Inativos"
-                                      placement="top"
-                                    >
-                                      <IconButton onClick={handleFilterClick}>
-                                        <MoreVertIcon />
-                                      </IconButton>
-                                    </Tooltip>
-                                  )}
                                 </Stack>
                               )}
                             </TableCell>
@@ -529,39 +519,45 @@ function ActionCell({ row, refreshData, onEdit }) {
 
   const toggleStatus = async () => {
     // Define novo status: se estiver ativo, queremos inativar (active: false)
-    // Se estiver inativo, queremos ativar (active: true)
-    const newStatusBool = !status; // inverte o status atual
+    const newStatusBool = !status;
     const newStatusText = newStatusBool ? "Ativo" : "Inativo";
+    const idTrecho = row.original.idNormativePart; // ID correto do trecho
 
     try {
-      // Constrói o payload com os dados atuais do acionista, alterando somente o campo active
-      const dadosAtualizados = {
-        idSharedholder: row.original.idSharedholder,
-        name: row.original.name,
-        document: row.original.document,
-        percentage: row.original.percentage, // mantemos o mesmo valor (pode ser null ou numérico)
-        active: newStatusBool,
-        idActionType: row.original.idActionType,
-      };
-
-      // Envia a requisição PUT com o payload atualizado
-      const response = await axios.put(
-        `${process.env.REACT_APP_API_URL}companies/shared-holders`,
-        dadosAtualizados,
+      // 1. GET: Buscar dados atuais do Trecho para não perder informações (riscos, descrição, etc)
+      const getResponse = await axios.get(
+        `https://api.egrc.homologacao.com.br/parts/${idTrecho}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
           },
         }
       );
 
-      if (response.status === 204) {
-        // Atualiza o estado para refletir o novo status
+      const currentData = getResponse.data;
+
+      // 2. Preparar Payload mantendo os dados originais e alterando apenas o active
+      const payload = {
+        idNormativePart: idTrecho,
+        code: currentData.code,
+        description: currentData.description,
+        idRisks: currentData.idRisks, // Array de IDs de risco vindo do GET
+        active: newStatusBool,
+      };
+
+      // 3. PUT: Atualizar o trecho
+      const urlPut = `https://api.egrc.homologacao.com.br/api/v1/normatives/${idTrecho}/parts`;
+      
+      const response = await axios.put(urlPut, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.status === 200 || response.status === 204) {
         setStatus(newStatusBool);
-        const message = `Acionista ${
-          row.original.name
-        } ${newStatusText.toLowerCase()}.`;
+        const message = `Trecho "${currentData.code}" ${newStatusText.toLowerCase()} com sucesso.`;
         enqueueSnackbar(message, {
           variant: "success",
           autoHideDuration: 3000,
@@ -573,7 +569,7 @@ function ActionCell({ row, refreshData, onEdit }) {
       }
     } catch (error) {
       console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, {
+      enqueueSnackbar(`Erro ao atualizar status: ${error.message}`, {
         variant: "error",
       });
     }
