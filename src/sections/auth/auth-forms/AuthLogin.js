@@ -3,16 +3,13 @@ import PropTypes from "prop-types";
 import React from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import axios from "axios";
-import jwt_decode from "jwt-decode"; // npm install jwt-decode
+import jwt_decode from "jwt-decode";
 
-// material-ui
 import {
-  Paper,
   Alert,
   Button,
   FormHelperText,
   Grid,
-  Link,
   InputAdornment,
   InputLabel,
   OutlinedInput,
@@ -23,12 +20,9 @@ import {
   Typography,
 } from "@mui/material";
 
-// third party
 import * as Yup from "yup";
 import { Formik } from "formik";
 
-// project import
-import useScriptRef from "../../../hooks/useScriptRef";
 import useAuth from "../../../hooks/useAuth";
 import IconButton from "../../../components/@extended/IconButton";
 import AnimateButton from "../../../components/@extended/AnimateButton";
@@ -36,7 +30,6 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useToken } from "../../../api/TokenContext";
 
-// assets
 import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 
 const AuthLogin = ({ isDemo = false }) => {
@@ -45,37 +38,20 @@ const AuthLogin = ({ isDemo = false }) => {
   const [tenants, setTenants] = React.useState([]);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [showPassword, setShowPassword] = React.useState(false);
-  const scriptedRef = useScriptRef();
   const navigate = useNavigate();
   const { login } = useAuth();
   const { setToken } = useToken();
-  const [progress, setProgress] = useState(0);
-  const [visible, setVisible] = useState(true);
 
-  // Atualiza a barra de progresso a cada 100ms (10s / 100 = 100 passos)
   useEffect(() => {
-    // Lógica para verificar o parâmetro de URL
     const params = new URLSearchParams(location.search);
     if (params.get('sessionExpired') === 'true') {
       setShowExpiredAlert(true);
     }
-
-    const interval = setInterval(() => {
-      setProgress((oldProgress) => {
-        const newProgress = oldProgress + 1;
-        if (newProgress >= 100) {
-          clearInterval(interval);
-        }
-        return newProgress;
-      });
-    }, 100);
-    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Após 10 segundos, inicia a transição de saída
   useEffect(() => {
     const timer = setTimeout(() => {
-      setVisible(false);
     }, 10000);
     return () => clearTimeout(timer);
   }, []);
@@ -98,10 +74,8 @@ const AuthLogin = ({ isDemo = false }) => {
         localStorage.removeItem('selected_tenant');
       }
 
-      // 1) Pegar token atual
       const currentAccessToken = localStorage.getItem("access_token");
   
-      // 2) Solicitar token do tenant selecionado
       const tokenResponse = await axios.post(
         `${API_URL}accounts/token`,
         { id_tenant: idTenant },
@@ -116,7 +90,6 @@ const AuthLogin = ({ isDemo = false }) => {
       localStorage.setItem("access_token", newToken);
       setToken(newToken);
   
-      // 3) Login com o novo token
       const loginResponse = await axios.post(
         `${API_URL}accounts/login`,
         {},
@@ -135,7 +108,6 @@ const AuthLogin = ({ isDemo = false }) => {
       const idUser = decoded.idUser 
       localStorage.setItem("id_user", idUser);
 
-      // 4) Buscar dados do colaborador e salvar nome no localStorage
       const collaboratorResponse = await axios.get(
         `${API_URL}collaborators/${idUser}`,
         {
@@ -144,12 +116,12 @@ const AuthLogin = ({ isDemo = false }) => {
           },
         }
       );
-      const username = collaboratorResponse.data.name;
-      localStorage.setItem("username", username);
+      
+      const userData = collaboratorResponse.data;
+      localStorage.setItem("username", userData.name);
 
-      const email = "info@codedthemes.com";
-      const password = "123456";
-      await login(email, password);
+      
+      login(finalToken, userData); 
   
       navigate("/dashboard/resumo");
     } catch (error) {
@@ -157,7 +129,6 @@ const AuthLogin = ({ isDemo = false }) => {
     }
   };
 
-  // Lógica de paginação: 4 tenants por página
   const tenantsPerPage = 4;
   const totalPages = Math.ceil(tenants.length / tenantsPerPage);
   const indexOfLastTenant = currentPage * tenantsPerPage;
@@ -179,7 +150,7 @@ const AuthLogin = ({ isDemo = false }) => {
       overflowY: { xs: 'auto', md: 'hidden' }
     }}
   >
-    {/* —— ESQUERDA (dark) —— */}
+    {}
     <Box
       sx={{
         display: { xs: 'none', md: 'flex' },
@@ -205,7 +176,7 @@ const AuthLogin = ({ isDemo = false }) => {
       </Typography>
     </Box>
 
-    {/* —— DIREITA (light) —— */}
+    {}
     <Box
       sx={{
         flex: 1,
@@ -217,7 +188,7 @@ const AuthLogin = ({ isDemo = false }) => {
         py: { xs: 4, md: 0 }
       }}
     >
-      {/* container do form/seleção */}
+      {}
       <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 400 }, mx: 'auto' }}>
           {tenants.length === 0 ? (
             <>
@@ -444,7 +415,7 @@ const AuthLogin = ({ isDemo = false }) => {
                 />
               </Stack>
             )}
-            {/* Botão para voltar ao login */}
+            {}
             <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
               <Button
                 variant="outlined"
@@ -481,5 +452,3 @@ AuthLogin.propTypes = {
 };
 
 export default AuthLogin;
-
-
