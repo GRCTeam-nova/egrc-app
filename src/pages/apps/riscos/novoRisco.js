@@ -1,1834 +1,1709 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import * as React from "react";
+import PropTypes from "prop-types";
+import { API_COMMAND } from "../../../config";
+import { Fragment, useMemo, useState, useEffect, useRef } from "react";
+import Popover from "@mui/material/Popover";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { useNavigate } from "react-router";
+import CustomerModal from "../../../sections/apps/customer/CustomerModal";
+import { enqueueSnackbar } from "notistack";
+import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
+import { useGetRiscos } from "../../../api/riscos";
+import { useLocation } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import emitter from "../tela2/eventEmitter";
+// project import
+import MainCard from "../../../components/MainCard";
+
+// material-ui
+import { useTheme } from "@mui/material/styles";
+
 import {
-  Button,
   Box,
-  TextField,
-  Autocomplete,
   Grid,
-  Switch,
-  Stack,
-  Typography,
+  Button,
+  FormControl,
+  FormControlLabel,
   Checkbox,
-  InputLabel,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
-  Paper,
+  Chip,
   Divider,
-  Card,
-  CardContent,
+  Stack,
+  Table,
+  InputLabel,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  useMediaQuery,
 } from "@mui/material";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import InfoIcon from "@mui/icons-material/Info";
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import SecurityIcon from "@mui/icons-material/Security";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import LinkIcon from "@mui/icons-material/Link";
-import { DatePicker } from "@mui/x-date-pickers";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { enqueueSnackbar } from "notistack";
-import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
-import LoadingOverlay from "../configuracoes/LoadingOverlay";
-import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from "react-router-dom";
+
+// third-party
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+// project-import
+import ScrollX from "../../../components/ScrollX";
+import IconButton from "../../../components/@extended/IconButton";
+import CircularProgress from "@mui/material/CircularProgress";
+import Drawer from "@mui/material/Drawer";
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
+import CloseIcon from '@mui/icons-material/Close';
+import Mark from "mark.js";
+import {
+  faXmark,
+  faBan,
+  faTrash,
+  faExclamation,
+} from "@fortawesome/free-solid-svg-icons";
+
+import {
+  DebouncedInput,
+  HeaderSort,
+  EmptyTable,
+  RowSelection,
+  TablePagination,
+  SelectColumnVisibility,
+} from "../../../components/third-party/react-table"; 
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
-import DrawerIncidente from "../configuracoes/novoIncidenteDrawerRiscos";
-import DrawerDepartamento from "../configuracoes/novoDepartamentoDrawerRiscos";
-import DrawerProcesso from "../configuracoes/novoProcessoDrawerRiscos";
-import DrawerControle from "../configuracoes/novoControleDrawerRiscos";
-import DrawerCategoria from "../configuracoes/novaCategoriaDrawerRiscos";
-import FileUploader from "../configuracoes/FileUploader";
-import DrawerPlanos from "../configuracoes/novoPlanoDrawerRisco";
-import { API_URL } from "../../../config";
 
-// Componente para seções organizadas
-function SectionCard({ title, icon, children, ...props }) {
-  return (
-    <Card sx={{ mb: 3, ...props.sx }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          {icon}
-          <Typography variant="h6" sx={{ ml: 1, color: 'primary.main', fontWeight: 600 }}>
-            {title}
-          </Typography>
-        </Box>
-        <Divider sx={{ mb: 3 }} />
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
+// assets
+import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
+import {
+  faFilter,
+} from "@fortawesome/free-solid-svg-icons";
 
-// ==============================|| LAYOUTS - COLUMNS CORRIGIDO ||============================== //
-function ColumnsLayoutsCorrigido() {
-  const { token } = useToken();
-  const authToken = token || localStorage.getItem("access_token");
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { dadosApi } = location.state || {};
+export const fuzzyFilter = (row, columnId, value) => {
+  let cellValue = row.getValue(columnId);
+
+  // CORREÇÃO: Verifica se é undefined OU null antes de prosseguir
+  if (cellValue === undefined || cellValue === null || value === undefined) return false;
+
+  const normalizeText = (text) => {
+    // Segurança adicional: se por acaso o texto for null, retorna string vazia
+    if (text === null || text === undefined) return "";
+
+    return text
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  };
+
+  cellValue = normalizeText(cellValue);
+  const valueStr = normalizeText(value);
+  return cellValue.includes(valueStr);
+};
+
+// ==============================|| REACT TABLE - LIST ||============================== //
+
+function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExportExcel }) {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === "dark";
+  const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
+  const [columnVisibility, setColumnVisibility] = useState({});
+  const recordType = "Riscos";
+  const tableRef = useRef(null);
+  const [sorting, setSorting] = useState([{ id: "name", asc: true }]);
+  const [rowSelection, setRowSelection] = useState({});
+  const [globalFilter, setGlobalFilter] = useState("");
+  const navigation = useNavigate();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState([]);
+
+  // Opções para os filtros
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [responsibleOptions, setResponsibleOptions] = useState([]);
+  const [treatmentOptions, setTreatmentOptions] = useState([]);
   
-  // Estados existentes (mantidos do código original)
-  const [planosAcoes, setPlanoAcao] = useState([]);
-  const [categorias, setCategorias] = useState([]);
-  const [frameworks, setFrameworks] = useState([]);
-  const [tratamentos, setTratamentos] = useState([]);
-  const [diretrizes, setDiretrizes] = useState([]);
-  const [fatores, setFatores] = useState([]);
-  const [riscoAssociados, setRiscoAssociados] = useState([]);
-  const [incidentes, setIncidentes] = useState([]);
-  const [causas, setCausas] = useState([]);
-  const [impactos, setImpactos] = useState([]);
-  const [normativas, setNormativas] = useState([]);
-  const [departamentos, setDepartamentos] = useState([]);
-  const [kris, setKris] = useState([]);
-  const [controles, setControles] = useState([]);
-  const [ameacas, setAmeacas] = useState([]);
-  const [processos, setProcessos] = useState([]);
-  const [descricao, setDescricao] = useState("");
-  const [descricaoTratamento, setDescricaoTratamento] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [nome, setNome] = useState("");
-  const [responsaveis, setResponsavel] = useState([]);
-  const [status, setStatus] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [requisicao, setRequisicao] = useState("Criar");
-  const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
-  const [riscoDados, setRiscoDados] = useState(null);
-  const [hasChanges, setHasChanges] = useState(false);
-  window.hasChanges = hasChanges;
-  window.setHasChanges = setHasChanges;
+  // Opções de Arrays
+  const [processOptions, setProcessOptions] = useState([]);
+  const [controlsOptions, setControlsOptions] = useState([]);
+  const [departmentsOptions, setDepartmentsOptions] = useState([]);
+  const [normativesOptions, setNormativesOptions] = useState([]);
+  const [factorsOptions, setFactorsOptions] = useState([]);
+  const [incidentsOptions, setIncidentsOptions] = useState([]);
+  const [causesOptions, setCausesOptions] = useState([]);
+  const [impactsOptions, setImpactsOptions] = useState([]);
+  const [krisOptions, setKrisOptions] = useState([]);
+  const [threatsOptions, setThreatsOptions] = useState([]);
+  const [frameworksOptions, setFrameworksOptions] = useState([]);
+  const [actionPlansOptions, setActionPlansOptions] = useState([]); // Novo
 
-  const [formData, setFormData] = useState({
-    empresaInferior: [],
-    diretriz: [],
-    fator: [],
-    files: [],
-    controle: [],
-    kri: [],
-    impacto: [],
-    planoAcao: [],
-    plano: [],
-    causa: [],
-    ameaca: [],
-    normativa: [],
-    incidente: [],
-    departamento: [],
-    categoria: "",
-    processo: [],
-    riscoAssociado: [],
-    conta: [],
-    framework: [],
-    responsavel: "",
-    dataInicioOperacao: null,
+  const [draftFilters, setDraftFilters] = useState({
+    name: [], 
+    responsible: [],
+    category: [],
+    treatment: [],
+    process: [],
+    controls: [],
+    departments: [],
+    normatives: [],
+    factors: [],
+    incidents: [],
+    causes: [],
+    impacts: [],
+    kris: [],
+    threats: [],
+    frameworks: [],
+    actionPlans: [], // Novo
+    startDate: null,
+    endDate: null,
   });
 
-  const fetchData = async (url, setState) => {
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-        },
-      });
-
-      // Transformando os dados para alterar idRisk, idLedgerAccount e idProcess -> id, e name -> nome
-      const transformedData = response.data.map((item) => ({
-        id:
-          item.idRisk ||
-          item.idLedgerAccount ||
-          item.idProcess ||
-          item.id_responsible ||
-          item.idCategory ||
-          item.idRisk ||
-          item.idFramework ||
-          item.idTreatment ||
-          item.idStrategicGuideline ||
-          item.idFactor ||
-          item.idIncident ||
-          item.idCause ||
-          item.idImpact ||
-          item.idNormative ||
-          item.idDepartment ||
-          item.idActionPlan ||
-          item.idKri ||
-          item.idControl ||
-          item.idThreat ||
-          item.idResponsible ||
-          item.idCollaborator,
-        nome: item.name,
-        ...item, // Mantém os outros campos intactos
-      }));
-
-      setState(transformedData);
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-    }
-  };
+  const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
   useEffect(() => {
-    if (!authToken) return;
-    fetchData(
-      `${API_URL}categories`,
-      setCategorias
-    );
-    fetchData(
-      `${API_URL}action-plans`,
-      setPlanoAcao
-    );
-    fetchData(
-      `${API_URL}departments`,
-      setDepartamentos
-    );
-    fetchData(
-      `${API_URL}risks`,
-      setRiscoAssociados
-    );
-    fetchData(
-      `${API_URL}risks/frameworks`,
-      setFrameworks
-    );
-    fetchData(
-      `${API_URL}risks/treatments`,
-      setTratamentos
-    );
-    fetchData(
-      `${API_URL}risks/strategic-guidelines`,
-      setDiretrizes
-    );
-    fetchData(
-      `${API_URL}risks/factors`,
-      setFatores
-    );
-    fetchData(
-      `${API_URL}risks/causes`,
-      setCausas
-    );
-    fetchData(
-      `${API_URL}risks/impacts`,
-      setImpactos
-    );
-    fetchData(`${API_URL}risks/kris`, setKris);
-    fetchData(
-      `${API_URL}risks/threats`,
-      setAmeacas
-    );
-    fetchData(
-      `${API_URL}normatives`,
-      setNormativas
-    );
-    fetchData(
-      `${API_URL}controls`,
-      setControles
-    );
-    fetchData(
-      `${API_URL}processes`,
-      setProcessos
-    );
-    fetchData(
-      `${API_URL}incidents`,
-      setIncidentes
-    );
-    fetchData(
-      `${API_URL}collaborators/responsibles`,
-      setResponsavel
-    );
-    window.scrollTo(0, 0);
-  }, [authToken]);
-
-  const handlePlanCreated = (newPlan) => {
-    setPlanoAcao((prevPlans) => [...prevPlans, newPlan]);
-    setFormData((prev) => ({
-      ...prev,
-      planoAcao: [...prev.planoAcao, newPlan.id],
-    }));
-  };
-
-  // Em caso de edição - CORRIGIDO
-  useEffect(() => {
-    if (dadosApi && authToken) {
-      const fetchEmpresaDados = async () => {
-        try {
-          const response = await fetch(
-            `${API_URL}risks/${dadosApi.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${authToken}`,
-              },
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error("Erro ao buscar os dados de empresas");
-          }
-
-          const data = await response.json();
-          setRequisicao("Editar");
-          setMensagemFeedback("editado");
-          setNome(data.name);
-          setCodigo(data.code);
-          setDescricao(data.description);
-          setDescricaoTratamento(data.treatmentDescription);
-          
-          // CORREÇÃO: Aguardar que os dados sejam carregados antes de definir formData
-          setFormData((prev) => ({
-            ...prev,
-            planoAcao: Array.isArray(data.idActionPlans) ? data.idActionPlans : [],
-            causa: Array.isArray(data.causes)
-              ? data.causes.map((u) => u.idCause)
-              : [],
-            departamento: Array.isArray(data.departments)
-              ? data.departments.map((u) => u.idDepartment)
-              : [],
-            fator: Array.isArray(data.factors)
-              ? data.factors.map((u) => u.idFactor)
-              : [],
-            impacto: Array.isArray(data.impacts)
-              ? data.impacts.map((u) => u.idImpact)
-              : [],
-            incidente: Array.isArray(data.incidents)
-              ? data.incidents.map((u) => u.idIncident)
-              : [],
-            kri: Array.isArray(data.krises)
-              ? data.krises.map((u) => u.idKri)
-              : [],
-            normativa: Array.isArray(data.normatives)
-              ? data.normatives.map((u) => u.idNormative)
-              : [],
-            riscoAssociado: Array.isArray(data.riskAssociates)
-              ? data.riskAssociates.map((u) => u.idRiskAssociate)
-              : [],
-            diretriz: Array.isArray(data.strategicGuidelines)
-              ? data.strategicGuidelines.map((u) => u.idStrategicGuideline)
-              : [],
-            categoria: data.idCategory || "",
-            controle: Array.isArray(data.idControls) ? data.idControls : [],
-            framework: Array.isArray(data.idFrameworks)
-              ? data.idFrameworks
-              : [],
-            files: data.files || [],
-            processo: Array.isArray(data.idProcesses) ? data.idProcesses : [],
-            responsavel: data.idResponsible || "",
-            ameaca: Array.isArray(data.idThreats) ? data.idThreats : [],
-            tratamento: data.idTreatment || "",
-            dataInicioOperacao: data.date ? new Date(data.date) : null,
-          }));
-
-          setStatus(data.active);
-          setRiscoDados(data);
-        } catch (err) {
-          console.error("Erro ao buscar os dados:", err.message);
-        } finally {
-          console.log("Requisição finalizada");
+    const getUniqueValues = (key, isArray = false) => {
+      if (!data) return [];
+      const values = data.flatMap(item => {
+        const value = item[key];
+        if (isArray && Array.isArray(value)) {
+          return value.filter(v => v !== null && v !== undefined && v !== "");
         }
-      };
+        return value !== null && value !== undefined && value !== "" ? [value] : [];
+      });
+      return [...new Set(values)].sort();
+    };
 
-      if (dadosApi.id) {
-        fetchEmpresaDados();
-      }
+    // Campos String
+    setCategoryOptions(getUniqueValues('category'));
+    setResponsibleOptions(getUniqueValues('responsible'));
+    setTreatmentOptions(getUniqueValues('treatment'));
+
+    // Campos Array
+    setProcessOptions(getUniqueValues('process', true));
+    setControlsOptions(getUniqueValues('controls', true));
+    setDepartmentsOptions(getUniqueValues('departments', true));
+    setNormativesOptions(getUniqueValues('normatives', true));
+    setFactorsOptions(getUniqueValues('factors', true));
+    setIncidentsOptions(getUniqueValues('incidents', true));
+    setCausesOptions(getUniqueValues('causes', true));
+    setImpactsOptions(getUniqueValues('impacts', true));
+    setKrisOptions(getUniqueValues('kris', true));
+    setThreatsOptions(getUniqueValues('threats', true));
+    setFrameworksOptions(getUniqueValues('frameworks', true));
+    setActionPlansOptions(getUniqueValues('actionPlans', true)); // Novo
+  }, [data]);
+
+  const applyFilters = () => {
+    const newFilters = [];
+    
+    // Mapeamento de filtros para exibição
+    if (draftFilters.responsible.length > 0) newFilters.push({ type: "Responsável", values: draftFilters.responsible });
+    if (draftFilters.category.length > 0) newFilters.push({ type: "Categoria", values: draftFilters.category });
+    if (draftFilters.treatment.length > 0) newFilters.push({ type: "Tratamento", values: draftFilters.treatment });
+    
+    // Arrays
+    if (draftFilters.process.length > 0) newFilters.push({ type: "Processos", values: draftFilters.process });
+    if (draftFilters.controls.length > 0) newFilters.push({ type: "Controles", values: draftFilters.controls });
+    if (draftFilters.departments.length > 0) newFilters.push({ type: "Departamentos", values: draftFilters.departments });
+    if (draftFilters.normatives.length > 0) newFilters.push({ type: "Normativos", values: draftFilters.normatives });
+    if (draftFilters.factors.length > 0) newFilters.push({ type: "Fatores", values: draftFilters.factors });
+    if (draftFilters.incidents.length > 0) newFilters.push({ type: "Incidentes", values: draftFilters.incidents });
+    if (draftFilters.causes.length > 0) newFilters.push({ type: "Causas", values: draftFilters.causes });
+    if (draftFilters.impacts.length > 0) newFilters.push({ type: "Impactos", values: draftFilters.impacts });
+    if (draftFilters.kris.length > 0) newFilters.push({ type: "KRIs", values: draftFilters.kris });
+    if (draftFilters.threats.length > 0) newFilters.push({ type: "Ameaças", values: draftFilters.threats });
+    if (draftFilters.frameworks.length > 0) newFilters.push({ type: "Frameworks", values: draftFilters.frameworks });
+    if (draftFilters.actionPlans.length > 0) newFilters.push({ type: "Planos de Ação", values: draftFilters.actionPlans }); // Novo
+
+    if (draftFilters.startDate) newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
+    if (draftFilters.endDate) newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
+    
+    setSelectedFilters(newFilters);
+
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: draftFilters.startDate,
+        EndDate: draftFilters.endDate,
+      });
     }
-  }, [dadosApi, authToken]);
 
-  const handleIncidentCreated = (newIncidente) => {
-    setIncidentes((prevIncidentes) => [...prevIncidentes, newIncidente]);
-    setFormData((prev) => ({
-      ...prev,
-      incidente: [...prev.incidente, newIncidente.id],
-    }));
+    toggleDrawer();
   };
 
-  const handleProcessCreated = (newProcesso) => {
-    setProcessos((prevProcessos) => [...prevProcessos, newProcesso]);
-    setFormData((prev) => ({
-      ...prev,
-      processo: [...prev.processo, newProcesso.id],
-    }));
+  const removeFilter = (index) => {
+    setSelectedFilters((prev) => {
+      const filterToRemove = prev[index];
+      
+      setDraftFilters((prevDraft) => {
+        const updatedDraft = { ...prevDraft };
+        const filterType = filterToRemove.type;
+        
+        // Mapa reverso atualizado
+        const mapTypeToKey = {
+          "Responsável": "responsible",
+          "Categoria": "category",
+          "Tratamento": "treatment",
+          "Processos": "process",
+          "Controles": "controls",
+          "Departamentos": "departments",
+          "Normativos": "normatives",
+          "Fatores": "factors",
+          "Incidentes": "incidents",
+          "Causas": "causes",
+          "Impactos": "impacts",
+          "KRIs": "kris",
+          "Ameaças": "threats",
+          "Frameworks": "frameworks",
+          "Planos de Ação": "actionPlans", // Novo
+        };
+
+        const key = mapTypeToKey[filterType];
+        if (key) {
+           updatedDraft[key] = updatedDraft[key].filter(
+            (value) => !filterToRemove.values.includes(value)
+          );
+        } else if (filterType === "Data Inicial") {
+            updatedDraft.startDate = null;
+        } else if (filterType === "Data Final") {
+            updatedDraft.endDate = null;
+        }
+
+        return updatedDraft;
+      });
+  
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
-  const handleControlCreated = (newControle) => {
-    setControles((prevControles) => [...prevControles, newControle]);
-    setFormData((prev) => ({
-      ...prev,
-      controle: [...prev.controle, newControle.id],
-    }));
-  };
-
-  const handleCategoriaCreated = (newCategoria) => {
-    setCategorias((prevCategorias) => [...prevCategorias, newCategoria]);
-    setFormData((prev) => ({
-      ...prev,
-      categoria: newCategoria.id,
-    }));
-  };
-
-  const handleDepartmentCreated = (newDepartamento) => {
-    setDepartamentos((prevDepartamentos) => [
-      ...prevDepartamentos,
-      newDepartamento,
-    ]);
-    setFormData((prev) => ({
-      ...prev,
-      departamento: [...prev.departamento, newDepartamento.id],
-    }));
-  };
-
-  const handleSelectAllPlanoAcao = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.planoAcao.length === planosAcoes.length) {
-        // Deselect all
-        setFormData({ ...formData, planoAcao: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          planoAcao: planosAcoes.map((planoAcao) => planoAcao.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "planoAcao",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
-
-  useEffect(() => {
-    const nomeDigitado = formatarNome(nome);
-
-    // Verifica e remove o departamento superior se necessário
-    const superiorSelecionada = riscoAssociados.find(
-      (risco) => risco.id === formData.riscoAssociado
-    );
-    if (
-      superiorSelecionada &&
-      formatarNome(superiorSelecionada.nome) === nomeDigitado
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        riscoAssociado: [],
-      }));
-    }
-  }, [nome, riscoAssociados, formData.riscoAssociado]);
-
-  const tratarMudancaInputGeral = (field, value) => {
-    if (field === "categoria") {
-      // Guarde apenas o ID do item selecionado
-      setFormData({ ...formData, [field]: value ? value.id : null });
-    } else {
-      // Para outros campos
-      setFormData({ ...formData, [field]: value });
-    }
-  };
-
-  const handleSelectAll = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.riscoAssociado.length === riscoAssociados.length) {
-        // Deselect all
-        setFormData({ ...formData, riscoAssociado: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          riscoAssociado: riscoAssociados.map(
-            (riscoAssociado) => riscoAssociado.id
-          ),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "riscoAssociado",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  // NEW
-  const handleSelectAllFrameworks = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.framework.length === frameworks.length) {
-        // Desmarcar todos
-        setFormData({ ...formData, framework: [] });
-      } else {
-        // Selecionar todos
-        setFormData({
-          ...formData,
-          framework: frameworks.map((fw) => fw.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "framework",
-        newValue.map((item) => item.id)
-      );
+  const handleRemoveAllFilters = () => {
+    setSelectedFilters([]);
+    setGlobalFilter("");
+    setDraftFilters({
+      responsible: [],
+      category: [],
+      treatment: [],
+      process: [],
+      controls: [],
+      departments: [],
+      normatives: [],
+      factors: [],
+      incidents: [],
+      causes: [],
+      impacts: [],
+      kris: [],
+      threats: [],
+      frameworks: [],
+      actionPlans: [], // Novo
+      startDate: null,
+      endDate: null,
+    });
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: null,
+        EndDate: null,
+      });
     }
   };
 
-  const handleSelectAllCausas = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.causa.length === causas.length) {
-        // Deselect all
-        setFormData({ ...formData, causa: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, causa: causas.map((causa) => causa.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "causa",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      return selectedFilters.every((filter) => {
+        const filterType = filter.type;
+        const filterValues = filter.values;
 
-  const handleSelectAllImpactos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.impacto.length === impactos.length) {
-        // Deselect all
-        setFormData({ ...formData, impacto: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          impacto: impactos.map((impacto) => impacto.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "impacto",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        if (filterType === "Data Inicial" || filterType === "Data Final") return true;
 
-  const handleSelectAllNormativas = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.normativa.length === normativas.length) {
-        // Deselect all
-        setFormData({ ...formData, normativa: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          normativa: normativas.map((normativa) => normativa.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "normativa",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        if (filterType === "Responsável") return filterValues.includes(item.responsible);
+        if (filterType === "Categoria") return filterValues.includes(item.category);
+        if (filterType === "Tratamento") return filterValues.includes(item.treatment);
 
-  const handleSelectAllDepartamentos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.departamento.length === departamentos.length) {
-        // Deselect all
-        setFormData({ ...formData, departamento: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          departamento: departamentos.map((departamento) => departamento.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "departamento",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        const arrayFilters = {
+          "Processos": item.process,
+          "Controles": item.controls,
+          "Departamentos": item.departments,
+          "Normativos": item.normatives,
+          "Fatores": item.factors,
+          "Incidentes": item.incidents,
+          "Causas": item.causes,
+          "Impactos": item.impacts,
+          "KRIs": item.kris,
+          "Ameaças": item.threats,
+          "Frameworks": item.frameworks,
+          "Planos de Ação": item.actionPlans, // Novo
+        };
 
-  const handleSelectAllControles = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.controle.length === controles.length) {
-        // Deselect all
-        setFormData({ ...formData, controle: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          controle: controles.map((controle) => controle.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "controle",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        if (arrayFilters[filterType]) {
+          return filterValues.some(val => (arrayFilters[filterType] || []).includes(val));
+        }
 
-  const handleSelectAllKris = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.kri.length === kris.length) {
-        // Deselect all
-        setFormData({ ...formData, kri: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, kri: kris.map((kri) => kri.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "kri",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+        return true;
+      });
+    });
+  }, [data, selectedFilters]);
 
-  const handleSelectAllIncidentes = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.incidente.length === incidentes.length) {
-        // Deselect all
-        setFormData({ ...formData, incidente: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          incidente: incidentes.map((incidente) => incidente.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "incidente",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
+  // Restante do código da tabela (useReactTable, useEffect de visibilidade, etc)...
+  // ... (código existente da tabela omitido para brevidade até o Drawer)
 
-  const handleSelectAllDiretrizes = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.diretriz.length === diretrizes.length) {
-        // Deselect all
-        setFormData({ ...formData, diretriz: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          diretriz: diretrizes.map((diretriz) => diretriz.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "diretriz",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllAmeacas = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.ameaca.length === ameacas.length) {
-        // Deselect all
-        setFormData({ ...formData, ameaca: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          ameaca: ameacas.map((ameaca) => ameaca.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "ameaca",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAllFatores = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.fator.length === fatores.length) {
-        // Deselect all
-        setFormData({ ...formData, fator: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, fator: fatores.map((fator) => fator.id) });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "fator",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const handleSelectAll2 = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          processo: processos.map((processo) => processo.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "processo",
-        newValue.map((item) => item.id)
-      );
-    }
-  };
-
-  const voltarParaCadastroMenu = () => {
-    navigate(-1);
-    window.scrollTo(0, 0);
-  };
-
-  const [formValidation, setFormValidation] = useState({
-    codigo: true,
-    nome: true,
-    categoria: true,
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    state: { sorting, rowSelection, globalFilter, columnVisibility },
+    enableRowSelection: true,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    globalFilterFn: fuzzyFilter,
+    debugTable: true,
   });
 
-  const allSelected =
-    formData.riscoAssociado.length === riscoAssociados.length &&
-    riscoAssociados.length > 0;
-  const allSelectedPlanoAcao =
-    formData.planoAcao.length === planosAcoes.length && planosAcoes.length > 0;
-  const allSelected2 =
-    formData.processo.length === processos.length && processos.length > 0;
-  const allSelectedDiretrizes =
-    formData.diretriz.length === diretrizes.length && diretrizes.length > 0;
-  const allSelectedFatores =
-    formData.fator.length === fatores.length && fatores.length > 0;
-  const allSelectedIncidente =
-    formData.incidente.length === incidentes.length && incidentes.length > 0;
-  const allSelectedCausas =
-    formData.causa.length === causas.length && causas.length > 0;
-  const allSelectedImpactos =
-    formData.impacto.length === impactos.length && impactos.length > 0;
-  const allSelectedNormativas =
-    formData.normativa.length === normativas.length && normativas.length > 0;
-  const allSelectedDepartamentos =
-    formData.departamento.length === departamentos.length &&
-    departamentos.length > 0;
-  const allSelectedKris =
-    formData.kri.length === kris.length && kris.length > 0;
-  const allSelectedControles =
-    formData.controle.length === controles.length && controles.length > 0;
-  const allSelectedAmeacas =
-    formData.ameaca.length === ameacas.length && ameacas.length > 0;
+  useEffect(
+    () =>
+      setColumnVisibility({
+        name: true,
+        code: true,
+        category: true,
+        responsible: true,
+        treatment: true,
+        process: false,
+        controls: false,
+        departments: false,
+        normatives: false,
+        factors: false,
+        incidents: false,
+        causes: false,
+        impacts: false,
+        kris: false,
+        threats: false,
+        frameworks: false,
+        date: false,
+        actionPlans: false, // Novo (Opcional, se houver coluna para isso)
+        actions: true 
+      }),
+    []
+  );
 
-  const allSelectedFrameworks =
-    formData.framework.length === frameworks.length && frameworks.length > 0;
-
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-
-  const tratarSubmit = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!nome.trim()) {
-      setFormValidation((prev) => ({ ...prev, nome: false }));
-      missingFields.push("Nome");
-    }
-    if (!codigo.trim()) {
-      setFormValidation((prev) => ({ ...prev, codigo: false }));
-      missingFields.push("Código");
-    }
-    if (!formData.categoria) {
-      setFormValidation((prev) => ({ ...prev, categoria: false }));
-      missingFields.push("Categoria");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // --- Lógica de arquivos para riscos (containerFolder 3) ---
-      // Se o formData não tiver a propriedade "files", garanta que seja um array
-      const riskFiles = formData.files || [];
-
-      // Separe os arquivos novos (instâncias de File) dos já existentes (objetos com URL)
-      const newFiles = riskFiles.filter((file) => file instanceof File);
-      const existingFiles = riskFiles.filter((file) => !(file instanceof File));
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 3); // 3 para riscos
-        // Em edição, já temos o id do risco; em criação, envia string vazia
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? riscoDados?.idRisk : ""
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          `${API_URL}files/uploads`,
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-        // Espera-se que o endpoint retorne um objeto do tipo { files: [...] }
-        uploadFilesResult = uploadResponse.data;
-      }
-
-      // Combina os arquivos já existentes com os novos enviados
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-
-      // Transforma cada item para que o payload contenha somente a URL (string)
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      // --- Configuração do payload e endpoint para riscos ---
-      if (requisicao === "Criar") {
-        url = `${API_URL}risks`;
-        method = "POST";
-        payload = {
-          code: codigo,
-          name: nome,
-          idCategory: formData.categoria || null,
-        };
-      } else if (requisicao === "Editar") {
-        url = `${API_URL}risks`;
-        method = "PUT";
-        payload = {
-          idRisk: riscoDados?.idRisk,
-          code: codigo,
-          name: nome,
-          description: descricao,
-          idActionPlans: formData.planoAcao?.length ? formData.planoAcao : null,
-          treatmentDescription: descricaoTratamento,
-          date: formData.dataInicioOperacao
-            ? formData.dataInicioOperacao.toISOString()
-            : null,
-          idResponsible: formData.responsavel || null,
-          active: status,
-          idCategory: formData.categoria || null,
-          idFrameworks: formData.framework?.length ? formData.framework : null,
-          idTreatment: formData.tratamento || null,
-          idRiskAssociates: formData.riscoAssociado?.length
-            ? formData.riscoAssociado
-            : null,
-          idStrategicGuidelines: formData.diretriz?.length
-            ? formData.diretriz
-            : null,
-          idFactors: formData.fator?.length ? formData.fator : null,
-          idIncidents: formData.incidente?.length ? formData.incidente : null,
-          idCauses: formData.causa?.length ? formData.causa : null,
-          idImpacts: formData.impacto?.length ? formData.impacto : null,
-          idNormatives: formData.normativa?.length ? formData.normativa : null,
-          idDepartments: formData.departamento?.length
-            ? formData.departamento
-            : null,
-          idKrises: formData.kri?.length ? formData.kri : null,
-          idProcesses: formData.processo?.length ? formData.processo : null,
-          idControls: formData.controle?.length ? formData.controle : null,
-          idThreats: formData.ameaca?.length ? formData.ameaca : null,
-          files: finalFilesPayload,
-        };
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      let data = null;
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      } else {
-        enqueueSnackbar(`Risco ${mensagemFeedback} com sucesso!`, {
-          variant: "success",
-          anchorOrigin: { vertical: "top", horizontal: "right" },
-        });
-      }
-
-      if (requisicao === "Criar" && data.data.idRisk) {
-        setRiscoDados(data.data);
-        setSuccessDialogOpen(true);
-      } else {
-        voltarParaCadastroMenu();
-      }
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Um risco já foi cadastrado com esse código.", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-    } finally {
-      setLoading(false);
-    }
+  const getAllColumnsFiltered = () => {
+    return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
   };
+  
+  // Style config (mantido do original)
+  const verticalDividerStyle = {
+    width: "0.5px",
+    height: "37px",
+    backgroundColor: "#98B3C3",
+    opacity: "0.75",
+    flexShrink: "0",
+    marginRight: "0px",
+    marginLeft: "7px",
+  };
+
+  // Mark.js effect (mantido do original)
+  useEffect(() => {
+    const markInstance = new Mark(tableRef.current);
+    if (globalFilter) {
+      markInstance.unmark({
+        done: () => {
+          markInstance.mark(globalFilter);
+        },
+      });
+    } else {
+      markInstance.unmark();
+    }
+  }, [globalFilter, table.getRowModel().rows]);
+
 
   return (
     <>
-      <LoadingOverlay isActive={loading} />
-      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
-        <Box sx={{ width: '100%', marginTop: 2 }}>
-          {/* Seção 1: Informações Básicas */}
-          <SectionCard 
-            title="Informações Básicas" 
-            icon={<InfoIcon color="primary" />}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{
+          backgroundColor: "#F1F1F1E5",
+          paddingBottom: 2,
+          paddingTop: 2,
+          paddingRight: 2,
+          paddingLeft: 2,
+          marginBottom: 3,
+          ...(matchDownSM && {
+            "& .MuiOutlinedInput-root, & .MuiFormControl-root": {
+              width: "110%",
+            },
+          }),
+        }}
+      >
+        <Stack direction="row" spacing={1} alignItems="center">
+          <SelectColumnVisibility
+            {...{
+              getVisibleLeafColumns: table.getVisibleLeafColumns,
+              getIsAllColumnsVisible: table.getIsAllColumnsVisible,
+              getToggleAllColumnsVisibilityHandler: table.getToggleAllColumnsVisibilityHandler,
+              getAllColumns: getAllColumnsFiltered,
+            }}
+          />
+          <DebouncedInput
+            value={globalFilter ?? ""}
+            onFilterChange={(value) => setGlobalFilter(String(value))}
+            placeholder={`Pesquise pelo nome`}
+            style={{
+              width: "350px",
+              height: "33px",
+              borderRadius: "8px",
+              border: "0.3px solid #00000010",
+              backgroundColor: "#FFFFFF",
+            }}
+          />
+          <Button
+            onClick={() => toggleDrawer(true)}
+            startIcon={
+              <FontAwesomeIcon icon={faFilter} style={{ color: "#00000080" }} />
+            }
+            style={{
+              width: "90px",
+              color: "#00000080",
+              backgroundColor: 'white',
+              fontSize: "13px",
+              marginLeft: 24,
+              fontWeight: 400,
+              height: "33px",
+              borderRadius: "8px",
+              border: "0.6px solid #00000040 ",
+            }}
           >
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Código *</InputLabel>
-                  <TextField
-                    onChange={(event) => setCodigo(event.target.value)}
-                    fullWidth
-                    placeholder="Código do risco"
-                    value={codigo}
-                    error={!codigo && formValidation.codigo === false}
-                    helperText={!codigo && formValidation.codigo === false ? "Campo obrigatório" : ""}
-                  />
-                </Stack>
-              </Grid>
+            Filtros
+          </Button>
+        </Stack>
 
-              <Grid item xs={12} md={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Nome *</InputLabel>
-                  <TextField
-                    onChange={(event) => setNome(event.target.value)}
-                    fullWidth
-                    placeholder="Nome do risco"
-                    value={nome}
-                    error={!nome && formValidation.nome === false}
-                    helperText={!nome && formValidation.nome === false ? "Campo obrigatório" : ""}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Categoria principal *{" "}
-                    <DrawerCategoria
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onCategoryCreated={handleCategoriaCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    options={categorias}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      categorias.find(
-                        (categoria) => categoria.id === formData.categoria
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        categoria: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        placeholder="Selecione uma categoria"
-                        error={
-                          !formData.categoria && formValidation.categoria === false
-                        }
-                        helperText={
-                          !formData.categoria && formValidation.categoria === false 
-                            ? "Campo obrigatório" 
-                            : ""
-                        }
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              {requisicao === "Editar" && (
-                <Grid item xs={12} md={6}>
-                  <Stack spacing={1}>
-                    <InputLabel>Data de identificação</InputLabel>
-                    <DatePicker
-                      value={formData.dataInicioOperacao || null}
-                      onChange={(newValue) => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          dataInicioOperacao: newValue,
-                        }));
-                      }}
-                      slotProps={{
-                        textField: {
-                          placeholder: "00/00/0000",
-                          fullWidth: true,
-                        },
-                      }}
-                    />
-                  </Stack>
-                </Grid>
-              )}
-
-              <Grid item xs={12}>
-                <Stack spacing={1}>
-                  <InputLabel>Descrição</InputLabel>
-                  <TextField
-                    onChange={(event) => setDescricao(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={4}
-                    placeholder="Descreva o risco detalhadamente"
-                    value={descricao}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsavel: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        placeholder="Selecione um responsável"
-                      />
-                    )}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} md={6} mt={1}>
-                <Stack spacing={1}>
-                  <InputLabel>Status</InputLabel>
-                  <Stack direction="row" alignItems="center" spacing={1} >
-                    <Switch
-                      checked={status}
-                      onChange={(event) => setStatus(event.target.checked)}
-                    />
-                    <Typography>{status ? "Ativo" : "Inativo"}</Typography>
-                  </Stack>
-                </Stack>
-              </Grid>
-            </Grid>
-          </SectionCard>
-
-          {requisicao === "Editar" && (
-            <>
-              {/* Seção 2: Análise de Risco */}
-              <SectionCard 
-                title="Análise de Risco" 
-                icon={<AssessmentIcon color="primary" />}
-              >
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Causas</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...causas]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.causa.map(
-                          (id) => causas.find((causa) => causa.id === id) || id
-                        )}
-                        onChange={handleSelectAllCausas}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedCausas : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Impactos</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...impactos]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.impacto.map(
-                          (id) => impactos.find((impacto) => impacto.id === id) || id
-                        )}
-                        onChange={handleSelectAllImpactos}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedImpactos : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Ameaças</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todas" }, ...ameacas]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.ameaca.map(
-                          (id) => ameacas.find((ameaca) => ameaca.id === id) || id
-                        )}
-                        onChange={handleSelectAllAmeacas}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedAmeacas : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params}/>
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Fatores</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...fatores]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.fator.map(
-                          (id) => fatores.find((fator) => fator.id === id) || id
-                        )}
-                        onChange={handleSelectAllFatores}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedFatores : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Stack spacing={1}>
-                      <InputLabel>
-                        Incidentes{" "}
-                        <DrawerIncidente
-                          buttonSx={{
-                            marginLeft: 1.5,
-                            height: "20px",
-                            minWidth: "20px",
-                          }}
-                          onIncidentCreated={handleIncidentCreated}
-                        />
-                      </InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...incidentes]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.incidente.map(
-                          (id) => incidentes.find((incidente) => incidente.id === id) || id
-                        )}
-                        onChange={handleSelectAllIncidentes}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedIncidente : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-                </Grid>
-              </SectionCard>
-
-              {/* Seção 3: Tratamento e Controle */}
-              <SectionCard 
-                title="Tratamento e Controle" 
-                icon={<SecurityIcon color="primary" />}
-              >
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Tratamento</InputLabel>
-                      <Autocomplete
-                        options={tratamentos}
-                        getOptionLabel={(option) => option.nome}
-                        value={
-                          tratamentos.find(
-                            (tratamento) => tratamento.id === formData.tratamento
-                          ) || null
-                        }
-                        onChange={(event, newValue) => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            tratamento: newValue ? newValue.id : "",
-                          }));
-                        }}
-                        renderInput={(params) => (
-                          <TextField {...params} placeholder="Selecione um tratamento" />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>
-                        Plano de ação{" "}
-                        <DrawerPlanos
-                          buttonSx={{
-                            marginLeft: 1.5,
-                            height: "20px",
-                            minWidth: "20px",
-                          }}
-                          onPlansCreated={handlePlanCreated}
-                        />
-                      </InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...planosAcoes]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.planoAcao.map(
-                          (id) => planosAcoes.find((planoAcao) => planoAcao.id === id) || id
-                        )}
-                        onChange={handleSelectAllPlanoAcao}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedPlanoAcao : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Stack spacing={1}>
-                      <InputLabel>Descrição do tratamento</InputLabel>
-                      <TextField
-                        onChange={(event) => setDescricaoTratamento(event.target.value)}
-                        fullWidth
-                        multiline
-                        rows={4}
-                        placeholder="Descreva como o risco será tratado"
-                        value={descricaoTratamento}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>
-                        Controles{" "}
-                        <DrawerControle
-                          buttonSx={{
-                            marginLeft: 1.5,
-                            height: "20px",
-                            minWidth: "20px",
-                          }}
-                          onControlCreated={handleControlCreated}
-                        />
-                      </InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...controles]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.controle.map(
-                          (id) => controles.find((controle) => controle.id === id) || id
-                        )}
-                        onChange={handleSelectAllControles}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedControles : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>KRI</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...kris]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.kri.map(
-                          (id) => kris.find((kri) => kri.id === id) || id
-                        )}
-                        onChange={handleSelectAllKris}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedKris : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-                </Grid>
-              </SectionCard>
-
-              {/* Seção 4: Governança e Compliance */}
-              <SectionCard 
-                title="Governança e Compliance" 
-                icon={<AccountBalanceIcon color="primary" />}
-              >
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Frameworks</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...frameworks]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.framework.map(
-                          (id) => frameworks.find((fw) => fw.id === id) || id
-                        )}
-                        onChange={handleSelectAllFrameworks}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedFrameworks : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Diretrizes estratégicas</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...diretrizes]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.diretriz.map(
-                          (id) => diretrizes.find((diretriz) => diretriz.id === id) || id
-                        )}
-                        onChange={handleSelectAllDiretrizes}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedDiretrizes : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>Normativas</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disabled
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...normativas]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.normativa.map(
-                          (id) => normativas.find((normativa) => normativa.id === id) || id
-                        )}
-                        onChange={handleSelectAllNormativas}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedNormativas : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Stack spacing={1}>
-                      <InputLabel>
-                        Processos{" "}
-                        <DrawerProcesso
-                          buttonSx={{
-                            marginLeft: 1.5,
-                            height: "20px",
-                            minWidth: "20px",
-                          }}
-                          onProcessCreated={handleProcessCreated}
-                        />
-                      </InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todas" }, ...processos]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.processo.map(
-                          (id) => processos.find((processo) => processo.id === id) || id
-                        )}
-                        onChange={handleSelectAll2}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelected2 : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Stack spacing={1}>
-                      <InputLabel>
-                        Departamentos{" "}
-                        <DrawerDepartamento
-                          buttonSx={{
-                            marginLeft: 1.5,
-                            height: "20px",
-                            minWidth: "20px",
-                          }}
-                          onDepartmentCreated={handleDepartmentCreated}
-                        />
-                      </InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...departamentos]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.departamento.map(
-                          (id) => departamentos.find((departamento) => departamento.id === id) || id
-                        )}
-                        onChange={handleSelectAllDepartamentos}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelectedDepartamentos : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-                </Grid>
-              </SectionCard>
-
-              {/* Seção 5: Relacionamentos */}
-              <SectionCard 
-                title="Relacionamentos" 
-                icon={<LinkIcon color="primary" />}
-              >
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <Stack spacing={1}>
-                      <InputLabel>Risco Associado</InputLabel>
-                      <Autocomplete
-                        multiple
-                        disableCloseOnSelect
-                        options={[
-                          { id: "all", nome: "Selecionar todos" },
-                          ...riscoAssociados.filter((risco) => {
-                            const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
-                            return formatarNome(risco.nome) !== formatarNome(nome);
-                          }),
-                        ]}
-                        getOptionLabel={(option) => option.nome}
-                        value={formData.riscoAssociado.map(
-                          (id) => riscoAssociados.find((r) => r.id === id)
-                        ).filter(Boolean)}
-                        onChange={handleSelectAll}
-                        isOptionEqualToValue={(option, value) =>
-                          option.id === value.id
-                        }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all" ? allSelected : selected
-                                  }
-                                />
-                              </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
-                      />
-                    </Stack>
-                  </Grid>
-
-                  <Grid item xs={12}>
-                    <Stack spacing={1}>
-                      <InputLabel>Anexos</InputLabel>
-                      <FileUploader
-                        containerFolder={1}
-                        initialFiles={formData.files}
-                        onFilesChange={(files) =>
-                          setFormData((prev) => ({ ...prev, files }))
-                        }
-                      />
-                    </Stack>
-                  </Grid>
-                </Grid>
-              </SectionCard>
-            </>
-          )}
-
-          {/* Botões de ação */}
-          <Paper sx={{ p: 3, mt: 3, backgroundColor: 'grey.50' }}>
-            <Stack direction="row" spacing={2} justifyContent="flex-start">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems="center"
+          sx={{ width: { xs: "100%", sm: "auto" } }}
+        >
+           <div style={{verticalDividerStyle}}></div>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+                ml: 0.75,
+              }}
+            >
               <Button
                 variant="contained"
-                color="primary"
-                onClick={tratarSubmit}
-                sx={{
-                  minWidth: 120,
-                  height: 40,
-                  fontWeight: 600,
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigation(`/riscos/criar`, { state: { indoPara: "NovoRisco" } });
                 }}
+                startIcon={<PlusOutlined />}
+                style={{ borderRadius: "20px", height: "32px" }}
               >
-                {requisicao === "Criar" ? "Criar Risco" : "Atualizar"}
+                Novo
               </Button>
+            </Box>
+          </Stack>
+                <Stack>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+                ml: 0.75,
+              }}
+            >
               <Button
                 variant="outlined"
-                onClick={voltarParaCadastroMenu}
-                sx={{
-                  minWidth: 120,
-                  height: 40,
-                  fontWeight: 600,
-                }}
+                onClick={onExportExcel}
+                startIcon={<DownloadOutlined />}
+                disabled={isLoading}
+                style={{ borderRadius: "20px", height: "32px" }}
               >
-                Cancelar
+                Exportar Excel
               </Button>
-            </Stack>
-          </Paper>
-        </Box>
+            </Box>
+          </Stack>
+        </Stack>
+      </Stack>
 
-        {/* Dialog de sucesso mantido do original */}
-        <Dialog
-          open={successDialogOpen}
-          onClose={() => setSuccessDialogOpen(false)}
-          sx={{
-            "& .MuiDialog-paper": {
-              padding: "24px",
-              borderRadius: "12px",
-              width: "400px",
-              textAlign: "center",
-            },
-          }}
-        >
-          <Box display="flex" justifyContent="center" mt={2}>
-            <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
-          </Box>
-          <DialogTitle
-            sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
-          >
-            Risco Criado com Sucesso!
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText
-              sx={{ fontSize: "16px", color: "#555", px: 2 }}
-            >
-              O risco foi cadastrado com sucesso. Você pode voltar para a
-              listagem ou adicionar mais informações a esse risco.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions
-            sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
-          >
-            <Button
-              onClick={() => {
-                setSuccessDialogOpen(false);
-                voltarParaCadastroMenu();
-              }}
-              variant="outlined"
-              sx={{
-                borderColor: "#007bff",
-                color: "#007bff",
-                fontWeight: 600,
-              }}
-            >
-              Voltar para Listagem
-            </Button>
-            <Button
-              onClick={() => {
-                setRequisicao("Editar");
-                setSuccessDialogOpen(false);
-              }}
-              variant="contained"
-              sx={{
-                backgroundColor: "#007bff",
-                fontWeight: 600,
-              }}
-            >
-              Continuar Editando
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </LocalizationProvider>
+      <Box mb={2}>
+        {selectedFilters.map((filter, index) => (
+          <Chip
+            key={index}
+            label={
+              <Box display="flex" alignItems="center">
+                <Typography
+                  sx={{ color: "#1C5297", fontWeight: 600, marginRight: "4px" }}
+                >
+                  {filter.type}:
+                </Typography>
+                <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
+                  {filter.values.join(", ")}
+                </Typography>
+              </Box>
+            }
+            onDelete={() => removeFilter(index)}
+            sx={{
+              margin: 0.5,
+              backgroundColor: "#1C52971A",
+              border: "0.7px solid #1C529733",
+            }}
+          />
+        ))}
+        {selectedFilters.length > 0 && (
+          <Chip
+            label="Limpar Filtros"
+            onClick={handleRemoveAllFilters}
+            sx={{
+              margin: 0.5,
+              backgroundColor: "transparent",
+              color: "#1C5297",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+            }}
+          />
+        )}
+      </Box>
+
+      {/* Drawer para filtros */}
+      <Drawer anchor="right" open={drawerOpen} onClose={toggleDrawer} PaperProps={{ sx: { width: 670 } }}>
+        <Box sx={{ width: 650, p: 3 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box component="h2" sx={{ color: '#1C5297', fontWeight: 600, fontSize: '16px' }}>Filtros</Box>
+            <IconButton onClick={toggleDrawer}>
+              <CloseIcon sx={{ color: '#1C5297', fontSize: '18px' }} />
+            </IconButton>
+          </Stack>
+
+          <Grid container spacing={2}>
+            {/* Responsável */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Responsável</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={responsibleOptions}
+                  value={draftFilters.responsible}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, responsible: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Categoria */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Categoria</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={categoryOptions}
+                  value={draftFilters.category}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, category: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Tratamento */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Tratamento</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={treatmentOptions}
+                  value={draftFilters.treatment}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, treatment: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Processos */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Processos</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={processOptions}
+                  value={draftFilters.process}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, process: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+            
+            {/* Controles */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Controles</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={controlsOptions}
+                  value={draftFilters.controls}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, controls: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Departamentos */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Departamentos</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={departmentsOptions}
+                  value={draftFilters.departments}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, departments: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Fatores */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Fatores</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={factorsOptions}
+                  value={draftFilters.factors}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, factors: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+            
+            {/* Incidentes */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Incidentes</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={incidentsOptions}
+                  value={draftFilters.incidents}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, incidents: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Causas */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Causas</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={causesOptions}
+                  value={draftFilters.causes}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, causes: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {/* Impactos */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Impactos</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={impactsOptions}
+                  value={draftFilters.impacts}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, impacts: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+             {/* KRIs */}
+             <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>KRIs</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={krisOptions}
+                  value={draftFilters.kris}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, kris: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+             {/* Ameaças */}
+             <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Ameaças</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={threatsOptions}
+                  value={draftFilters.threats}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, threats: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+             {/* Frameworks */}
+             <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Frameworks</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={frameworksOptions}
+                  value={draftFilters.frameworks}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, frameworks: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+             {/* Planos de Ação (NOVO) */}
+             <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Planos de Ação</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={actionPlansOptions}
+                  value={draftFilters.actionPlans}
+                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, actionPlans: value }))}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Data Inicial</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.startDate || ''}
+                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Data Final</InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.endDate || ''}
+                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
+            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
+            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
+          </Stack>
+        </Box>
+      </Drawer >
+
+      {/* Tabela */}
+      <MainCard content={false}>
+        <ScrollX>
+          <div ref={tableRef}>
+            <Stack>
+              <RowSelection selected={Object.keys(rowSelection).length} />
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow
+                        key={headerGroup.id}
+                        sx={{
+                          backgroundColor: isDarkMode ? "#14141" : "#F4F4F4",
+                          color: isDarkMode
+                            ? "rgba(0, 0, 0, 0.6)"
+                            : "rgba(255, 255, 255, 0.87)",
+                        }}
+                      >
+                        {headerGroup.headers.map((header) => {
+                          if (
+                            header.column.columnDef.meta !== undefined &&
+                            header.column.getCanSort()
+                          ) {
+                            Object.assign(header.column.columnDef.meta, {
+                              className:
+                                header.column.columnDef.meta.className +
+                                " cursor-pointer prevent-select",
+                            });
+                          }
+
+                          return (
+                            <TableCell
+                              sx={{
+                                fontSize: "11px",
+                                color: isDarkMode
+                                  ? "rgba(255, 255, 255, 0.87)"
+                                  : "rgba(0, 0, 0, 0.6)",
+                              }}
+                              key={header.id}
+                              {...header.column.columnDef.meta}
+                              onClick={header.column.getToggleSortingHandler()}
+                              {...(header.column.getCanSort() &&
+                                header.column.columnDef.meta === undefined && {
+                                className: "cursor-pointer prevent-select",
+                              })}
+                            >
+                              {header.isPlaceholder ? null : (
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                >
+                                  <Box>
+                                    {flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext()
+                                    )}
+                                  </Box>
+                                  {header.column.getCanSort() && (
+                                    <HeaderSort column={header.column} />
+                                  )}
+                                </Stack>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableHead>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          sx={{ textAlign: "center" }}
+                        >
+                          <CircularProgress />
+                        </TableCell>
+                      </TableRow>
+                    ) : data ? (
+                      data.length > 0 ? (
+                        table.getRowModel().rows.map((row) => (
+                          <Fragment key={row.id}>
+                            <TableRow
+                              sx={{
+                                "&:last-child td": { borderBottom: "none" },
+                                backgroundColor: isDarkMode ? "#14141" : "#fff",
+                              }}
+                            >
+                              {row.getVisibleCells().map((cell) => (
+                                <TableCell
+                                  key={cell.id}
+                                  {...cell.column.columnDef.meta}
+                                  sx={{
+                                    overflow: "hidden",
+                                    color: isDarkMode
+                                      ? "rgba(255, 255, 255, 0.87)"
+                                      : "rgba(0, 0, 0, 0.65)",
+                                    textOverflow: "ellipsis",
+                                    fontFamily:
+                                      '"Open Sans", Helvetica, sans-serif',
+                                    fontSize: "13px",
+                                    fontStyle: "normal",
+                                    fontWeight: 400,
+                                    lineHeight: "normal",
+                                  }}
+                                >
+                                  {flexRender(
+                                    cell.column.columnDef.cell,
+                                    cell.getContext()
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          </Fragment>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={columns.length}>
+                            <EmptyTable msg="Riscos não encontrados" />
+                          </TableCell>
+                        </TableRow>
+                      )
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          sx={{ textAlign: "left" }}
+                        >
+                          <CircularProgress />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <>
+                <Divider />
+                <Box sx={{ p: 2 }}>
+                  <TablePagination
+                    {...{
+                      setPageSize: table.setPageSize,
+                      setPageIndex: table.setPageIndex,
+                      getState: table.getState,
+                      getPageCount: table.getPageCount,
+                      totalItems: totalRows,
+                      recordType: recordType,
+                    }}
+                  />
+                </Box>
+              </>
+            </Stack>
+          </div>
+        </ScrollX>
+      </MainCard>
     </>
   );
 }
 
-export default ColumnsLayoutsCorrigido;
+ReactTable.propTypes = {
+  columns: PropTypes.array,
+  data: PropTypes.array,
+  totalRows: PropTypes.number,
+  isLoading: PropTypes.bool,
+  onApplyFilters: PropTypes.func,
+  onExportExcel: PropTypes.func,
+};
 
+function ActionCell({ row, refreshData }) {
+  const navigation = useNavigate();
+  const { token } = useToken();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openErrorDialog, setOpenErrorDialog] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(false); // Loading state
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  // --- NOVA LÓGICA: ATIVAR/INATIVAR ---
+  const handleToggleActive = async () => {
+    handleClose(); // Fecha o menu
+    setLoadingStatus(true);
+    const authToken = token || localStorage.getItem("access_token");
+
+    try {
+      // 1. GET: Busca os dados completos do risco
+      const responseGet = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/risks/${row.original.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+
+      if (!responseGet.ok) throw new Error("Erro ao buscar dados do risco.");
+      const data = await responseGet.json();
+
+      // 2. PREPARAR PAYLOAD: Mapeamento baseado no novoRisco.js
+      // Arrays de Objetos -> Arrays de IDs
+      // Arrays de IDs diretos -> Mantém
+      
+      const payload = {
+        idRisk: data.idRisk,
+        active: !data.active, // << INVERTE O STATUS >>
+        
+        // Campos simples
+        code: data.code,
+        name: data.name,
+        description: data.description,
+        treatmentDescription: data.treatmentDescription,
+        date: data.date ? data.date : null, // A API costuma aceitar o formato ISO que já vem
+        idResponsible: data.idResponsible || null,
+        idCategory: data.idCategory || null,
+        idTreatment: data.idTreatment || null,
+
+        // Campos que já vêm como Array de IDs no GET (baseado no novoRisco.js)
+        idActionPlans: Array.isArray(data.idActionPlans) ? data.idActionPlans : [],
+        idControls: Array.isArray(data.idControls) ? data.idControls : [],
+        idFrameworks: Array.isArray(data.idFrameworks) ? data.idFrameworks : [],
+        idProcesses: Array.isArray(data.idProcesses) ? data.idProcesses : [],
+        idThreats: Array.isArray(data.idThreats) ? data.idThreats : [],
+
+        // Campos que vêm como Array de Objetos e precisam de Map para IDs
+        idCauses: Array.isArray(data.causes) ? data.causes.map((u) => u.idCause) : [],
+        idDepartments: Array.isArray(data.departments) ? data.departments.map((u) => u.idDepartment) : [],
+        idFactors: Array.isArray(data.factors) ? data.factors.map((u) => u.idFactor) : [],
+        idImpacts: Array.isArray(data.impacts) ? data.impacts.map((u) => u.idImpact) : [],
+        idIncidents: Array.isArray(data.incidents) ? data.incidents.map((u) => u.idIncident) : [],
+        idKrises: Array.isArray(data.krises) ? data.krises.map((u) => u.idKri) : [],
+        idNormatives: Array.isArray(data.normatives) ? data.normatives.map((u) => u.idNormative) : [],
+        idRiskAssociates: Array.isArray(data.riskAssociates) ? data.riskAssociates.map((u) => u.idRiskAssociate) : [],
+        idStrategicGuidelines: Array.isArray(data.strategicGuidelines) ? data.strategicGuidelines.map((u) => u.idStrategicGuideline) : [],
+
+        // Arquivos (mantém strings ou extrai path)
+        files: Array.isArray(data.files) ? data.files.map(f => (typeof f === 'string' ? f : f.path)) : [],
+      };
+
+      // 3. PUT: Envia a atualização
+      const responsePut = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/risks`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!responsePut.ok) {
+        throw new Error("Erro ao atualizar status do risco.");
+      }
+
+      enqueueSnackbar(
+        `Risco ${data.active ? "inativado" : "ativado"} com sucesso!`,
+        { variant: "success" }
+      );
+      
+      refreshData();
+
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao alterar o status do risco.", { variant: "error" });
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
+  // -------------------------------------
+
+  const handleDeleteDialogClose = () => {
+    setOpenDeleteDialog(false);
+    handleClose();
+  };
+
+  const handleDelete = async () => {
+    try {
+      const response = await fetch(
+        `${API_COMMAND}/api/Riscos/${row.original.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.ok) {
+        enqueueSnackbar(`Risco ${row.original.name} excluído.`, {
+          variant: "success",
+          autoHideDuration: 3000,
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+        refreshData();
+      } else {
+        const errorBody = await response.text();
+        throw new Error(
+          `Falha ao excluir o risco: ${response.status} ${response.statusText} - ${errorBody}`
+        );
+      }
+    } catch (error) {
+      console.error("Erro:", error);
+      setOpenErrorDialog(true);
+    }
+    handleDeleteDialogClose();
+  };
+
+  const buttonStyle = {
+    borderRadius: 8,
+    backgroundColor: "#1C52970D",
+    width: "30px",
+    height: "30px",
+  };
+
+  const open = Boolean(anchorEl);
+  const id = open ? "simple-popover" : undefined;
+  
+  // Verifica status atual para texto do botão (assume true se undefined)
+  const isActive = row.original.active !== false;
+
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="center"
+      spacing={0}
+    >
+      {loadingStatus ? (
+        <CircularProgress size={20} />
+      ) : (
+        <IconButton
+          aria-describedby={id}
+          color="primary"
+          onClick={handleClick}
+          style={buttonStyle}
+        >
+          <MoreVertIcon />
+        </IconButton>
+      )}
+
+      <Popover
+        id={id}
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "left",
+        }}
+      >
+        <Stack>
+          <Button
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/riscos/criar`, {
+                state: {
+                  indoPara: "NovoRisco",
+                  dadosApi,
+                },
+              });
+              handleClose();
+            }}
+            color="primary"
+            style={{ color: "#707070", fontWeight: 400 }}
+          >
+            Editar
+          </Button>
+
+          {/* Botão Ativar/Inativar */}
+          <Button
+            onClick={handleToggleActive}
+            style={{ color: "#707070", fontWeight: 400 }}
+          >
+            {isActive ? "Inativar" : "Ativar"}
+          </Button>
+
+          {/* Botão Excluir (Descomente se necessário) */}
+          {/* <Button
+            onClick={() => {
+               setOpenDeleteDialog(true);
+            }}
+            style={{ color: "#707070", fontWeight: 400 }}
+          >
+            Excluir
+          </Button> */}
+        </Stack>
+      </Popover>
+      
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleDeleteDialogClose}
+        sx={{
+          "& .MuiPaper-root": {
+            width: "547px",
+            height: "290px",
+            maxWidth: "none",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: "#ED5565",
+            width: "auto",
+            height: "42px",
+            borderRadius: "4px 4px 0px 0px",
+            display: "flex",
+            alignItems: "center",
+            padding: "10px",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <IconButton
+              aria-label="delete"
+              sx={{
+                fontSize: "16px",
+                marginRight: "2px",
+                color: "rgba(255, 255, 255, 1)",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  boxShadow: "none",
+                  color: "white",
+                },
+              }}
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </IconButton>
+
+            <Typography
+              variant="body1"
+              sx={{
+                fontFamily: '"Open Sans", Helvetica, sans-serif',
+                fontSize: "16px",
+                fontWeight: 500,
+                lineHeight: "21px",
+                letterSpacing: "0em",
+                textAlign: "left",
+                color: "rgba(255, 255, 255, 1)",
+                flexGrow: 1,
+              }}
+            >
+              Excluir
+            </Typography>
+          </div>
+          <IconButton
+            aria-label="close"
+            onClick={handleDeleteDialogClose}
+            sx={{
+              color: "rgba(255, 255, 255, 1)",
+              "&:hover": {
+                backgroundColor: "transparent",
+                boxShadow: "none",
+                color: "white",
+              },
+            }}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            component="div"
+            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
+          >
+            Tem certeza que deseja excluir o risco "{row.original.name}"?
+          </Typography>
+          <Typography
+            component="div"
+            style={{ marginTop: "20px", color: "#717171" }}
+          >
+            Esta ação não poderá ser desfeita.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleDelete}
+            color="primary"
+            autoFocus
+            style={{
+              marginTop: "-55px",
+              width: "162px",
+              height: "32px",
+              padding: "8px 16px",
+              borderRadius: "4px",
+              background: "#ED5565",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#fff",
+              textTransform: "none",
+            }}
+          >
+            Sim, excluir
+          </Button>
+          <Button
+            onClick={handleDeleteDialogClose}
+            style={{
+              marginTop: "-55px",
+              padding: "8px 16px",
+              width: "91px",
+              height: "32px",
+              borderRadius: "4px",
+              border: "1px solid rgba(0, 0, 0, 0.40)",
+              background: "#FFF",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
+            }}
+          >
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={openErrorDialog}
+        onClose={() => setOpenErrorDialog(false)}
+        sx={{
+          "& .MuiPaper-root": {
+            width: "547px",
+            height: "290px",
+            maxWidth: "none",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: "#F69B50",
+            width: "auto",
+            height: "42px",
+            borderRadius: "4px 4px 0px 0px",
+            display: "flex",
+            alignItems: "center",
+            padding: "10px",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <IconButton
+              aria-label="delete"
+              sx={{
+                fontSize: "16px",
+                marginRight: "2px",
+                color: "rgba(255, 255, 255, 1)",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  boxShadow: "none",
+                  color: "white",
+                },
+              }}
+            >
+              <FontAwesomeIcon icon={faExclamation} />
+            </IconButton>
+
+            <Typography
+              variant="body1"
+              sx={{
+                fontFamily: '"Open Sans", Helvetica, sans-serif',
+                fontSize: "16px",
+                fontWeight: 500,
+                lineHeight: "21px",
+                letterSpacing: "0em",
+                textAlign: "left",
+                color: "rgba(255, 255, 255, 1)",
+                flexGrow: 1,
+              }}
+            >
+              Erro na Exclusão
+            </Typography>
+          </div>
+          <IconButton
+            aria-label="close"
+            onClick={() => setOpenErrorDialog(false)}
+            sx={{
+              color: "rgba(255, 255, 255, 1)",
+              "&:hover": {
+                backgroundColor: "transparent",
+                boxShadow: "none",
+                color: "white",
+              },
+            }}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            component="div"
+            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
+          >
+            Não foi possível excluir.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenErrorDialog(false)}
+            style={{
+              marginTop: "-55px",
+              width: "64px",
+              height: "32px",
+              padding: "8px 16px",
+              borderRadius: "4px",
+              background: "#F69B50",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#fff",
+              textTransform: "none",
+            }}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Stack>
+  );
+}
+
+ActionCell.propTypes = {
+  row: PropTypes.object.isRequired,
+  refreshData: PropTypes.func.isRequired,
+};
+
+// ==============================|| LISTAGEM ||============================== //
+
+// ==============================|| COMPONENTE PRINCIPAL ||============================== //
+
+const ListagemEmpresa = () => {
+  const theme = useTheme();
+  const location = useLocation();
+  const navigation = useNavigate();
+  const { processoSelecionadoId } = location.state || {};
+  const [formData, setFormData] = useState({ refreshCount: 0 });
+  const [backendFilters, setBackendFilters] = useState({});
+  const {
+    acoesJudiciais: resultData,
+    isLoading,
+  } = useGetRiscos({ ...formData, ...backendFilters }, processoSelecionadoId);
+
+  // Extrai o array 'reportRisks' do objeto retornado
+  const lists = resultData || [];
+
+  const handleBackendFiltersChange = (newFilters) => {
+    setBackendFilters(newFilters);
+  };
+  
+  const totalRows = lists ? lists.length : 0;
+  const [open, setOpen] = useState(false);
+  const [customerModal, setCustomerModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerDeleteId] = useState("");
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const refreshOrgaos = () => {
+    setFormData((currentData) => ({
+      ...currentData,
+      refreshCount: currentData.refreshCount + 1,
+    }));
+  };
+
+  useEffect(() => {
+    const refreshHandler = () => {
+      refreshOrgaos();
+    };
+
+    emitter.on("refreshCustomers", refreshHandler);
+
+    return () => {
+      emitter.off("refreshCustomers", refreshHandler);
+    };
+  }, []);
+
+  const handleClose = () => {
+    setOpen(!open);
+  };
+
+  const handleFormDataChange = (newFormData) => {
+    setFormData(newFormData);
+  };
+
+  const handleExportExcel = () => {
+    setFormData((prev) => ({
+      ...prev,
+      ...backendFilters,
+      GenerateExcel: true,
+      refreshCount: prev.refreshCount + 1
+    }));
+  };
+
+  // Definição das colunas baseada no JSON fornecido
+  const columns = useMemo(
+    () => [
+      {
+        header: "Risco",
+        accessorKey: "name",
+        cell: ({ row }) => (
+          <Typography
+            sx={{ fontSize: '13px', cursor: "pointer", fontWeight: 600, color: theme.palette.primary.main }}
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/riscos/criar`, {
+                state: { indoPara: "NovoRisco", dadosApi },
+              });
+            }}
+          >
+            {row.original.name}
+          </Typography>
+        ),
+      },
+      {
+        header: "Código",
+        accessorKey: "code",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.code}</Typography>,
+      },
+      {
+        header: "Responsável",
+        accessorKey: "responsible",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.responsible}</Typography>,
+      },
+      {
+        header: "Categoria",
+        accessorKey: "category",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.category}</Typography>,
+      },
+      {
+        header: "Tratamento",
+        accessorKey: "treatment",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.treatment}</Typography>,
+      },
+      
+      // Colunas tipo Array
+      {
+        header: "Processos",
+        accessorKey: "process",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.process || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Controles",
+        accessorKey: "controls",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.controls || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Departamentos",
+        accessorKey: "departments",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.departments || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Normativos",
+        accessorKey: "normatives",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.normatives || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Fatores",
+        accessorKey: "factors",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.factors || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Incidentes",
+        accessorKey: "incidents",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.incidents || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Causas",
+        accessorKey: "causes",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.causes || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Impactos",
+        accessorKey: "impacts",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.impacts || []).join(", ")}</Typography>,
+      },
+      {
+        header: "KRIs",
+        accessorKey: "kris",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.kris || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Ameaças",
+        accessorKey: "threats",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.threats || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Frameworks",
+        accessorKey: "frameworks",
+        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.frameworks || []).join(", ")}</Typography>,
+      },
+      {
+        header: "Data",
+        accessorKey: "date",
+        cell: ({ row }) => {
+          try {
+            return <Typography sx={{ fontSize: '13px' }}>{new Date(row.original.date).toLocaleDateString()}</Typography>;
+          } catch {
+            return <Typography sx={{ fontSize: '13px' }}>—</Typography>;
+          }
+        },
+      },
+
+      // Coluna de ações (não deve aparecer no seletor)
+      {
+        id: "actions",
+        header: " ",
+        enableHiding: false,
+        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
+      },
+    ],
+    [theme]
+  );
+
+  useEffect(() => {
+    if (isInitialLoad && !isLoading) {
+      setIsInitialLoad(false);
+    }
+  }, [isLoading, isInitialLoad]);
+
+  useEffect(() => {
+    // Ao finalizar a chamada de relatório, resetamos o flag para evitar novas descargas
+    if (!isLoading && formData.GenerateExcel) {
+      setFormData((prev) => ({ ...prev, GenerateExcel: false }));
+    }
+  }, [isLoading, formData.GenerateExcel]);
+
+  return (
+    <>
+      {isInitialLoad && isLoading ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "50vh",
+          }}
+        >
+          <CircularProgress />
+        </div>
+      ) : (
+        <Box>
+          {lists && (
+            <ReactTable
+              {...{
+                data: lists,
+                columns,
+                modalToggler: () => {
+                  setCustomerModal(true);
+                  setSelectedCustomer(null);
+                },
+                totalRows,
+                onFormDataChange: handleFormDataChange,
+                isLoading,
+                refreshData: refreshOrgaos,
+                onApplyFilters: handleBackendFiltersChange,
+                onExportExcel: handleExportExcel,
+              }}
+            />
+          )}
+        </Box>
+      )}
+      <AlertCustomerDelete
+        id={customerDeleteId}
+        title={customerDeleteId}
+        open={open}
+        handleClose={handleClose}
+      />
+      <CustomerModal
+        open={customerModal}
+        modalToggler={setCustomerModal}
+        customer={selectedCustomer}
+      />
+    </>
+  );
+};
+
+export default ListagemEmpresa;
