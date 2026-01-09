@@ -1,6 +1,6 @@
 {
   "name": "egrc-app",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "private": true,
   "dependencies": {
     "@ant-design/colors": "^7.0.0",
@@ -164,4 +164,5 @@
     "react-error-overlay": "6.0.11"
   }
 }
+
 
