@@ -845,7 +845,46 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={12} sx={{ paddingBottom: 3 }}>
+              
+              {formData.status === 3 && (
+                <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                  <Stack spacing={1}>
+                    <InputLabel>Data de conclusão</InputLabel>
+                    <TextField
+                      disabled
+                      fullWidth
+                      value={(() => {
+                        const raw =
+                          normativaDados?.dateOfConclusion ||
+                          normativaDados?.conclusionDate ||
+                          normativaDados?.conclusion_date ||
+                          normativaDados?.completionDate ||
+                          normativaDados?.completion_date ||
+                          normativaDados?.finishedAt ||
+                          normativaDados?.finished_at ||
+                          "";
+                        if (!raw) return "";
+                        const s = String(raw);
+                        const mm = s.match(
+                          /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/
+                        );
+                        if (mm)
+                          return `${mm[3]}-${mm[2]}-${mm[1]} ${mm[4]}-${mm[5]}`;
+                        const d = new Date(raw);
+                        if (Number.isNaN(d.getTime())) return String(raw);
+                        const pad = (n) => String(n).padStart(2, "0");
+                        return `${pad(d.getDate())}-${pad(
+                          d.getMonth() + 1
+                        )}-${d.getFullYear()} ${pad(d.getHours())}-${pad(
+                          d.getMinutes()
+                        )}`;
+                      })()}
+                    />
+                  </Stack>
+                </Grid>
+              )}
+
+<Grid item xs={12} sx={{ paddingBottom: 3 }}>
                 <Accordion>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     Dados do risco

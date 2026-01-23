@@ -1,21 +1,39 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import {API_URL} from "config";
+import { API_URL } from "config";
 
 import {
- Button, Box, TextField, Autocomplete, Grid, Switch, Stack, Typography, InputLabel, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle
-} from '@mui/material';
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Button,
+  Box,
+  TextField,
+  Autocomplete,
+  Grid,
+  Switch,
+  Stack,
+  Typography,
+  InputLabel,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ListaCiclosAvaliacoes from "../ciclos/listaCiclosAvaliacao";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { enqueueSnackbar } from 'notistack';
-import { useNavigate } from 'react-router';
-import { useState, useEffect } from 'react';
-import LoadingOverlay from '../configuracoes/LoadingOverlay';
+import { enqueueSnackbar } from "notistack";
+import { useNavigate } from "react-router";
+import { useState, useEffect } from "react";
+import LoadingOverlay from "../configuracoes/LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from 'react-router-dom';
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
@@ -24,13 +42,13 @@ function ColumnsLayouts() {
   const { dadosApi } = location.state || {};
   const [tiposConsolidacoes, setTiposConsolidacoes] = useState([]);
   const [ciclosAnteriores, setCiclosAnteiores] = useState([]);
-  const [descricao, setDescricao] = useState('');
+  const [descricao, setDescricao] = useState("");
   const [status, setStatus] = useState(true);
-  const [codigo, setCodigo] = useState('');
-  const [nome, setNome] = useState('');
+  const [codigo, setCodigo] = useState("");
+  const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
-  const [requisicao, setRequisicao] = useState('Criar');
-  const [mensagemFeedback, setMensagemFeedback] = useState('cadastrado');
+  const [requisicao, setRequisicao] = useState("Criar");
+  const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
   const [cicloDados, setCicloDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   window.hasChanges = hasChanges;
@@ -49,14 +67,13 @@ function ColumnsLayouts() {
     normativa: [],
     incidente: [],
     departamento: [],
-    tipoConsolidacao: '',
+    tipoConsolidacao: "",
     processo: [],
     cicloAnterior: [],
     conta: [],
-    responsavel: '',
+    responsavel: "",
     dataBase: null,
   });
-
 
   const fetchData = async (url, setState) => {
     try {
@@ -67,22 +84,31 @@ function ColumnsLayouts() {
       });
 
       // Transformando os dados para alterar idCycle, idLedgerAccount e idProcess -> id, e name -> nome
-      const transformedData = response.data.map(item => ({
-        id: item.idCycle || item.idLedgerAccount
-          || item.idProcess || item.id_responsible
-          || item.idCategory || item.idCycle
-          || item.idFramework || item.idTreatment
-          || item.idStrategicGuideline || item.idFactor
-          || item.idIncident || item.idCause
-          || item.idImpact || item.idNormative
-          || item.idDepartment || item.idKri
-          || item.idControl || item.idThreat,
+      const transformedData = response.data.map((item) => ({
+        id:
+          item.idCycle ||
+          item.idLedgerAccount ||
+          item.idProcess ||
+          item.id_responsible ||
+          item.idCategory ||
+          item.idCycle ||
+          item.idFramework ||
+          item.idTreatment ||
+          item.idStrategicGuideline ||
+          item.idFactor ||
+          item.idIncident ||
+          item.idCause ||
+          item.idImpact ||
+          item.idNormative ||
+          item.idDepartment ||
+          item.idKri ||
+          item.idControl ||
+          item.idThreat,
         nome: item.name,
         ...item, // Mantém os outros campos intactos
       }));
 
       setState(transformedData);
-
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     }
@@ -108,7 +134,7 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -119,9 +145,9 @@ function ColumnsLayouts() {
           setRequisicao("Editar");
           setMensagemFeedback("editado");
           setNome(data.name);
-          setCodigo(data.code)
-          setDescricao(data.description)
-          setStatus(data.active)
+          setCodigo(data.code);
+          setDescricao(data.description);
+          setStatus(data.active);
           setFormData((prev) => ({
             ...prev,
             causa: Array.isArray(data.causes)
@@ -155,14 +181,12 @@ function ColumnsLayouts() {
             responsavel: data.idResponsible || null,
             cicloAnterior: data.idPreviousCycle || null,
             ameaca: data.idThreats || null,
-            tratamento: data.idTreatment || null
+            tratamento: data.idTreatment || null,
           }));
 
           setFormData((prev) => ({
             ...prev,
-            dataBase: data.baseDate
-              ? new Date(data.baseDate)
-              : null,
+            dataBase: data.baseDate ? new Date(data.baseDate) : null,
           }));
 
           setCicloDados(data);
@@ -186,7 +210,7 @@ function ColumnsLayouts() {
 
     // Verifica e remove o departamento superior se necessário
     const superiorSelecionada = ciclosAnteriores.find(
-      (ciclo) => ciclo.id === formData.cicloAnterior
+      (ciclo) => ciclo.id === formData.cicloAnterior,
     );
     if (
       superiorSelecionada &&
@@ -198,7 +222,6 @@ function ColumnsLayouts() {
       }));
     }
   }, [nome, ciclosAnteriores, formData.cicloAnterior]);
-
 
   const voltarParaCadastroMenu = () => {
     navigate(-1);
@@ -223,12 +246,12 @@ function ColumnsLayouts() {
   });
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  
+
   const tratarSubmit = async () => {
-    let url = '';
-    let method = '';
+    let url = "";
+    let method = "";
     let payload = {};
-  
+
     const missingFields = [];
     if (!nome.trim()) {
       setFormValidation((prev) => ({ ...prev, nome: false }));
@@ -242,7 +265,7 @@ function ColumnsLayouts() {
       setFormValidation((prev) => ({ ...prev, dataBase: false }));
       missingFields.push("Data base");
     }
-    if (formData.tipoConsolidacao === '') {
+    if (formData.tipoConsolidacao === "") {
       setFormValidation((prev) => ({ ...prev, tipoConsolidacao: false }));
       missingFields.push("Tipo de consolidação");
     }
@@ -257,20 +280,20 @@ function ColumnsLayouts() {
       });
       return; // Para a execução se a validação falhar
     }
-  
+
     // Verifica se é para criar ou atualizar
-    if (requisicao === 'Criar') {
+    if (requisicao === "Criar") {
       url = `${process.env.REACT_APP_API_URL}cycles`;
-      method = 'POST';
+      method = "POST";
       payload = {
         code: codigo,
         name: nome,
         baseDate: formData.dataBase?.toISOString(),
-        typeConsolidation: formData.tipoConsolidacao
+        typeConsolidation: formData.tipoConsolidacao,
       };
-    } else if (requisicao === 'Editar') {
+    } else if (requisicao === "Editar") {
       url = `${process.env.REACT_APP_API_URL}cycles`;
-      method = 'PUT';
+      method = "PUT";
       payload = {
         idCycle: cicloDados?.idCycle,
         code: codigo,
@@ -279,23 +302,25 @@ function ColumnsLayouts() {
         baseDate: formData.dataBase?.toISOString(),
         active: status,
         typeConsolidation: formData.tipoConsolidacao,
-        idPreviousCycle: formData.cicloAnterior?.length ? formData.cicloAnterior : null,
+        idPreviousCycle: formData.cicloAnterior?.length
+          ? formData.cicloAnterior
+          : null,
       };
     }
-  
+
     try {
       setLoading(true);
-  
+
       // Realiza a requisição (POST ou PUT)
       const response = await fetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
-  
+
       // Verifica se a resposta não foi bem-sucedida e tenta extrair mensagem de erro, se possível
       if (!response.ok) {
         let errorData = {};
@@ -304,16 +329,22 @@ function ColumnsLayouts() {
         } catch (e) {
           // Se não houver corpo na resposta, ignora
         }
-        throw new Error(errorData.message || 'O Código informado já foi cadastrado.');
+        throw new Error(
+          errorData.message || "O Código informado já foi cadastrado.",
+        );
       }
-  
+
       // Se for edição e o status for 204 (No Content), não há corpo para processar
-      if (requisicao === 'Editar' && response.status === 204) {
-        enqueueSnackbar(`Ciclo ${mensagemFeedback} com sucesso!`, { variant: 'success' });
+      if (requisicao === "Editar" && response.status === 204) {
+        enqueueSnackbar(`Ciclo ${mensagemFeedback} com sucesso!`, {
+          variant: "success",
+        });
         voltarParaCadastroMenu();
       } else {
         const data = await response.json();
-        enqueueSnackbar(`Ciclo ${mensagemFeedback} com sucesso!`, { variant: 'success' });
+        enqueueSnackbar(`Ciclo ${mensagemFeedback} com sucesso!`, {
+          variant: "success",
+        });
         if (requisicao === "Criar" && data.data.idCycle) {
           // Atualiza o estado para modo de edição
           setCicloDados(data.data);
@@ -324,19 +355,19 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar('Não foi possível cadastrar esse ciclo.', { variant: 'error' });
+      enqueueSnackbar("Não foi possível cadastrar esse ciclo.", {
+        variant: "error",
+      });
     } finally {
       setLoading(false);
     }
   };
-  
 
   return (
     <>
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={1} marginTop={2}>
-
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>Código *</InputLabel>
@@ -364,11 +395,9 @@ function ColumnsLayouts() {
 
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
-              <InputLabel>
-                Data base *
-              </InputLabel>
+              <InputLabel>Data base *</InputLabel>
               <DatePicker
-              error={!formData.dataBase && formValidation.dataBase === false}
+                error={!formData.dataBase && formValidation.dataBase === false}
                 value={formData.dataBase || null}
                 onChange={(newValue) => {
                   setFormData((prev) => ({
@@ -391,85 +420,107 @@ function ColumnsLayouts() {
               <Autocomplete
                 options={tiposConsolidacoes}
                 getOptionLabel={(option) => option.nome}
-                value={tiposConsolidacoes.find(tipoConsolidacao => tipoConsolidacao.id === formData.tipoConsolidacao) || null}
+                value={
+                  tiposConsolidacoes.find(
+                    (tipoConsolidacao) =>
+                      tipoConsolidacao.id === formData.tipoConsolidacao,
+                  ) || null
+                }
                 onChange={(event, newValue) => {
-                  setFormData(prev => ({
+                  setFormData((prev) => ({
                     ...prev,
-                    tipoConsolidacao: newValue ? newValue.id : ''
+                    tipoConsolidacao: newValue ? newValue.id : "",
                   }));
                 }}
                 renderInput={(params) => (
-                  <TextField {...params}
-                    error={!formData.tipoConsolidacao && formValidation.tipoConsolidacao === false}
+                  <TextField
+                    {...params}
+                    error={
+                      !formData.tipoConsolidacao &&
+                      formValidation.tipoConsolidacao === false
+                    }
                   />
                 )}
               />
             </Stack>
           </Grid>
 
-          {requisicao === 'Editar' && (
+          {requisicao === "Editar" && (
             <>
-
-          <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Descrição</InputLabel>
-              <TextField
-                onChange={(event) => setDescricao(event.target.value)}
-                fullWidth
-                multiline
-                rows={4}
-                value={descricao}
-              />
-            </Stack>
-          </Grid>
-
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Ciclo Anterior</InputLabel>
-              <Autocomplete
-                options={ciclosAnteriores.filter((ciclo) => {
-                  // IDs dos departamentos já selecionados nos outros campos:
-                  const selectedInferior = formData.cicloAnterior || [];
-                  const selectedIds = [...selectedInferior];
-              
-                  // Se for o valor atual selecionado, não filtra
-                  if (formData.cicloAnterior === ciclo.id) return true;
-              
-                  // Exclui se já estiver selecionado em outro campo ou se o nome for igual ao nome do departamento atual
-                  return (
-                    !selectedIds.includes(ciclo.id) &&
-                    formatarNome(ciclo.nome) !== formatarNome(nome)
-                  );
-                })}
-                getOptionLabel={(option) => option.nome}
-                value={ciclosAnteriores.find(cicloAnterior => cicloAnterior.id === formData.cicloAnterior) || null}
-                onChange={(event, newValue) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    cicloAnterior: newValue ? newValue.id : ''
-                  }));
-                }}
-                renderInput={(params) => (
-                  <TextField {...params}
-                    error={!formData.cicloAnterior && formValidation.cicloAnterior === false}
+              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Descrição</InputLabel>
+                  <TextField
+                    onChange={(event) => setDescricao(event.target.value)}
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={descricao}
                   />
-                )}
-              />
-            </Stack>
-          </Grid>
-          <Grid item xs={4}>
-                          <Stack spacing={1}>
-                            <Stack direction="row" alignItems="center" spacing={1} style={{ marginTop: 37.5, marginLeft: 37.5 }}>
-                              <Switch
-                                checked={status}
-                                onChange={(event) => setStatus(event.target.checked)}
-                              />
-                              <Typography>{status ? "Ativo" : "Inativo"}</Typography>
-                            </Stack>
-                          </Stack>
-                        </Grid>
+                </Stack>
+              </Grid>
 
-                        {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Ciclo Anterior</InputLabel>
+                  <Autocomplete
+                    options={ciclosAnteriores.filter((ciclo) => {
+                      // IDs dos departamentos já selecionados nos outros campos:
+                      const selectedInferior = formData.cicloAnterior || [];
+                      const selectedIds = [...selectedInferior];
+
+                      // Se for o valor atual selecionado, não filtra
+                      if (formData.cicloAnterior === ciclo.id) return true;
+
+                      // Exclui se já estiver selecionado em outro campo ou se o nome for igual ao nome do departamento atual
+                      return (
+                        !selectedIds.includes(ciclo.id) &&
+                        formatarNome(ciclo.nome) !== formatarNome(nome)
+                      );
+                    })}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      ciclosAnteriores.find(
+                        (cicloAnterior) =>
+                          cicloAnterior.id === formData.cicloAnterior,
+                      ) || null
+                    }
+                    onChange={(event, newValue) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        cicloAnterior: newValue ? newValue.id : "",
+                      }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        error={
+                          !formData.cicloAnterior &&
+                          formValidation.cicloAnterior === false
+                        }
+                      />
+                    )}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={4}>
+                <Stack spacing={1}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    style={{ marginTop: 37.5, marginLeft: 37.5 }}
+                  >
+                    <Switch
+                      checked={status}
+                      onChange={(event) => setStatus(event.target.checked)}
+                    />
+                    <Typography>{status ? "Ativo" : "Inativo"}</Typography>
+                  </Stack>
+                </Stack>
+              </Grid>
+
+              {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6">Avaliações</Typography>
@@ -480,17 +531,42 @@ function ColumnsLayouts() {
           </Accordion>
         </Grid> */}
 
-          </>
-          
+              {cicloDados?.idCycle && (
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">Avaliações</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ px: 0 }}>
+                      <ListaCiclosAvaliacoes cicloId={cicloDados.idCycle} />
+                    </AccordionDetails>
+                  </Accordion>
+                </Grid>
+              )}
+            </>
           )}
 
           {/* Botões de ação */}
           <Grid item xs={12} mt={-5}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-start', gap: '8px', marginRight: '20px', marginTop: 5 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "flex-start",
+                gap: "8px",
+                marginRight: "20px",
+                marginTop: 10,
+              }}
+            >
               <Button
                 variant="contained"
                 color="primary"
-                style={{ width: "91px", height: '32px', borderRadius: '4px', fontSize: '14px', fontWeight: 600 }}
+                style={{
+                  width: "91px",
+                  height: "32px",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
                 onClick={tratarSubmit}
               >
                 Atualizar
