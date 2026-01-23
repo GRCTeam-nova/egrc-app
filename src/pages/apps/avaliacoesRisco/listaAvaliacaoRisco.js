@@ -670,7 +670,7 @@ function ActionCell({ row, refreshData }) {
   
       // Atualizar o estado e exibir mensagem de sucesso
       setStatus(newStatus);
-      const message = `Avaliação de risco ${row.original.name} ${newStatus.toLowerCase()}.`;
+      const message = `Avaliação de risco ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {
         variant: "success",
@@ -682,10 +682,33 @@ function ActionCell({ row, refreshData }) {
       });
   
       refreshData();
-    } catch (error) {
+        } catch (error) {
       console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, { variant: "error" });
+
+      const apiData = error?.response?.data;
+      const apiMessage =
+        typeof apiData === "string"
+          ? apiData
+          : apiData?.message || apiData?.Message || apiData?.error || apiData?.title;
+
+      const message = apiMessage || error.message || "Erro inesperado.";
+
+      // Caso específico: tentar reativar e já existir avaliação para o ciclo
+      if (message === "Já existe uma avaliação para este ciclo") {
+        enqueueSnackbar(message, {
+          variant: "error",
+          autoHideDuration: 4000,
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+      } else {
+        enqueueSnackbar(`Erro: ${message}`, {
+          variant: "error",
+          autoHideDuration: 4000,
+          anchorOrigin: { vertical: "top", horizontal: "center" },
+        });
+      }
     }
+
   
     handleDialogClose();
   };
@@ -865,13 +888,13 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja inativar a avaliacaoRisco "{row.original.name}"?
+            Tem certeza que deseja inativar a essa avaliação?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Ao inativar, essa avaliacaoRisco não aparecerá mais no cadastro manual.
+            Ao inativar, essa avaliação não aparecerá mais no cadastro manual.
           </Typography>
         </DialogContent>
         <DialogActions>
