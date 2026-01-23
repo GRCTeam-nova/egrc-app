@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import * as React from "react";
 import {
   Button,
@@ -32,16 +31,13 @@ import DrawerProcesso from "../configuracoes/novoProcessoDrawerIncidentes";
 import DrawerRisco from "../configuracoes/novoRiscoDrawerIncidentes";
 import { NumericFormat } from "react-number-format";
 
-// ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
   const { dadosApi } = location.state || {};
   const [valor, setValor] = useState("");
-  // --- NOVO STATE ---
-  const [valorRecuperado, setValorRecuperado] = useState(""); 
-  // ------------------
+  const [valorRecuperado, setValorRecuperado] = useState("");
   const [tiposIncidentes, setTipoIncidentes] = useState([]);
   const [riscos, setRiscoAssociados] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
@@ -51,6 +47,10 @@ function ColumnsLayouts() {
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
   const [baseOrigem, setBaseOrigem] = useState("");
+  const incidentLevels = [
+    { id: 1, nome: "Primário" },
+    { id: 2, nome: "Movimentação" },
+  ];
   const [outrasInformacoes, setOutrasInformacoes] = useState("");
   const [status] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -67,6 +67,7 @@ function ColumnsLayouts() {
     fator: [],
     controle: [],
     kri: [],
+    incidentLevel: null,
     impacto: [],
     plano: [],
     causa: [],
@@ -90,7 +91,6 @@ function ColumnsLayouts() {
         },
       });
 
-      // Transformando os dados para alterar idIncident, idLedgerAccount e idProcess -> id, e name -> nome
       const transformedData = response.data.map((item) => ({
         id:
           item.idIncident ||
@@ -113,7 +113,7 @@ function ColumnsLayouts() {
           item.idThreat ||
           item.idIncidentType,
         nome: item.name,
-        ...item, // Mantém os outros campos intactos
+        ...item,
       }));
 
       setState(transformedData);
@@ -125,24 +125,15 @@ function ColumnsLayouts() {
   useEffect(() => {
     fetchData(
       `${process.env.REACT_APP_API_URL}incidents/types`,
-      setTipoIncidentes
+      setTipoIncidentes,
     );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
-      setDepartamentos
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}risks`,
-      setRiscoAssociados
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}departments`, setDepartamentos);
+    fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscoAssociados);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
     window.scrollTo(0, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Em caso de edição
   useEffect(() => {
     if (dadosApi) {
       const fetchEmpresaDados = async () => {
@@ -153,7 +144,7 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -167,14 +158,13 @@ function ColumnsLayouts() {
           setCodigo(data.code);
           setDescricao(data.description);
           setValor(data.value);
-          // --- SETAR VALOR RECUPERADO NA EDIÇÃO ---
           setValorRecuperado(data.recoveredValue);
-          // ----------------------------------------
           setCausaIncidente(data.cause);
           setOutrasInformacoes(data.information);
           setBaseOrigem(data.origin);
           setFormData((prev) => ({
             ...prev,
+            incidentLevel: data.incidentLevel ?? null,
             causa: Array.isArray(data.causes)
               ? data.causes.map((u) => u.idCause)
               : [],
@@ -224,14 +214,13 @@ function ColumnsLayouts() {
         fetchEmpresaDados();
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dadosApi]);
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "tipoIncidente") {
-      // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
-      // Para outros campos
       setFormData({ ...formData, [field]: value });
     }
   };
@@ -266,16 +255,14 @@ function ColumnsLayouts() {
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.risco.length === riscos.length) {
-        // Deselect all
         setFormData({ ...formData, risco: [] });
       } else {
-        // Select all
         setFormData({ ...formData, risco: riscos.map((risco) => risco.id) });
       }
     } else {
       tratarMudancaInputGeral(
         "risco",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -283,10 +270,8 @@ function ColumnsLayouts() {
   const handleSelectAllDepartamentos = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.departamento.length === departamentos.length) {
-        // Deselect all
         setFormData({ ...formData, departamento: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           departamento: departamentos.map((departamento) => departamento.id),
@@ -295,7 +280,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "departamento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -303,10 +288,8 @@ function ColumnsLayouts() {
   const handleSelectAll2 = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.processo.length === processos.length) {
-        // Deselect all
         setFormData({ ...formData, processo: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           processo: processos.map((processo) => processo.id),
@@ -315,7 +298,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "processo",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -323,7 +306,6 @@ function ColumnsLayouts() {
   const voltarParaCadastroMenu = () => {
     navigate(-1);
     window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
   const continuarEdicao = () => {
@@ -331,7 +313,6 @@ function ColumnsLayouts() {
     setSuccessDialogOpen(false);
   };
 
-  // Função para voltar para a listagem
   const voltarParaListagem = () => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
@@ -385,10 +366,9 @@ function ColumnsLayouts() {
       enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
         variant: "error",
       });
-      return; // Para a execução se a validação falhar
+      return;
     }
 
-    // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
       url = `${process.env.REACT_APP_API_URL}incidents`;
       method = "POST";
@@ -412,9 +392,8 @@ function ColumnsLayouts() {
         date: formData.dataIndice ? formData.dataIndice.toISOString() : null,
         active: status,
         value: valor,
-        // --- ENVIO DO VALOR RECUPERADO ---
-        recoveredValue: valorRecuperado, 
-        // ---------------------------------
+        incidentLevel: formData.incidentLevel ?? null,
+        recoveredValue: valorRecuperado,
         cause: causaIncidente,
         information: outrasInformacoes,
         origin: baseOrigem,
@@ -433,7 +412,6 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
 
-      // Primeira requisição (POST ou PUT inicial)
       const response = await fetch(url, {
         method,
         headers: {
@@ -458,7 +436,6 @@ function ColumnsLayouts() {
       }
 
       if (requisicao === "Criar" && data.data.idIncident) {
-        // Atualiza o estado para modo de edição
         setIncidenteDados(data.data);
         setSuccessDialogOpen(true);
       } else {
@@ -532,7 +509,7 @@ function ColumnsLayouts() {
                 value={
                   tiposIncidentes.find(
                     (tipoIncidente) =>
-                      tipoIncidente.id === formData.tipoIncidente
+                      tipoIncidente.id === formData.tipoIncidente,
                   ) || null
                 }
                 onChange={(event, newValue) => {
@@ -573,13 +550,13 @@ function ColumnsLayouts() {
                     thousandSeparator="."
                     decimalSeparator=","
                     prefix="R$ "
-                    allowNegative={true} 
+                    allowNegative={true}
                     inputProps={{ inputMode: "decimal" }}
                   />
                 </Stack>
               </Grid>
 
-              {/* --- NOVO CAMPO VALOR RECUPERADO --- */}
+              {}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Valor Recuperado</InputLabel>
@@ -602,7 +579,7 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
-              {/* ----------------------------------- */}
+              {}
 
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -630,6 +607,28 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Nível do incidente</InputLabel>
+                  <Autocomplete
+                    options={incidentLevels}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      incidentLevels.find(
+                        (lvl) => lvl.id === formData.incidentLevel,
+                      ) || null
+                    }
+                    onChange={(event, newValue) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        incidentLevel: newValue ? newValue.id : null,
+                      }));
+                    }}
+                    renderInput={(params) => <TextField {...params} />}
+                  />
+                </Stack>
+              </Grid>
+
               <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
                   <InputLabel>
@@ -652,7 +651,7 @@ function ColumnsLayouts() {
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.risco.map(
-                      (id) => riscos.find((risco) => risco.id === id) || id
+                      (id) => riscos.find((risco) => risco.id === id) || id,
                     )}
                     onChange={handleSelectAll}
                     isOptionEqualToValue={(option, value) =>
@@ -712,8 +711,8 @@ function ColumnsLayouts() {
                     value={formData.departamento.map(
                       (id) =>
                         departamentos.find(
-                          (departamento) => departamento.id === id
-                        ) || id
+                          (departamento) => departamento.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAllDepartamentos}
                     isOptionEqualToValue={(option, value) =>
@@ -774,7 +773,7 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={formData.processo.map(
                       (id) =>
-                        processos.find((processo) => processo.id === id) || id
+                        processos.find((processo) => processo.id === id) || id,
                     )}
                     onChange={handleSelectAll2}
                     isOptionEqualToValue={(option, value) =>
@@ -838,7 +837,7 @@ function ColumnsLayouts() {
             </>
           )}
 
-          {/* Botões de ação */}
+          {}
           <Grid item xs={12} mt={-1}>
             <Box
               sx={{
@@ -877,19 +876,19 @@ function ColumnsLayouts() {
               },
             }}
           >
-            {/* Ícone de Sucesso */}
+            {}
             <Box display="flex" justifyContent="center" mt={2}>
               <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
             </Box>
 
-            {/* Título Centralizado */}
+            {}
             <DialogTitle
               sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
             >
               Incidente Criado com Sucesso!
             </DialogTitle>
 
-            {/* Mensagem */}
+            {}
             <DialogContent>
               <DialogContentText
                 sx={{ fontSize: "16px", color: "#555", px: 2 }}
@@ -899,7 +898,7 @@ function ColumnsLayouts() {
               </DialogContentText>
             </DialogContent>
 
-            {/* Botões */}
+            {}
             <DialogActions
               sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
             >
