@@ -8,14 +8,12 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetProcessos } from "../../../api/processos"; // Certifique-se que este hook existe
+import { useGetProcessos } from "../../../api/processos";
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import emitter from "../tela2/eventEmitter";
-// project import
 import MainCard from "../../../components/MainCard";
 
-// material-ui
 import { useTheme } from "@mui/material/styles";
 
 import {
@@ -41,7 +39,6 @@ import {
   useMediaQuery,
 } from "@mui/material";
 
-// third-party
 import {
   flexRender,
   getCoreRowModel,
@@ -51,14 +48,13 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 
-// project-import
 import ScrollX from "../../../components/ScrollX";
 import IconButton from "../../../components/@extended/IconButton";
 import CircularProgress from "@mui/material/CircularProgress";
 import Drawer from "@mui/material/Drawer";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
-import CloseIcon from '@mui/icons-material/Close';
+import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
   faXmark,
@@ -73,24 +69,24 @@ import {
   RowSelection,
   TablePagination,
   SelectColumnVisibility,
-} from "../../../components/third-party/react-table"; 
+} from "../../../components/third-party/react-table";
 import { useToken } from "../../../api/TokenContext";
 
-// assets
 import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
-import {
-  faFilter,
-} from "@fortawesome/free-solid-svg-icons";
+import { faFilter } from "@fortawesome/free-solid-svg-icons";
 
 export const fuzzyFilter = (row, columnId, value) => {
   const cellValue = row.getValue(columnId);
 
-  // 1. Segurança contra nulos
-  if (cellValue === undefined || cellValue === null || value === undefined || value === "") {
+  if (
+    cellValue === undefined ||
+    cellValue === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return false;
   }
 
-  // 2. Função para limpar texto (remove acentos e converte para minúsculas)
   const normalize = (val) => {
     if (val === null || val === undefined) return "";
     return String(val)
@@ -99,31 +95,69 @@ export const fuzzyFilter = (row, columnId, value) => {
       .toLowerCase();
   };
 
-  // 3. Normaliza o valor da Célula
   let cellString = "";
   if (Array.isArray(cellValue)) {
-    // Se for array (ex: Empresas), junta tudo numa string só separada por espaço
     cellString = cellValue.map((item) => normalize(item)).join(" ");
   } else {
     cellString = normalize(cellValue);
   }
 
-  // 4. Normaliza o valor da Busca e quebra em palavras
-  // Ex: "Empresa  03 " vira ["empresa", "03"]
-  const searchTerms = normalize(value).split(" ").filter((term) => term.trim() !== "");
+  const searchTerms = normalize(value)
+    .split(" ")
+    .filter((term) => term.trim() !== "");
 
-  // 5. Verifica se TODAS as palavras digitadas existem na célula
-  // Isso permite achar "Empresa 03" mesmo se no banco estiver "Empresa Teste 03"
   return searchTerms.every((term) => cellString.includes(term));
 };
 
-// ==============================|| REACT TABLE - LIST ||============================== //
 
-function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExportExcel }) {
+const defaultVisibility = {
+  name: true,
+  code: true,
+  type: true,
+  responsible: true,
+  kri: false,
+  companies: true,
+  risks: false,
+  processesBottoms: false,
+  lgpds: false,
+  deficiencies: false,
+  ledgerAccounts: false,
+  platforms: false,
+  informationActivities: false,
+  controls: false,
+  incidents: false,
+  actionPlans: false,
+  normatives: false,
+  departments: false,
+  date: false,
+  actions: true,
+};
+
+function ReactTable({
+  data,
+  columns,
+  totalRows,
+  isLoading,
+  onApplyFilters,
+  onExportExcel,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
-  const [columnVisibility, setColumnVisibility] = useState({});
+  const STORAGE_KEY = "egrc_table_visibility_processos";
+
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : defaultVisibility;
+    } catch (error) {
+      console.error("Erro ao carregar visibilidade das colunas", error);
+      return defaultVisibility;
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
   const recordType = "Processos";
   const tableRef = useRef(null);
   const [sorting, setSorting] = useState([{ id: "name", asc: true }]);
@@ -131,22 +165,18 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   const [globalFilter, setGlobalFilter] = useState("");
   const navigation = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [selectedFilters, setSelectedFilters] = useState([
+    { type: "Status", values: ["Ativo"] },
+  ]);
 
-  // Opções para os filtros (Processos)
-  const [typeOptions, setTypeOptions] = useState([]); // Antes era category
+  const [typeOptions, setTypeOptions] = useState([]);
   const [responsibleOptions, setResponsibleOptions] = useState([]);
-  const [kriOptions, setKriOptions] = useState([]); 
 
-  // Opções de Arrays
   const [companiesOptions, setCompaniesOptions] = useState([]);
   const [risksOptions, setRisksOptions] = useState([]);
-  const [processesBottomsOptions, setProcessesBottomsOptions] = useState([]);
-  const [lgpdsOptions, setLgpdsOptions] = useState([]);
   const [deficienciesOptions, setDeficienciesOptions] = useState([]);
   const [ledgerAccountsOptions, setLedgerAccountsOptions] = useState([]);
   const [platformsOptions, setPlatformsOptions] = useState([]);
-  const [informationActivitiesOptions, setInformationActivitiesOptions] = useState([]);
   const [controlsOptions, setControlsOptions] = useState([]);
   const [incidentsOptions, setIncidentsOptions] = useState([]);
   const [actionPlansOptions, setActionPlansOptions] = useState([]);
@@ -154,6 +184,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   const [departmentsOptions, setDepartmentsOptions] = useState([]);
 
   const [draftFilters, setDraftFilters] = useState({
+    status: ["Ativo"],
     responsible: [],
     type: [],
     kri: [],
@@ -179,64 +210,102 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   useEffect(() => {
     const getUniqueValues = (key, isArray = false) => {
       if (!data) return [];
-      const values = data.flatMap(item => {
+      const values = data.flatMap((item) => {
         const value = item[key];
         if (isArray && Array.isArray(value)) {
-          return value.filter(v => v !== null && v !== undefined && v !== "");
+          return value.filter((v) => v !== null && v !== undefined && v !== "");
         }
-        return value !== null && value !== undefined && value !== "" ? [value] : [];
+        return value !== null && value !== undefined && value !== ""
+          ? [value]
+          : [];
       });
       return [...new Set(values)].sort();
     };
 
-    // Campos String
-    setTypeOptions(getUniqueValues('type'));
-    setResponsibleOptions(getUniqueValues('responsible'));
-    setKriOptions(getUniqueValues('kri'));
+    setTypeOptions(getUniqueValues("type"));
+    setResponsibleOptions(getUniqueValues("responsible"));
 
-    // Campos Array
-    setCompaniesOptions(getUniqueValues('companies', true));
-    setRisksOptions(getUniqueValues('risks', true));
-    setProcessesBottomsOptions(getUniqueValues('processesBottoms', true));
-    setLgpdsOptions(getUniqueValues('lgpds', true));
-    setDeficienciesOptions(getUniqueValues('deficiencies', true));
-    setLedgerAccountsOptions(getUniqueValues('ledgerAccounts', true));
-    setPlatformsOptions(getUniqueValues('platforms', true));
-    setInformationActivitiesOptions(getUniqueValues('informationActivities', true));
-    setControlsOptions(getUniqueValues('controls', true));
-    setIncidentsOptions(getUniqueValues('incidents', true));
-    setActionPlansOptions(getUniqueValues('actionPlans', true));
-    setNormativesOptions(getUniqueValues('normatives', true));
-    setDepartmentsOptions(getUniqueValues('departments', true));
-
+    setCompaniesOptions(getUniqueValues("companies", true));
+    setRisksOptions(getUniqueValues("risks", true));
+    setDeficienciesOptions(getUniqueValues("deficiencies", true));
+    setLedgerAccountsOptions(getUniqueValues("ledgerAccounts", true));
+    setPlatformsOptions(getUniqueValues("platforms", true));
+    setControlsOptions(getUniqueValues("controls", true));
+    setIncidentsOptions(getUniqueValues("incidents", true));
+    setActionPlansOptions(getUniqueValues("actionPlans", true));
+    setNormativesOptions(getUniqueValues("normatives", true));
+    setDepartmentsOptions(getUniqueValues("departments", true));
   }, [data]);
 
   const applyFilters = () => {
     const newFilters = [];
-    
-    // Mapeamento de filtros para exibição visual (Chips)
-    if (draftFilters.responsible.length > 0) newFilters.push({ type: "Responsável", values: draftFilters.responsible });
-    if (draftFilters.type.length > 0) newFilters.push({ type: "Tipo", values: draftFilters.type });
-    if (draftFilters.kri.length > 0) newFilters.push({ type: "KRI", values: draftFilters.kri });
-    
-    // Arrays
-    if (draftFilters.companies.length > 0) newFilters.push({ type: "Empresas", values: draftFilters.companies });
-    if (draftFilters.risks.length > 0) newFilters.push({ type: "Riscos", values: draftFilters.risks });
-    if (draftFilters.processesBottoms.length > 0) newFilters.push({ type: "Subprocessos", values: draftFilters.processesBottoms });
-    if (draftFilters.lgpds.length > 0) newFilters.push({ type: "LGPD", values: draftFilters.lgpds });
-    if (draftFilters.deficiencies.length > 0) newFilters.push({ type: "Deficiências", values: draftFilters.deficiencies });
-    if (draftFilters.ledgerAccounts.length > 0) newFilters.push({ type: "Contas Contábeis", values: draftFilters.ledgerAccounts });
-    if (draftFilters.platforms.length > 0) newFilters.push({ type: "Plataformas", values: draftFilters.platforms });
-    if (draftFilters.informationActivities.length > 0) newFilters.push({ type: "Atividades de Info", values: draftFilters.informationActivities });
-    if (draftFilters.controls.length > 0) newFilters.push({ type: "Controles", values: draftFilters.controls });
-    if (draftFilters.incidents.length > 0) newFilters.push({ type: "Incidentes", values: draftFilters.incidents });
-    if (draftFilters.actionPlans.length > 0) newFilters.push({ type: "Planos de Ação", values: draftFilters.actionPlans });
-    if (draftFilters.normatives.length > 0) newFilters.push({ type: "Normativos", values: draftFilters.normatives });
-    if (draftFilters.departments.length > 0) newFilters.push({ type: "Departamentos", values: draftFilters.departments });
 
-    if (draftFilters.startDate) newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
-    if (draftFilters.endDate) newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
-    
+    if (draftFilters.status.length > 0) {
+      newFilters.push({ type: "Status", values: draftFilters.status });
+    }
+    if (draftFilters.responsible.length > 0)
+      newFilters.push({
+        type: "Responsável",
+        values: draftFilters.responsible,
+      });
+    if (draftFilters.type.length > 0)
+      newFilters.push({ type: "Tipo", values: draftFilters.type });
+    if (draftFilters.kri.length > 0)
+      newFilters.push({ type: "KRI", values: draftFilters.kri });
+
+    if (draftFilters.companies.length > 0)
+      newFilters.push({ type: "Empresas", values: draftFilters.companies });
+    if (draftFilters.risks.length > 0)
+      newFilters.push({ type: "Riscos", values: draftFilters.risks });
+    if (draftFilters.processesBottoms.length > 0)
+      newFilters.push({
+        type: "Subprocessos",
+        values: draftFilters.processesBottoms,
+      });
+    if (draftFilters.lgpds.length > 0)
+      newFilters.push({ type: "Dados", values: draftFilters.lgpds });
+    if (draftFilters.deficiencies.length > 0)
+      newFilters.push({
+        type: "Deficiências",
+        values: draftFilters.deficiencies,
+      });
+    if (draftFilters.ledgerAccounts.length > 0)
+      newFilters.push({
+        type: "Contas Contábeis",
+        values: draftFilters.ledgerAccounts,
+      });
+    if (draftFilters.platforms.length > 0)
+      newFilters.push({ type: "Ativos", values: draftFilters.platforms });
+    if (draftFilters.informationActivities.length > 0)
+      newFilters.push({
+        type: "Atividades de Info",
+        values: draftFilters.informationActivities,
+      });
+    if (draftFilters.controls.length > 0)
+      newFilters.push({ type: "Controles", values: draftFilters.controls });
+    if (draftFilters.incidents.length > 0)
+      newFilters.push({ type: "Incidentes", values: draftFilters.incidents });
+    if (draftFilters.actionPlans.length > 0)
+      newFilters.push({
+        type: "Planos de Ação",
+        values: draftFilters.actionPlans,
+      });
+    if (draftFilters.normatives.length > 0)
+      newFilters.push({ type: "Normativos", values: draftFilters.normatives });
+    if (draftFilters.departments.length > 0)
+      newFilters.push({
+        type: "Departamentos",
+        values: draftFilters.departments,
+      });
+
+    if (draftFilters.startDate)
+      newFilters.push({
+        type: "Data Inicial",
+        values: [draftFilters.startDate],
+      });
+    if (draftFilters.endDate)
+      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
+
     setSelectedFilters(newFilters);
 
     if (onApplyFilters) {
@@ -252,45 +321,45 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   const removeFilter = (index) => {
     setSelectedFilters((prev) => {
       const filterToRemove = prev[index];
-      
+
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
         const filterType = filterToRemove.type;
-        
-        // Mapa reverso: Nome do Chip -> Chave no State
+
         const mapTypeToKey = {
-          "Responsável": "responsible",
-          "Tipo": "type",
-          "KRI": "kri",
-          "Empresas": "companies",
-          "Riscos": "risks",
-          "Subprocessos": "processesBottoms",
-          "LGPD": "lgpds",
-          "Deficiências": "deficiencies",
+          Status: "status",
+          Responsável: "responsible",
+          Tipo: "type",
+          KRI: "kri",
+          Empresas: "companies",
+          Riscos: "risks",
+          Subprocessos: "processesBottoms",
+          Dados: "lgpds",
+          Deficiências: "deficiencies",
           "Contas Contábeis": "ledgerAccounts",
-          "Plataformas": "platforms",
+          Ativos: "platforms",
           "Atividades de Info": "informationActivities",
-          "Controles": "controls",
-          "Incidentes": "incidents",
+          Controles: "controls",
+          Incidentes: "incidents",
           "Planos de Ação": "actionPlans",
-          "Normativos": "normatives",
-          "Departamentos": "departments"
+          Normativos: "normatives",
+          Departamentos: "departments",
         };
 
         const key = mapTypeToKey[filterType];
         if (key) {
-           updatedDraft[key] = updatedDraft[key].filter(
-            (value) => !filterToRemove.values.includes(value)
+          updatedDraft[key] = updatedDraft[key].filter(
+            (value) => !filterToRemove.values.includes(value),
           );
         } else if (filterType === "Data Inicial") {
-            updatedDraft.startDate = null;
+          updatedDraft.startDate = null;
         } else if (filterType === "Data Final") {
-            updatedDraft.endDate = null;
+          updatedDraft.endDate = null;
         }
 
         return updatedDraft;
       });
-  
+
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -299,6 +368,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
     setSelectedFilters([]);
     setGlobalFilter("");
     setDraftFilters({
+      status: [],
       responsible: [],
       type: [],
       kri: [],
@@ -332,32 +402,46 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
         const filterType = filter.type;
         const filterValues = filter.values;
 
-        if (filterType === "Data Inicial" || filterType === "Data Final") return true;
+        if (filterType === "Data Inicial" || filterType === "Data Final")
+          return true;
 
-        // Filtros String
-        if (filterType === "Responsável") return filterValues.includes(item.responsible);
+        if (filterType === "Status") {
+          const showActive = filterValues.includes("Ativo");
+          const showInactive = filterValues.includes("Inativo");
+
+          if (showActive && showInactive) return true;
+
+          if (showActive) return item.active === true;
+          if (showInactive) return item.active === false;
+
+          return true;
+        }
+
+        if (filterType === "Responsável")
+          return filterValues.includes(item.responsible);
         if (filterType === "Tipo") return filterValues.includes(item.type);
         if (filterType === "KRI") return filterValues.includes(item.kri);
 
-        // Filtros Array
         const arrayFilters = {
-          "Empresas": item.companies,
-          "Riscos": item.risks,
-          "Subprocessos": item.processesBottoms,
-          "LGPD": item.lgpds,
-          "Deficiências": item.deficiencies,
+          Empresas: item.companies,
+          Riscos: item.risks,
+          Subprocessos: item.processesBottoms,
+          Dados: item.lgpds,
+          Deficiências: item.deficiencies,
           "Contas Contábeis": item.ledgerAccounts,
-          "Plataformas": item.platforms,
+          Ativos: item.platforms,
           "Atividades de Info": item.informationActivities,
-          "Controles": item.controls,
-          "Incidentes": item.incidents,
+          Controles: item.controls,
+          Incidentes: item.incidents,
           "Planos de Ação": item.actionPlans,
-          "Normativos": item.normatives,
-          "Departamentos": item.departments,
+          Normativos: item.normatives,
+          Departamentos: item.departments,
         };
 
         if (arrayFilters[filterType]) {
-          return filterValues.some(val => (arrayFilters[filterType] || []).includes(val));
+          return filterValues.some((val) =>
+            (arrayFilters[filterType] || []).includes(val),
+          );
         }
 
         return true;
@@ -382,37 +466,10 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
     debugTable: true,
   });
 
-  useEffect(
-    () =>
-      setColumnVisibility({
-        name: true,
-        code: true,
-        type: true,
-        responsible: true,
-        kri: false,
-        companies: true,
-        risks: false,
-        processesBottoms: false,
-        lgpds: false,
-        deficiencies: false,
-        ledgerAccounts: false,
-        platforms: false,
-        informationActivities: false,
-        controls: false,
-        incidents: false,
-        actionPlans: false,
-        normatives: false,
-        departments: false,
-        date: false,
-        actions: true 
-      }),
-    []
-  );
-
   const getAllColumnsFiltered = () => {
     return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
   };
-  
+
   const verticalDividerStyle = {
     width: "0.5px",
     height: "37px",
@@ -435,7 +492,6 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
       markInstance.unmark();
     }
   }, [globalFilter, table.getRowModel().rows]);
-
 
   return (
     <>
@@ -463,7 +519,8 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
             {...{
               getVisibleLeafColumns: table.getVisibleLeafColumns,
               getIsAllColumnsVisible: table.getIsAllColumnsVisible,
-              getToggleAllColumnsVisibilityHandler: table.getToggleAllColumnsVisibilityHandler,
+              getToggleAllColumnsVisibilityHandler:
+                table.getToggleAllColumnsVisibilityHandler,
               getAllColumns: getAllColumnsFiltered,
             }}
           />
@@ -487,7 +544,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
             style={{
               width: "90px",
               color: "#00000080",
-              backgroundColor: 'white',
+              backgroundColor: "white",
               fontSize: "13px",
               marginLeft: 24,
               fontWeight: 400,
@@ -506,7 +563,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
           alignItems="center"
           sx={{ width: { xs: "100%", sm: "auto" } }}
         >
-           <div style={{verticalDividerStyle}}></div>
+          <div style={{ verticalDividerStyle }}></div>
           <Stack direction="row" spacing={2} alignItems="center">
             <Box
               sx={{
@@ -520,7 +577,9 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                 variant="contained"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigation(`/processos/criar`, { state: { indoPara: "NovoProcesso" } });
+                  navigation(`/processos/criar`, {
+                    state: { indoPara: "NovoProcesso" },
+                  });
                 }}
                 startIcon={<PlusOutlined />}
                 style={{ borderRadius: "20px", height: "32px" }}
@@ -529,7 +588,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
               </Button>
             </Box>
           </Stack>
-                <Stack>
+          <Stack>
             <Box
               sx={{
                 display: "flex",
@@ -592,276 +651,317 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
         )}
       </Box>
 
-      {/* Drawer para filtros */}
-      <Drawer anchor="right" open={drawerOpen} onClose={toggleDrawer} PaperProps={{ sx: { width: 670 } }}>
+      {}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 670 } }}
+      >
         <Box sx={{ width: 650, p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Box component="h2" sx={{ color: '#1C5297', fontWeight: 600, fontSize: '16px' }}>Filtros</Box>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box
+              component="h2"
+              sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
+            >
+              Filtros
+            </Box>
             <IconButton onClick={toggleDrawer}>
-              <CloseIcon sx={{ color: '#1C5297', fontSize: '18px' }} />
+              <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
             </IconButton>
           </Stack>
 
           <Grid container spacing={2}>
-            {/* Responsável */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Responsável</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={["Ativo", "Inativo"]}
+                  value={draftFilters.status}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, status: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Responsável
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={responsibleOptions}
                   value={draftFilters.responsible}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, responsible: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, responsible: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Tipo */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Tipo</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Tipo
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={typeOptions}
                   value={draftFilters.type}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, type: value }))}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-            
-            {/* KRI */}
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>KRI</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={kriOptions}
-                  value={draftFilters.kri}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, kri: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, type: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Empresas */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Empresas</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Empresas
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={companiesOptions}
                   value={draftFilters.companies}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, companies: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, companies: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
-            
-            {/* Riscos */}
+
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Riscos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Riscos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={risksOptions}
                   value={draftFilters.risks}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, risks: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, risks: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Subprocessos */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Subprocessos</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={processesBottomsOptions}
-                  value={draftFilters.processesBottoms}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, processesBottoms: value }))}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-            
-            {/* LGPD */}
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>LGPD</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={lgpdsOptions}
-                  value={draftFilters.lgpds}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, lgpds: value }))}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-
-            {/* Controles */}
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Controles</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Controles
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={controlsOptions}
                   value={draftFilters.controls}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, controls: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, controls: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Deficiências */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Deficiências</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Deficiências
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={deficienciesOptions}
                   value={draftFilters.deficiencies}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, deficiencies: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      deficiencies: value,
+                    }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
-            
-             {/* Contas Contábeis */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Contas Contábeis</InputLabel>
+
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Contas Contábeis
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={ledgerAccountsOptions}
                   value={draftFilters.ledgerAccounts}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, ledgerAccounts: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      ledgerAccounts: value,
+                    }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Plataformas */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Plataformas</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Ativos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={platformsOptions}
                   value={draftFilters.platforms}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, platforms: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, platforms: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Atividades de Informação */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Atividades de Informação</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={informationActivitiesOptions}
-                  value={draftFilters.informationActivities}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, informationActivities: value }))}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-            
-             {/* Incidentes */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Incidentes</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Incidentes
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={incidentsOptions}
                   value={draftFilters.incidents}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, incidents: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, incidents: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Planos de Ação */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Planos de Ação</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Planos de Ação
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={actionPlansOptions}
                   value={draftFilters.actionPlans}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, actionPlans: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, actionPlans: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Normativos */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Normativos</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Normativos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={normativesOptions}
                   value={draftFilters.normatives}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, normatives: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, normatives: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Departamentos */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Departamentos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Departamentos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={departmentsOptions}
                   value={draftFilters.departments}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, departments: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, departments: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
             <Grid item xs={6}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Data Inicial</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Inicial
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <TextField
                   type="date"
-                  value={draftFilters.startDate || ''}
-                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                  value={draftFilters.startDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
                   InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
             </Grid>
 
             <Grid item xs={6}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Data Final</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Final
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <TextField
                   type="date"
-                  value={draftFilters.endDate || ''}
-                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                  value={draftFilters.endDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
                   InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
@@ -869,13 +969,17 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
           </Grid>
 
           <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
-            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
           </Stack>
         </Box>
-      </Drawer >
+      </Drawer>
 
-      {/* Tabela */}
+      {}
       <MainCard content={false}>
         <ScrollX>
           <div ref={tableRef}>
@@ -919,8 +1023,8 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                className: "cursor-pointer prevent-select",
-                              })}
+                                  className: "cursor-pointer prevent-select",
+                                })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
@@ -931,7 +1035,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                                   <Box>
                                     {flexRender(
                                       header.column.columnDef.header,
-                                      header.getContext()
+                                      header.getContext(),
                                     )}
                                   </Box>
                                   {header.column.getCanSort() && (
@@ -985,7 +1089,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                                 >
                                   {flexRender(
                                     cell.column.columnDef.cell,
-                                    cell.getContext()
+                                    cell.getContext(),
                                   )}
                                 </TableCell>
                               ))}
@@ -1065,50 +1169,52 @@ function ActionCell({ row, refreshData }) {
   };
 
   const handleToggleActive = async () => {
-    handleClose(); // Fecha o menu
+    handleClose();
     const authToken = token || localStorage.getItem("access_token");
 
     try {
-      // 1. GET: Busca os dados completos do processo
-      // Precisamos disso pois o PUT exige o objeto completo, não apenas o status
       const responseGet = await fetch(
         `https://api.egrc.homologacao.com.br/api/v1/processes/${row.original.id}`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
           },
-        }
+        },
       );
 
       if (!responseGet.ok) throw new Error("Erro ao buscar dados do processo.");
       const data = await responseGet.json();
 
-      // 2. PREPARAR PAYLOAD: Mapeamento idêntico ao novoProcesso.js
-      // O GET retorna objetos (ex: companies: [{idCompany...}]), mas o PUT pede IDs (idCompanies: [1...])
       const payload = {
         idProcess: data.idProcess,
-        active: !data.active, // << AQUI ESTÁ A ALTERAÇÃO DO STATUS >>
+        active: !data.active,
         name: data.name,
         code: data.code,
         description: data.description,
-        files: data.files || [], // Mantém arquivos existentes
+        files: data.files || [],
         idProcessType: data.idProcessType || null,
         idProcessSuperior: data.idProcessSuperior || null,
-        
-        // Mapeamentos de Arrays de Objetos para Arrays de IDs
-        idCompanies: Array.isArray(data.companies) ? data.companies.map((u) => u.idCompany) : [],
-        idDepartments: Array.isArray(data.departments) ? data.departments.map((u) => u.idDepartment) : [],
-        idProcessBottoms: Array.isArray(data.processBottoms) ? data.processBottoms.map((u) => u.idProcessBottom) : [],
-        
-        // Processos Anterior/Posterior (novoProcesso.js envia apenas o primeiro ID ou null)
-        idProcessPrevious: Array.isArray(data.idProcessPrevious) && data.idProcessPrevious.length > 0 
-            ? data.idProcessPrevious[0].idProcess 
+
+        idCompanies: Array.isArray(data.companies)
+          ? data.companies.map((u) => u.idCompany)
+          : [],
+        idDepartments: Array.isArray(data.departments)
+          ? data.departments.map((u) => u.idDepartment)
+          : [],
+        idProcessBottoms: Array.isArray(data.processBottoms)
+          ? data.processBottoms.map((u) => u.idProcessBottom)
+          : [],
+
+        idProcessPrevious:
+          Array.isArray(data.idProcessPrevious) &&
+          data.idProcessPrevious.length > 0
+            ? data.idProcessPrevious[0].idProcess
             : null,
-        idProcessNext: Array.isArray(data.idProcessNext) && data.idProcessNext.length > 0 
-            ? data.idProcessNext[0].idProcess 
+        idProcessNext:
+          Array.isArray(data.idProcessNext) && data.idProcessNext.length > 0
+            ? data.idProcessNext[0].idProcess
             : null,
 
-        // Campos que já vêm como IDs ou null no GET (baseado no novoProcesso.js)
         idLgpds: data.idLgpds || [],
         idKri: data.idKri || null,
         idResponsible: data.idResponsible || null,
@@ -1119,7 +1225,6 @@ function ActionCell({ row, refreshData }) {
         idLedgerAccounts: data.idLedgerAccounts || [],
       };
 
-      // 3. PUT: Envia a atualização
       const responsePut = await fetch(
         `https://api.egrc.homologacao.com.br/api/v1/processes`,
         {
@@ -1129,7 +1234,7 @@ function ActionCell({ row, refreshData }) {
             Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       if (!responsePut.ok) {
@@ -1138,27 +1243,26 @@ function ActionCell({ row, refreshData }) {
 
       enqueueSnackbar(
         `Processo ${data.active ? "inativado" : "ativado"} com sucesso!`,
-        { variant: "success" }
+        { variant: "success" },
       );
-      
-      // Atualiza a tabela
-      refreshData();
 
+      refreshData();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Erro ao alterar o status do processo.", { variant: "error" });
-    } 
+      enqueueSnackbar("Erro ao alterar o status do processo.", {
+        variant: "error",
+      });
+    }
   };
 
   const handleDelete = async () => {
     try {
-      // Endpoint ajustado para Processos
       const response = await fetch(
         `${API_COMMAND}/api/Processos/${row.original.id}`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }
-        }
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
 
       if (response.ok) {
@@ -1174,7 +1278,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o processo: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o processo: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -1240,7 +1344,7 @@ function ActionCell({ row, refreshData }) {
             Editar
           </Button>
 
-          {/* Botão de Ativar/Inativar */}
+          {}
           <Button
             onClick={handleToggleActive}
             style={{ color: "#707070", fontWeight: 400 }}
@@ -1248,18 +1352,11 @@ function ActionCell({ row, refreshData }) {
             {isActive ? "Inativar" : "Ativar"}
           </Button>
 
-          {/* <Button
-            onClick={() => {
-               setOpenDeleteDialog(true);
-            }}
-            style={{ color: "#707070", fontWeight: 400 }}
-          >
-            Excluir
-          </Button> */}
-          
+          {
+}
         </Stack>
       </Popover>
-      
+
       <Dialog
         open={openDeleteDialog}
         onClose={handleDeleteDialogClose}
@@ -1492,9 +1589,7 @@ ActionCell.propTypes = {
   refreshData: PropTypes.func.isRequired,
 };
 
-// ==============================|| LISTAGEM ||============================== //
 
-// ==============================|| COMPONENTE PRINCIPAL ||============================== //
 
 const ListagemProcessos = () => {
   const theme = useTheme();
@@ -1503,18 +1598,17 @@ const ListagemProcessos = () => {
   const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
   const [backendFilters, setBackendFilters] = useState({});
-  const {
-    acoesJudiciais: resultData,
-    isLoading,
-  } = useGetProcessos({ ...formData, ...backendFilters }, processoSelecionadoId);
+  const { acoesJudiciais: resultData, isLoading } = useGetProcessos(
+    { ...formData, ...backendFilters },
+    processoSelecionadoId,
+  );
 
-  // Extrai o array 'reportProcesss' do objeto retornado
   const lists = resultData || [];
 
   const handleBackendFiltersChange = (newFilters) => {
     setBackendFilters(newFilters);
   };
-  
+
   const totalRows = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1554,11 +1648,10 @@ const ListagemProcessos = () => {
       ...prev,
       ...backendFilters,
       GenerateExcel: true,
-      refreshCount: prev.refreshCount + 1
+      refreshCount: prev.refreshCount + 1,
     }));
   };
 
-  // Definição das colunas baseada no JSON fornecido
   const columns = useMemo(
     () => [
       {
@@ -1566,7 +1659,12 @@ const ListagemProcessos = () => {
         accessorKey: "name",
         cell: ({ row }) => (
           <Typography
-            sx={{ fontSize: '13px', cursor: "pointer", fontWeight: 600, color: theme.palette.primary.main }}
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
             onClick={() => {
               const dadosApi = row.original;
               navigation(`/processos/criar`, {
@@ -1581,103 +1679,194 @@ const ListagemProcessos = () => {
       {
         header: "Código",
         accessorKey: "code",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.code}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
+        ),
       },
       {
         header: "Tipo",
         accessorKey: "type",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.type}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.type}</Typography>
+        ),
       },
       {
         header: "Responsável",
         accessorKey: "responsible",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.responsible}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.responsible}
+          </Typography>
+        ),
       },
       {
         header: "KRI",
         accessorKey: "kri",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.kri}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.kri}</Typography>
+        ),
       },
-      
-      // Colunas tipo Array
+
       {
         header: "Empresas",
         accessorKey: "companies",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.companies || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.companies || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Riscos",
         accessorKey: "risks",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.risks || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.risks || []).join(", ")}
+          </Typography>
+        ),
       },
       {
-        header: "Subprocessos",
-        accessorKey: "processesBottoms",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.processesBottoms || []).join(", ")}</Typography>,
-      },
-      {
-        header: "LGPD",
+        header: "Dados",
         accessorKey: "lgpds",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.lgpds || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.lgpds || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Deficiências",
         accessorKey: "deficiencies",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.deficiencies || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.deficiencies || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Contas Contábeis",
         accessorKey: "ledgerAccounts",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.ledgerAccounts || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.ledgerAccounts || []).join(", ")}
+          </Typography>
+        ),
       },
       {
-        header: "Plataformas",
+        header: "Ativos",
         accessorKey: "platforms",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.platforms || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.platforms || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Atividades de Info",
         accessorKey: "informationActivities",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.informationActivities || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.informationActivities || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Controles",
         accessorKey: "controls",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.controls || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.controls || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Incidentes",
         accessorKey: "incidents",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.incidents || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.incidents || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Planos de Ação",
         accessorKey: "actionPlans",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.actionPlans || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.actionPlans || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Normativos",
         accessorKey: "normatives",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.normatives || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.normatives || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Departamentos",
         accessorKey: "departments",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.departments || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.departments || []).join(", ")}
+          </Typography>
+        ),
       },
       {
-        header: "Data",
+        header: "Data de Criação",
         accessorKey: "date",
         cell: ({ row }) => {
           try {
-            return <Typography sx={{ fontSize: '13px' }}>{new Date(row.original.date).toLocaleDateString()}</Typography>;
+            return (
+              <Typography sx={{ fontSize: "13px" }}>
+                {new Date(row.original.date).toLocaleDateString()}
+              </Typography>
+            );
           } catch {
-            return <Typography sx={{ fontSize: '13px' }}>—</Typography>;
+            return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
           }
         },
       },
 
-      // Coluna de ações (não deve aparecer no seletor)
+      {
+        header: "Status",
+        accessorKey: "active",
+        cell: ({ row }) => (
+          <Chip
+            label={row.original.active === true ? "Ativo" : "Inativo"}
+            color={row.original.active === true ? "success" : "error"}
+            sx={{
+              backgroundColor: "transparent",
+              color: "#00000099",
+              fontWeight: 600,
+              fontSize: "12px",
+              height: "28px",
+              "& .MuiChip-icon": {
+                color:
+                  row.original.active === true ? "success.main" : "error.main",
+                marginLeft: "4px",
+              },
+            }}
+            icon={
+              <span
+                style={{
+                  backgroundColor:
+                    row.original.active === true ? "green" : "red",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  marginRight: "-6px",
+                  marginLeft: "2px",
+                }}
+              />
+            }
+          />
+        ),
+      },
       {
         id: "actions",
         header: " ",
@@ -1685,7 +1874,7 @@ const ListagemProcessos = () => {
         cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
       },
     ],
-    [theme]
+    [theme],
   );
 
   useEffect(() => {
@@ -1695,7 +1884,6 @@ const ListagemProcessos = () => {
   }, [isLoading, isInitialLoad]);
 
   useEffect(() => {
-    // Ao finalizar a chamada de relatório, resetamos o flag para evitar novas descargas
     if (!isLoading && formData.GenerateExcel) {
       setFormData((prev) => ({ ...prev, GenerateExcel: false }));
     }

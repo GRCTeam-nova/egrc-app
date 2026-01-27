@@ -12,10 +12,8 @@ import { useGetRiscos } from "../../../api/riscos";
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import emitter from "../tela2/eventEmitter";
-// project import
 import MainCard from "../../../components/MainCard";
 
-// material-ui
 import { useTheme } from "@mui/material/styles";
 
 import {
@@ -23,8 +21,6 @@ import {
   Grid,
   Button,
   FormControl,
-  FormControlLabel,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
@@ -43,7 +39,6 @@ import {
   useMediaQuery,
 } from "@mui/material";
 
-// third-party
 import {
   flexRender,
   getCoreRowModel,
@@ -53,14 +48,13 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 
-// project-import
 import ScrollX from "../../../components/ScrollX";
 import IconButton from "../../../components/@extended/IconButton";
 import CircularProgress from "@mui/material/CircularProgress";
 import Drawer from "@mui/material/Drawer";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
-import CloseIcon from '@mui/icons-material/Close';
+import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
   faXmark,
@@ -76,24 +70,20 @@ import {
   RowSelection,
   TablePagination,
   SelectColumnVisibility,
-} from "../../../components/third-party/react-table"; 
+} from "../../../components/third-party/react-table";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
-// assets
 import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
-import {
-  faFilter,
-} from "@fortawesome/free-solid-svg-icons";
+import { faFilter } from "@fortawesome/free-solid-svg-icons";
 
 export const fuzzyFilter = (row, columnId, value) => {
   let cellValue = row.getValue(columnId);
 
-  // CORREÇÃO: Verifica se é undefined OU null antes de prosseguir
-  if (cellValue === undefined || cellValue === null || value === undefined) return false;
+  if (cellValue === undefined || cellValue === null || value === undefined)
+    return false;
 
   const normalizeText = (text) => {
-    // Segurança adicional: se por acaso o texto for null, retorna string vazia
     if (text === null || text === undefined) return "";
 
     return text
@@ -108,13 +98,52 @@ export const fuzzyFilter = (row, columnId, value) => {
   return cellValue.includes(valueStr);
 };
 
-// ==============================|| REACT TABLE - LIST ||============================== //
+const defaultVisibility = {
+  name: true,
+  code: true,
+  category: true,
+  responsible: true,
+  treatment: true,
+  process: false,
+  controls: false,
+  departments: false,
+  normatives: false,
+  factors: false,
+  incidents: false,
+  causes: false,
+  impacts: false,
+  kris: false,
+  threats: false,
+  frameworks: false,
+  date: false,
+  actionPlans: false,
+  actions: true,
+};
 
-function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExportExcel }) {
+function ReactTable({
+  data,
+  columns,
+  totalRows,
+  isLoading,
+  onApplyFilters,
+  onExportExcel,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
+  const STORAGE_KEY = "egrc_table_visibility_riscos";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
-  const [columnVisibility, setColumnVisibility] = useState({});
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : defaultVisibility;
+    } catch (error) {
+      console.error("Erro ao carregar visibilidade das colunas", error);
+      return defaultVisibility;
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
   const recordType = "Riscos";
   const tableRef = useRef(null);
   const [sorting, setSorting] = useState([{ id: "name", asc: true }]);
@@ -122,18 +151,16 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   const [globalFilter, setGlobalFilter] = useState("");
   const navigation = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState([]);
-
-  // Opções para os filtros
+  const [selectedFilters, setSelectedFilters] = useState([
+    { type: "Status", values: ["Ativo"] },
+  ]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [responsibleOptions, setResponsibleOptions] = useState([]);
   const [treatmentOptions, setTreatmentOptions] = useState([]);
-  
-  // Opções de Arrays
+
   const [processOptions, setProcessOptions] = useState([]);
   const [controlsOptions, setControlsOptions] = useState([]);
   const [departmentsOptions, setDepartmentsOptions] = useState([]);
-  const [normativesOptions, setNormativesOptions] = useState([]);
   const [factorsOptions, setFactorsOptions] = useState([]);
   const [incidentsOptions, setIncidentsOptions] = useState([]);
   const [causesOptions, setCausesOptions] = useState([]);
@@ -141,10 +168,11 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   const [krisOptions, setKrisOptions] = useState([]);
   const [threatsOptions, setThreatsOptions] = useState([]);
   const [frameworksOptions, setFrameworksOptions] = useState([]);
-  const [actionPlansOptions, setActionPlansOptions] = useState([]); // Novo
+  const [actionPlansOptions, setActionPlansOptions] = useState([]);
 
   const [draftFilters, setDraftFilters] = useState({
-    name: [], 
+    status: ["Ativo"],
+    name: [],
     responsible: [],
     category: [],
     treatment: [],
@@ -159,7 +187,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
     kris: [],
     threats: [],
     frameworks: [],
-    actionPlans: [], // Novo
+    actionPlans: [],
     startDate: null,
     endDate: null,
   });
@@ -169,61 +197,90 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   useEffect(() => {
     const getUniqueValues = (key, isArray = false) => {
       if (!data) return [];
-      const values = data.flatMap(item => {
+      const values = data.flatMap((item) => {
         const value = item[key];
         if (isArray && Array.isArray(value)) {
-          return value.filter(v => v !== null && v !== undefined && v !== "");
+          return value.filter((v) => v !== null && v !== undefined && v !== "");
         }
-        return value !== null && value !== undefined && value !== "" ? [value] : [];
+        return value !== null && value !== undefined && value !== ""
+          ? [value]
+          : [];
       });
       return [...new Set(values)].sort();
     };
 
-    // Campos String
-    setCategoryOptions(getUniqueValues('category'));
-    setResponsibleOptions(getUniqueValues('responsible'));
-    setTreatmentOptions(getUniqueValues('treatment'));
+    setCategoryOptions(getUniqueValues("category"));
+    setResponsibleOptions(getUniqueValues("responsible"));
+    setTreatmentOptions(getUniqueValues("treatment"));
 
-    // Campos Array
-    setProcessOptions(getUniqueValues('process', true));
-    setControlsOptions(getUniqueValues('controls', true));
-    setDepartmentsOptions(getUniqueValues('departments', true));
-    setNormativesOptions(getUniqueValues('normatives', true));
-    setFactorsOptions(getUniqueValues('factors', true));
-    setIncidentsOptions(getUniqueValues('incidents', true));
-    setCausesOptions(getUniqueValues('causes', true));
-    setImpactsOptions(getUniqueValues('impacts', true));
-    setKrisOptions(getUniqueValues('kris', true));
-    setThreatsOptions(getUniqueValues('threats', true));
-    setFrameworksOptions(getUniqueValues('frameworks', true));
-    setActionPlansOptions(getUniqueValues('actionPlans', true)); // Novo
+    setProcessOptions(getUniqueValues("process", true));
+    setControlsOptions(getUniqueValues("controls", true));
+    setDepartmentsOptions(getUniqueValues("departments", true));
+    setFactorsOptions(getUniqueValues("factors", true));
+    setIncidentsOptions(getUniqueValues("incidents", true));
+    setCausesOptions(getUniqueValues("causes", true));
+    setImpactsOptions(getUniqueValues("impacts", true));
+    setKrisOptions(getUniqueValues("kris", true));
+    setThreatsOptions(getUniqueValues("threats", true));
+    setFrameworksOptions(getUniqueValues("frameworks", true));
+    setActionPlansOptions(getUniqueValues("actionPlans", true));
   }, [data]);
 
   const applyFilters = () => {
     const newFilters = [];
-    
-    // Mapeamento de filtros para exibição
-    if (draftFilters.responsible.length > 0) newFilters.push({ type: "Responsável", values: draftFilters.responsible });
-    if (draftFilters.category.length > 0) newFilters.push({ type: "Categoria", values: draftFilters.category });
-    if (draftFilters.treatment.length > 0) newFilters.push({ type: "Tratamento", values: draftFilters.treatment });
-    
-    // Arrays
-    if (draftFilters.process.length > 0) newFilters.push({ type: "Processos", values: draftFilters.process });
-    if (draftFilters.controls.length > 0) newFilters.push({ type: "Controles", values: draftFilters.controls });
-    if (draftFilters.departments.length > 0) newFilters.push({ type: "Departamentos", values: draftFilters.departments });
-    if (draftFilters.normatives.length > 0) newFilters.push({ type: "Normativos", values: draftFilters.normatives });
-    if (draftFilters.factors.length > 0) newFilters.push({ type: "Fatores", values: draftFilters.factors });
-    if (draftFilters.incidents.length > 0) newFilters.push({ type: "Incidentes", values: draftFilters.incidents });
-    if (draftFilters.causes.length > 0) newFilters.push({ type: "Causas", values: draftFilters.causes });
-    if (draftFilters.impacts.length > 0) newFilters.push({ type: "Impactos", values: draftFilters.impacts });
-    if (draftFilters.kris.length > 0) newFilters.push({ type: "KRIs", values: draftFilters.kris });
-    if (draftFilters.threats.length > 0) newFilters.push({ type: "Ameaças", values: draftFilters.threats });
-    if (draftFilters.frameworks.length > 0) newFilters.push({ type: "Frameworks", values: draftFilters.frameworks });
-    if (draftFilters.actionPlans.length > 0) newFilters.push({ type: "Planos de Ação", values: draftFilters.actionPlans }); // Novo
 
-    if (draftFilters.startDate) newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
-    if (draftFilters.endDate) newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
-    
+    if (draftFilters.status.length > 0) {
+      newFilters.push({ type: "Status", values: draftFilters.status });
+    }
+    if (draftFilters.responsible.length > 0)
+      newFilters.push({
+        type: "Responsável",
+        values: draftFilters.responsible,
+      });
+    if (draftFilters.category.length > 0)
+      newFilters.push({ type: "Categoria", values: draftFilters.category });
+    if (draftFilters.treatment.length > 0)
+      newFilters.push({ type: "Tratamento", values: draftFilters.treatment });
+
+    if (draftFilters.process.length > 0)
+      newFilters.push({ type: "Processos", values: draftFilters.process });
+    if (draftFilters.controls.length > 0)
+      newFilters.push({ type: "Controles", values: draftFilters.controls });
+    if (draftFilters.departments.length > 0)
+      newFilters.push({
+        type: "Departamentos",
+        values: draftFilters.departments,
+      });
+    if (draftFilters.normatives.length > 0)
+      newFilters.push({ type: "Normativos", values: draftFilters.normatives });
+    if (draftFilters.factors.length > 0)
+      newFilters.push({ type: "Fatores", values: draftFilters.factors });
+    if (draftFilters.incidents.length > 0)
+      newFilters.push({ type: "Incidentes", values: draftFilters.incidents });
+    if (draftFilters.causes.length > 0)
+      newFilters.push({ type: "Causas", values: draftFilters.causes });
+    if (draftFilters.impacts.length > 0)
+      newFilters.push({ type: "Impactos", values: draftFilters.impacts });
+    if (draftFilters.kris.length > 0)
+      newFilters.push({ type: "KRIs", values: draftFilters.kris });
+    if (draftFilters.threats.length > 0)
+      newFilters.push({ type: "Ameaças", values: draftFilters.threats });
+    if (draftFilters.frameworks.length > 0)
+      newFilters.push({ type: "Frameworks", values: draftFilters.frameworks });
+    if (draftFilters.actionPlans.length > 0)
+      newFilters.push({
+        type: "Planos de Ação",
+        values: draftFilters.actionPlans,
+      });
+
+    if (draftFilters.startDate)
+      newFilters.push({
+        type: "Data Inicial",
+        values: [draftFilters.startDate],
+      });
+    if (draftFilters.endDate)
+      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
+
     setSelectedFilters(newFilters);
 
     if (onApplyFilters) {
@@ -239,44 +296,44 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
   const removeFilter = (index) => {
     setSelectedFilters((prev) => {
       const filterToRemove = prev[index];
-      
+
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
         const filterType = filterToRemove.type;
-        
-        // Mapa reverso atualizado
+
         const mapTypeToKey = {
-          "Responsável": "responsible",
-          "Categoria": "category",
-          "Tratamento": "treatment",
-          "Processos": "process",
-          "Controles": "controls",
-          "Departamentos": "departments",
-          "Normativos": "normatives",
-          "Fatores": "factors",
-          "Incidentes": "incidents",
-          "Causas": "causes",
-          "Impactos": "impacts",
-          "KRIs": "kris",
-          "Ameaças": "threats",
-          "Frameworks": "frameworks",
-          "Planos de Ação": "actionPlans", // Novo
+          "Status": "status",
+          Responsável: "responsible",
+          Categoria: "category",
+          Tratamento: "treatment",
+          Processos: "process",
+          Controles: "controls",
+          Departamentos: "departments",
+          Normativos: "normatives",
+          Fatores: "factors",
+          Incidentes: "incidents",
+          Causas: "causes",
+          Impactos: "impacts",
+          KRIs: "kris",
+          Ameaças: "threats",
+          Frameworks: "frameworks",
+          "Planos de Ação": "actionPlans",
         };
 
         const key = mapTypeToKey[filterType];
         if (key) {
-           updatedDraft[key] = updatedDraft[key].filter(
-            (value) => !filterToRemove.values.includes(value)
+          updatedDraft[key] = updatedDraft[key].filter(
+            (value) => !filterToRemove.values.includes(value),
           );
         } else if (filterType === "Data Inicial") {
-            updatedDraft.startDate = null;
+          updatedDraft.startDate = null;
         } else if (filterType === "Data Final") {
-            updatedDraft.endDate = null;
+          updatedDraft.endDate = null;
         }
 
         return updatedDraft;
       });
-  
+
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -285,6 +342,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
     setSelectedFilters([]);
     setGlobalFilter("");
     setDraftFilters({
+      status: [],
       responsible: [],
       category: [],
       treatment: [],
@@ -299,7 +357,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
       kris: [],
       threats: [],
       frameworks: [],
-      actionPlans: [], // Novo
+      actionPlans: [],
       startDate: null,
       endDate: null,
     });
@@ -317,38 +375,53 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
         const filterType = filter.type;
         const filterValues = filter.values;
 
-        if (filterType === "Data Inicial" || filterType === "Data Final") return true;
+        if (filterType === "Data Inicial" || filterType === "Data Final")
+          return true;
 
-        if (filterType === "Responsável") return filterValues.includes(item.responsible);
-        if (filterType === "Categoria") return filterValues.includes(item.category);
-        if (filterType === "Tratamento") return filterValues.includes(item.treatment);
+        if (filterType === "Status") {
+          const showActive = filterValues.includes("Ativo");
+          const showInactive = filterValues.includes("Inativo");
+
+          if (showActive && showInactive) return true;
+
+          if (showActive) return item.active === true;
+          if (showInactive) return item.active === false;
+
+          return true;
+        }
+        
+        if (filterType === "Responsável")
+          return filterValues.includes(item.responsible);
+        if (filterType === "Categoria")
+          return filterValues.includes(item.category);
+        if (filterType === "Tratamento")
+          return filterValues.includes(item.treatment);
 
         const arrayFilters = {
-          "Processos": item.process,
-          "Controles": item.controls,
-          "Departamentos": item.departments,
-          "Normativos": item.normatives,
-          "Fatores": item.factors,
-          "Incidentes": item.incidents,
-          "Causas": item.causes,
-          "Impactos": item.impacts,
-          "KRIs": item.kris,
-          "Ameaças": item.threats,
-          "Frameworks": item.frameworks,
-          "Planos de Ação": item.actionPlans, // Novo
+          Processos: item.process,
+          Controles: item.controls,
+          Departamentos: item.departments,
+          Normativos: item.normatives,
+          Fatores: item.factors,
+          Incidentes: item.incidents,
+          Causas: item.causes,
+          Impactos: item.impacts,
+          KRIs: item.kris,
+          Ameaças: item.threats,
+          Frameworks: item.frameworks,
+          "Planos de Ação": item.actionPlans,
         };
 
         if (arrayFilters[filterType]) {
-          return filterValues.some(val => (arrayFilters[filterType] || []).includes(val));
+          return filterValues.some((val) =>
+            (arrayFilters[filterType] || []).includes(val),
+          );
         }
 
         return true;
       });
     });
   }, [data, selectedFilters]);
-
-  // Restante do código da tabela (useReactTable, useEffect de visibilidade, etc)...
-  // ... (código existente da tabela omitido para brevidade até o Drawer)
 
   const table = useReactTable({
     data: filteredData,
@@ -367,37 +440,10 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
     debugTable: true,
   });
 
-  useEffect(
-    () =>
-      setColumnVisibility({
-        name: true,
-        code: true,
-        category: true,
-        responsible: true,
-        treatment: true,
-        process: false,
-        controls: false,
-        departments: false,
-        normatives: false,
-        factors: false,
-        incidents: false,
-        causes: false,
-        impacts: false,
-        kris: false,
-        threats: false,
-        frameworks: false,
-        date: false,
-        actionPlans: false, // Novo (Opcional, se houver coluna para isso)
-        actions: true 
-      }),
-    []
-  );
-
   const getAllColumnsFiltered = () => {
     return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
   };
-  
-  // Style config (mantido do original)
+
   const verticalDividerStyle = {
     width: "0.5px",
     height: "37px",
@@ -408,7 +454,6 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
     marginLeft: "7px",
   };
 
-  // Mark.js effect (mantido do original)
   useEffect(() => {
     const markInstance = new Mark(tableRef.current);
     if (globalFilter) {
@@ -421,7 +466,6 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
       markInstance.unmark();
     }
   }, [globalFilter, table.getRowModel().rows]);
-
 
   return (
     <>
@@ -449,7 +493,8 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
             {...{
               getVisibleLeafColumns: table.getVisibleLeafColumns,
               getIsAllColumnsVisible: table.getIsAllColumnsVisible,
-              getToggleAllColumnsVisibilityHandler: table.getToggleAllColumnsVisibilityHandler,
+              getToggleAllColumnsVisibilityHandler:
+                table.getToggleAllColumnsVisibilityHandler,
               getAllColumns: getAllColumnsFiltered,
             }}
           />
@@ -473,7 +518,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
             style={{
               width: "90px",
               color: "#00000080",
-              backgroundColor: 'white',
+              backgroundColor: "white",
               fontSize: "13px",
               marginLeft: 24,
               fontWeight: 400,
@@ -492,7 +537,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
           alignItems="center"
           sx={{ width: { xs: "100%", sm: "auto" } }}
         >
-           <div style={{verticalDividerStyle}}></div>
+          <div style={{ verticalDividerStyle }}></div>
           <Stack direction="row" spacing={2} alignItems="center">
             <Box
               sx={{
@@ -506,7 +551,9 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                 variant="contained"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigation(`/riscos/criar`, { state: { indoPara: "NovoRisco" } });
+                  navigation(`/riscos/criar`, {
+                    state: { indoPara: "NovoRisco" },
+                  });
                 }}
                 startIcon={<PlusOutlined />}
                 style={{ borderRadius: "20px", height: "32px" }}
@@ -515,7 +562,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
               </Button>
             </Box>
           </Stack>
-                <Stack>
+          <Stack>
             <Box
               sx={{
                 display: "flex",
@@ -578,246 +625,348 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
         )}
       </Box>
 
-      {/* Drawer para filtros */}
-      <Drawer anchor="right" open={drawerOpen} onClose={toggleDrawer} PaperProps={{ sx: { width: 670 } }}>
+      {}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 670 } }}
+      >
         <Box sx={{ width: 650, p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Box component="h2" sx={{ color: '#1C5297', fontWeight: 600, fontSize: '16px' }}>Filtros</Box>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box
+              component="h2"
+              sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
+            >
+              Filtros
+            </Box>
             <IconButton onClick={toggleDrawer}>
-              <CloseIcon sx={{ color: '#1C5297', fontSize: '18px' }} />
+              <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
             </IconButton>
           </Stack>
 
           <Grid container spacing={2}>
-            {/* Responsável */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Responsável</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={["Ativo", "Inativo"]}
+                  value={draftFilters.status}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, status: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Responsável
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={responsibleOptions}
                   value={draftFilters.responsible}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, responsible: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, responsible: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Categoria */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Categoria</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Categoria
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={categoryOptions}
                   value={draftFilters.category}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, category: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, category: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Tratamento */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Tratamento</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Tratamento
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={treatmentOptions}
                   value={draftFilters.treatment}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, treatment: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, treatment: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Processos */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Processos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Processos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={processOptions}
                   value={draftFilters.process}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, process: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, process: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
-            
-            {/* Controles */}
+
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Controles</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Controles
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={controlsOptions}
                   value={draftFilters.controls}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, controls: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, controls: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Departamentos */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Departamentos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Departamentos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={departmentsOptions}
                   value={draftFilters.departments}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, departments: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, departments: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Fatores */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Fatores</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Fatores
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={factorsOptions}
                   value={draftFilters.factors}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, factors: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, factors: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
-            
-            {/* Incidentes */}
+
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Incidentes</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Incidentes
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={incidentsOptions}
                   value={draftFilters.incidents}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, incidents: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, incidents: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Causas */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Causas</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Causas
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={causesOptions}
                   value={draftFilters.causes}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, causes: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, causes: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-            {/* Impactos */}
+            {}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Impactos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Impactos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={impactsOptions}
                   value={draftFilters.impacts}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, impacts: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, impacts: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* KRIs */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>KRIs</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                KRIs
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={krisOptions}
                   value={draftFilters.kris}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, kris: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, kris: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Ameaças */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Ameaças</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Ameaças
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={threatsOptions}
                   value={draftFilters.threats}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, threats: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, threats: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Frameworks */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Frameworks</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Frameworks
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={frameworksOptions}
                   value={draftFilters.frameworks}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, frameworks: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, frameworks: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-             {/* Planos de Ação (NOVO) */}
-             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Planos de Ação</InputLabel>
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Planos de Ação
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={actionPlansOptions}
                   value={draftFilters.actionPlans}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, actionPlans: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, actionPlans: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
             <Grid item xs={6}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Data Inicial</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Inicial
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <TextField
                   type="date"
-                  value={draftFilters.startDate || ''}
-                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                  value={draftFilters.startDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
                   InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
             </Grid>
 
             <Grid item xs={6}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Data Final</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Final
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <TextField
                   type="date"
-                  value={draftFilters.endDate || ''}
-                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                  value={draftFilters.endDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
                   InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
@@ -825,13 +974,17 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
           </Grid>
 
           <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
-            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
           </Stack>
         </Box>
-      </Drawer >
+      </Drawer>
 
-      {/* Tabela */}
+      {}
       <MainCard content={false}>
         <ScrollX>
           <div ref={tableRef}>
@@ -875,8 +1028,8 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                className: "cursor-pointer prevent-select",
-                              })}
+                                  className: "cursor-pointer prevent-select",
+                                })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
@@ -887,7 +1040,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                                   <Box>
                                     {flexRender(
                                       header.column.columnDef.header,
-                                      header.getContext()
+                                      header.getContext(),
                                     )}
                                   </Box>
                                   {header.column.getCanSort() && (
@@ -941,7 +1094,7 @@ function ReactTable({ data, columns, totalRows, isLoading, onApplyFilters, onExp
                                 >
                                   {flexRender(
                                     cell.column.columnDef.cell,
-                                    cell.getContext()
+                                    cell.getContext(),
                                   )}
                                 </TableCell>
                               ))}
@@ -1004,6 +1157,8 @@ function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
   const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [status, setStatus] = useState(row.original.active);
+  const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openErrorDialog, setOpenErrorDialog] = useState(false);
 
@@ -1015,24 +1170,86 @@ function ActionCell({ row, refreshData }) {
     setAnchorEl(null);
   };
 
+  const handleDialogOpen = () => {
+    setOpenDialog(true);
+  };
+
+  const handleDialogClose = () => {
+    setOpenDialog(false);
+    handleClose();
+  };
+
   const handleDeleteDialogClose = () => {
     setOpenDeleteDialog(false);
     handleClose();
   };
 
+  const toggleStatus = async () => {
+    const idRisco = row.original.id;
+    const newStatus = status === true ? "Inativo" : "Ativo";
+
+    try {
+      const getResponse = await axios.get(
+        `${process.env.REACT_APP_API_URL}risks/${idRisco}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const dadosEndpoint = getResponse.data;
+
+      const dadosAtualizados = {
+        ...dadosEndpoint,
+        active: newStatus === "Ativo",
+      };
+
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}risks`,
+        dadosAtualizados,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      setStatus(newStatus);
+      const message = `Risco ${row.original.name} ${newStatus.toLowerCase()}.`;
+
+      enqueueSnackbar(message, {
+        variant: "success",
+        autoHideDuration: 3000,
+        anchorOrigin: {
+          vertical: "top",
+          horizontal: "center",
+        },
+      });
+
+      refreshData();
+    } catch (error) {
+      console.error("Erro:", error);
+      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, {
+        variant: "error",
+      });
+    }
+
+    handleDialogClose();
+  };
+
   const handleDelete = async () => {
     try {
-      // Ajuste o endpoint conforme a API de Riscos
       const response = await fetch(
-        `${API_COMMAND}/api/Riscos/${row.original.id}`,
+        `${API_COMMAND}/api/Orgao/${row.original.id}`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }
-        }
+        },
       );
 
       if (response.ok) {
-        enqueueSnackbar(`Risco ${row.original.name} excluído.`, {
+        enqueueSnackbar(`Empresa ${row.original.nome} excluído.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
@@ -1044,7 +1261,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o risco: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o risco: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -1096,7 +1313,7 @@ function ActionCell({ row, refreshData }) {
               const dadosApi = row.original;
               navigation(`/riscos/criar`, {
                 state: {
-                  indoPara: "NovoRisco",
+                  indoPara: "NovaEmpresa",
                   dadosApi,
                 },
               });
@@ -1110,16 +1327,140 @@ function ActionCell({ row, refreshData }) {
 
           <Button
             onClick={() => {
-               setOpenDeleteDialog(true);
+              if (row.original.active === true) handleDialogOpen();
+              else toggleStatus();
             }}
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            Excluir
+            {row.original.active === true ? "Inativar" : "Ativar"}
           </Button>
-          
         </Stack>
       </Popover>
-      
+      <Dialog
+        open={openDialog}
+        onClose={handleDialogClose}
+        sx={{
+          "& .MuiPaper-root": {
+            width: "547px",
+            height: "290px",
+            maxWidth: "none",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            background: "#ED5565",
+            width: "auto",
+            height: "42px",
+            borderRadius: "4px 4px 0px 0px",
+            display: "flex",
+            alignItems: "center",
+            padding: "10px",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <IconButton
+              aria-label="delete"
+              sx={{
+                fontSize: "16px",
+                marginRight: "2px",
+                color: "rgba(255, 255, 255, 1)",
+                "&:hover": {
+                  backgroundColor: "transparent",
+                  boxShadow: "none",
+                  color: "white",
+                  cursor: "default",
+                },
+              }}
+            >
+              <FontAwesomeIcon icon={faBan} />
+            </IconButton>
+
+            <Typography
+              variant="body1"
+              sx={{
+                fontFamily: '"Open Sans", Helvetica, sans-serif',
+                fontSize: "16px",
+                fontWeight: 500,
+                lineHeight: "21px",
+                letterSpacing: "0em",
+                textAlign: "left",
+                color: "rgba(255, 255, 255, 1)",
+                flexGrow: 1,
+              }}
+            >
+              Inativar
+            </Typography>
+          </div>
+          <IconButton
+            aria-label="close"
+            onClick={handleDialogClose}
+            sx={{
+              color: "rgba(255, 255, 255, 1)",
+              "&:hover": {
+                backgroundColor: "transparent",
+                boxShadow: "none",
+                color: "white",
+              },
+            }}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography
+            component="div"
+            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
+          >
+            Tem certeza que deseja inativar o risco "{row.original.name}"?
+          </Typography>
+          <Typography
+            component="div"
+            style={{ marginTop: "20px", color: "#717171" }}
+          >
+            Ao inativar, esse risco não aparecerá mais no cadastro manual.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={toggleStatus}
+            color="primary"
+            autoFocus
+            style={{
+              marginTop: "-55px",
+              width: "162px",
+              height: "32px",
+              padding: "8px 16px",
+              borderRadius: "4px",
+              background: "#ED5565",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#fff",
+              textTransform: "none",
+            }}
+          >
+            Sim, inativar
+          </Button>
+          <Button
+            onClick={handleDialogClose}
+            style={{
+              marginTop: "-55px",
+              padding: "8px 16px",
+              width: "91px",
+              height: "32px",
+              borderRadius: "4px",
+              border: "1px solid rgba(0, 0, 0, 0.40)",
+              background: "#FFF",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
+            }}
+          >
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog
         open={openDeleteDialog}
         onClose={handleDeleteDialogClose}
@@ -1154,6 +1495,7 @@ function ActionCell({ row, refreshData }) {
                   backgroundColor: "transparent",
                   boxShadow: "none",
                   color: "white",
+                  cursor: "default",
                 },
               }}
             >
@@ -1196,13 +1538,14 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja excluir o risco "{row.original.name}"?
+            Tem certeza que deseja excluir o risco "{row.original.nome}"?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Esta ação não poderá ser desfeita.
+            Esse risco não será mais disponibilizado ao cadastrar um novo
+            processo.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1278,6 +1621,7 @@ function ActionCell({ row, refreshData }) {
                   backgroundColor: "transparent",
                   boxShadow: "none",
                   color: "white",
+                  cursor: "default",
                 },
               }}
             >
@@ -1297,7 +1641,7 @@ function ActionCell({ row, refreshData }) {
                 flexGrow: 1,
               }}
             >
-              Erro na Exclusão
+              Exclusão não permitida
             </Typography>
           </div>
           <IconButton
@@ -1320,7 +1664,14 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Não foi possível excluir.
+            Não é possível excluir o Empresa.
+          </Typography>
+          <Typography
+            component="div"
+            style={{ marginTop: "20px", color: "#717171" }}
+          >
+            O risco não pode ser excluído pois está vinculado a processos. É
+            possível inativar o risco nas configurações de edição.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1352,10 +1703,6 @@ ActionCell.propTypes = {
   refreshData: PropTypes.func.isRequired,
 };
 
-// ==============================|| LISTAGEM ||============================== //
-
-// ==============================|| COMPONENTE PRINCIPAL ||============================== //
-
 const ListagemEmpresa = () => {
   const theme = useTheme();
   const location = useLocation();
@@ -1363,18 +1710,17 @@ const ListagemEmpresa = () => {
   const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
   const [backendFilters, setBackendFilters] = useState({});
-  const {
-    acoesJudiciais: resultData,
-    isLoading,
-  } = useGetRiscos({ ...formData, ...backendFilters }, processoSelecionadoId);
+  const { acoesJudiciais: resultData, isLoading } = useGetRiscos(
+    { ...formData, ...backendFilters },
+    processoSelecionadoId,
+  );
 
-  // Extrai o array 'reportRisks' do objeto retornado
   const lists = resultData || [];
 
   const handleBackendFiltersChange = (newFilters) => {
     setBackendFilters(newFilters);
   };
-  
+
   const totalRows = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1414,11 +1760,10 @@ const ListagemEmpresa = () => {
       ...prev,
       ...backendFilters,
       GenerateExcel: true,
-      refreshCount: prev.refreshCount + 1
+      refreshCount: prev.refreshCount + 1,
     }));
   };
 
-  // Definição das colunas baseada no JSON fornecido
   const columns = useMemo(
     () => [
       {
@@ -1426,7 +1771,12 @@ const ListagemEmpresa = () => {
         accessorKey: "name",
         cell: ({ row }) => (
           <Typography
-            sx={{ fontSize: '13px', cursor: "pointer", fontWeight: 600, color: theme.palette.primary.main }}
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
             onClick={() => {
               const dadosApi = row.original;
               navigation(`/riscos/criar`, {
@@ -1441,93 +1791,188 @@ const ListagemEmpresa = () => {
       {
         header: "Código",
         accessorKey: "code",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.code}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
+        ),
       },
       {
         header: "Responsável",
         accessorKey: "responsible",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.responsible}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.responsible}
+          </Typography>
+        ),
       },
       {
         header: "Categoria",
         accessorKey: "category",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.category}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.category}
+          </Typography>
+        ),
       },
       {
         header: "Tratamento",
         accessorKey: "treatment",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{row.original.treatment}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.treatment}
+          </Typography>
+        ),
       },
-      
-      // Colunas tipo Array
+
       {
         header: "Processos",
         accessorKey: "process",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.process || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.process || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Controles",
         accessorKey: "controls",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.controls || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.controls || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Departamentos",
         accessorKey: "departments",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.departments || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.departments || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Normativos",
         accessorKey: "normatives",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.normatives || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.normatives || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Fatores",
         accessorKey: "factors",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.factors || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.factors || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Incidentes",
         accessorKey: "incidents",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.incidents || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.incidents || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Causas",
         accessorKey: "causes",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.causes || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.causes || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Impactos",
         accessorKey: "impacts",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.impacts || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.impacts || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "KRIs",
         accessorKey: "kris",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.kris || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.kris || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Ameaças",
         accessorKey: "threats",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.threats || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.threats || []).join(", ")}
+          </Typography>
+        ),
       },
       {
         header: "Frameworks",
         accessorKey: "frameworks",
-        cell: ({ row }) => <Typography sx={{ fontSize: '13px' }}>{(row.original.frameworks || []).join(", ")}</Typography>,
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.frameworks || []).join(", ")}
+          </Typography>
+        ),
       },
       {
-        header: "Data",
+        header: "Data de Criação",
         accessorKey: "date",
         cell: ({ row }) => {
           try {
-            return <Typography sx={{ fontSize: '13px' }}>{new Date(row.original.date).toLocaleDateString()}</Typography>;
+            return (
+              <Typography sx={{ fontSize: "13px" }}>
+                {new Date(row.original.date).toLocaleDateString()}
+              </Typography>
+            );
           } catch {
-            return <Typography sx={{ fontSize: '13px' }}>—</Typography>;
+            return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
           }
         },
       },
-
-      // Coluna de ações (não deve aparecer no seletor)
+      {
+        header: "Status",
+        accessorKey: "active",
+        cell: ({ row }) => (
+          <Chip
+            label={row.original.active === true ? "Ativo" : "Inativo"}
+            color={row.original.active === true ? "success" : "error"}
+            sx={{
+              backgroundColor: "transparent",
+              color: "#00000099",
+              fontWeight: 600,
+              fontSize: "12px",
+              height: "28px",
+              "& .MuiChip-icon": {
+                color:
+                  row.original.active === true ? "success.main" : "error.main",
+                marginLeft: "4px",
+              },
+            }}
+            icon={
+              <span
+                style={{
+                  backgroundColor:
+                    row.original.active === true ? "green" : "red",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  marginRight: "-6px",
+                  marginLeft: "2px",
+                }}
+              />
+            }
+          />
+        ),
+      },
       {
         id: "actions",
         header: " ",
@@ -1535,7 +1980,7 @@ const ListagemEmpresa = () => {
         cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
       },
     ],
-    [theme]
+    [theme],
   );
 
   useEffect(() => {
@@ -1545,7 +1990,6 @@ const ListagemEmpresa = () => {
   }, [isLoading, isInitialLoad]);
 
   useEffect(() => {
-    // Ao finalizar a chamada de relatório, resetamos o flag para evitar novas descargas
     if (!isLoading && formData.GenerateExcel) {
       setFormData((prev) => ({ ...prev, GenerateExcel: false }));
     }
