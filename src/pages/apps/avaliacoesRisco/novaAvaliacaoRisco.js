@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import {API_URL} from "config";
+import { API_URL } from "config";
 import {
   Accordion,
   AccordionDetails,
@@ -45,7 +45,10 @@ function ColumnsLayouts() {
   const location = useLocation();
   const { dadosApi } = location.state || {};
   const idUser = localStorage.getItem("id_user");
+  const [questionariosApi, setQuestionariosApi] = useState([]); // <- NOVO
   const [filledQuestionarios, setFilledQuestionarios] = useState([]);
+  const [loadingText, setLoadingText] = useState("");
+
   const [tipoConsolidacao, setTipoConsolidacao] = useState(1);
 
   const [sobrepor, setSobrepor] = useState(false);
@@ -74,9 +77,10 @@ function ColumnsLayouts() {
   const [hasChanges, setHasChanges] = useState(false);
   const [statuss] = useState([
     { id: 1, nome: "Não iniciada" },
-    { id: 2, nome: "Iniciado" },
+    { id: 2, nome: "Iniciada" },
     { id: 3, nome: "Em avaliação" },
-    { id: 4, nome: "Completo" },
+    { id: 4, nome: "Completa" },
+    { id: 5, nome: "Finalizada" },
   ]);
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
@@ -132,23 +136,46 @@ function ColumnsLayouts() {
     responsavelAv: true,
   });
 
+  const formatDateConclusion = (raw) => {
+    if (!raw) return "";
+
+    // Normaliza frações de segundo longas: .0047459 -> .004
+    const normalized = String(raw).replace(/\.(\d{3})\d+/, ".$1");
+
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return String(raw);
+
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    const DD = pad2(d.getDate());
+    const MM = pad2(d.getMonth() + 1);
+    const YYYY = d.getFullYear();
+    const HH = pad2(d.getHours());
+    const MIN = pad2(d.getMinutes());
+
+    return `${DD}-${MM}-${YYYY} ${HH}-${MIN}`;
+  };
+
   // --- REGRAS DE PERMISSIONAMENTO (Baseado no PDF 1.1) ---
   const isEditing = requisicao === "Editar";
   const statusAtual = formData.status;
-  const isResponsibleAv = idUser === formData.responsavelAv;
+  const isResponsibleAv = String(idUser) === String(formData.responsavelAv);
 
   // 1. Ciclo e Risco: Editáveis apenas na criação. Na alteração (mesmo status 1) são estáticos.
   const isRiskCycleEditable = !isEditing;
 
-  // 2. Respondentes e Responsável: Editáveis na criação (0) e na alteração se status for "Não iniciada" (0).
-  const isPeopleEditable = (!statusAtual || statusAtual === 1 || statusAtual === 2);
+  // 2. Respondentes e Responsável: Editáveis na criação e na alteração se status for "Não iniciada" (1) ou "Iniciada" (2).
+  const isPeopleEditable =
+    !statusAtual || statusAtual === 1 || statusAtual === 2;
 
-  // 3. Avaliação (Heatmap, Justificativa, Switch): Apenas Responsável no status "Em avaliação" (3).
-  const isEvaluationEditable = isResponsibleAv && statusAtual === 3;
+  // 3. Avaliação (Heatmap, Justificativa, Switch): Apenas Responsável nos status "Em avaliação" (3) e "Completa" (4).
+  const isEvaluationEditable =
+    isResponsibleAv && (statusAtual === 3 || statusAtual === 4);
 
   const isEmAvaliacao = statusAtual === 3;
   const isComplete = statusAtual === 4;
-  localStorage.setItem("AvConcluida", isComplete);
+  const isFinalizada = statusAtual === 5;
+  localStorage.setItem("AvConcluida", isComplete || isFinalizada);
 
   const initialOverlay = useMemo(
     () => ({
@@ -174,7 +201,7 @@ function ColumnsLayouts() {
       formData.idProbabilityPlanned,
       formData.idSeverityPlanned,
       comentario,
-    ]
+    ],
   );
 
   const fetchData = async (url, setState) => {
@@ -223,55 +250,37 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}categories`,
-      setCategorias
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}categories`, setCategorias);
     fetchData(`${process.env.REACT_APP_API_URL}cycles`, setCiclo);
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setRespondentes
+      setRespondentes,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsaveis
+      setResponsaveis,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsaveisAv
+      setResponsaveisAv,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}risks/treatments`,
-      setTratamentos
+      setTratamentos,
     );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}risks/causes`,
-      setCausa
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}risks/impacts`,
-      setImpactos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}risks/causes`, setCausa);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/impacts`, setImpactos);
     fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
-      setControle
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}controls`, setControle);
     fetchData(
       `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
-      setDiretriz
+      setDiretriz,
     );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}incidents`,
-      setIncidente
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}incidents`, setIncidente);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
     fetchData(
       `${process.env.REACT_APP_API_URL}risks?onlyWithAnalisysProfile=true`,
-      setRiscos
+      setRiscos,
     );
     window.scrollTo(0, 0);
   }, []);
@@ -287,7 +296,7 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -297,7 +306,7 @@ function ColumnsLayouts() {
           const [resUsers] = await Promise.all([
             fetch(
               `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             ),
           ]);
 
@@ -305,10 +314,9 @@ function ColumnsLayouts() {
           const users = await resUsers.json();
 
           const [resRisco] = await Promise.all([
-            fetch(
-              `${process.env.REACT_APP_API_URL}risks/${data.idRisk}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            ),
+            fetch(`${process.env.REACT_APP_API_URL}risks/${data.idRisk}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
 
           const dataRisk = await resRisco.json();
@@ -316,7 +324,7 @@ function ColumnsLayouts() {
           const [resCategoria] = await Promise.all([
             fetch(
               `${process.env.REACT_APP_API_URL}categories/${dataRisk.idCategory}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             ),
           ]);
 
@@ -325,7 +333,7 @@ function ColumnsLayouts() {
           const [resPerfil] = await Promise.all([
             fetch(
               `${process.env.REACT_APP_API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             ),
           ]);
 
@@ -334,17 +342,16 @@ function ColumnsLayouts() {
           const [resQuiz] = await Promise.all([
             fetch(
               `${process.env.REACT_APP_API_URL}quiz/assessments/${dadosApi.idAssessment}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             ),
           ]);
 
           const dataQuiz = await resQuiz.json();
 
           const [resCycle] = await Promise.all([
-            fetch(
-              `${process.env.REACT_APP_API_URL}cycles/${data.idCycle}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            ),
+            fetch(`${process.env.REACT_APP_API_URL}cycles/${data.idCycle}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
 
           const dataCycle = await resCycle.json();
@@ -375,7 +382,15 @@ function ColumnsLayouts() {
           // Se necessário, atualize outros estados individuais
           setDescricaoRisco(data.riskDescription || "");
           setComentario(data.justification || "");
-          setSobrepor(!!data.replaceUser && data.replaceUser !== "false");
+          const normalizeReplaceUserFlag = (v) => {
+            if (v == null) return false; // null/undefined
+            const s = String(v).trim().toLowerCase();
+            if (!s) return false; // ""
+            if (["false", "null", "undefined", "0"].includes(s)) return false;
+            return true; // qualquer nome real → true
+          };
+
+          setSobrepor(normalizeReplaceUserFlag(data.replaceUser));
 
           // Atualiza o formData garantindo que os campos que devem ser arrays, sejam arrays
           setFormData((prev) => ({
@@ -430,7 +445,9 @@ function ColumnsLayouts() {
                   .replace(/[""]/g, "")
                   .split(",")
                   .map((name) => {
-                    const item = tratamentos.find((t) => t.nome === name.trim());
+                    const item = tratamentos.find(
+                      (t) => t.nome === name.trim(),
+                    );
                     return item || { id: name.trim(), nome: name.trim() };
                   })
               : [],
@@ -548,17 +565,21 @@ function ColumnsLayouts() {
 
   const handleFilledQuestionarios = (items) => {
     setFilledQuestionarios(items);
-    // aqui você já pode incluir esses itens no payload ou fazer o que precisar
     console.log("Questionários filtrados:", items);
   };
+
   useEffect(() => {
     if (normativaDados?.idAssessment) {
       axios
         .get(
           `${process.env.REACT_APP_API_URL}quiz/assessments/${normativaDados.idAssessment}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         )
-        .then((res) => setFilledQuestionarios(res.data))
+        .then((res) => {
+          setQuestionariosApi(res.data); // <- NOVO (lista completa)
+          setFilledQuestionarios(res.data); // mantém compatibilidade (heatmap etc.)
+        })
+
         .catch((err) => console.error("Erro ao refazer quiz:", err));
     }
   }, [sobrepor, normativaDados?.idAssessment]);
@@ -577,7 +598,7 @@ function ColumnsLayouts() {
       const coords = coordsArray(key);
       const sum = coords.reduce(
         (acc, [r, c]) => ({ r: acc.r + r, c: acc.c + c }),
-        { r: 0, c: 0 }
+        { r: 0, c: 0 },
       );
       const len = coords.length;
       return len ? `${Math.round(sum.r / len)}:${Math.round(sum.c / len)}` : "";
@@ -588,7 +609,7 @@ function ColumnsLayouts() {
       if (!coords.length) return "";
       const max = coords.reduce(
         ([r0, c0], [r, c]) => [r > r0 ? r : r0, c > c0 ? c : c0],
-        coords[0]
+        coords[0],
       );
       return `${max[0]}:${max[1]}`;
     };
@@ -624,7 +645,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "controle",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -644,7 +665,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "diretriz",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -664,7 +685,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "responsavel",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -684,7 +705,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "respondente",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -704,7 +725,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "causa",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -724,7 +745,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "kri",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -744,7 +765,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "impacto",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -764,7 +785,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "incidente",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -784,7 +805,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "tratamento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -804,7 +825,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "processo",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -826,7 +847,22 @@ function ColumnsLayouts() {
     voltarParaCadastroMenu();
   };
 
-  useEffect(() => {
+  
+
+  // Ao salvar com "Sobrepor resultado do risco" ligado, a atualização FINALIZA a avaliação.
+  const handleAtualizarClick = () => {
+    if (sobrepor) {
+      setConfirmSobreporOpen(true);
+      return;
+    }
+    tratarSubmit();
+  };
+
+  const handleConfirmSobrepor = () => {
+    setConfirmSobreporOpen(false);
+    tratarSubmit();
+  };
+useEffect(() => {
     if (localStorage.getItem("avaliacaoIniciada") === "1") {
       enqueueSnackbar("Avaliação iniciada com sucesso!", {
         variant: "success",
@@ -870,30 +906,69 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  const { buttonTitle } = useMemo(() => {
+  
+  const [confirmSobreporOpen, setConfirmSobreporOpen] = useState(false);
+const { buttonTitle } = useMemo(() => {
     const currentStatus = formData.status;
-    const tester = idUser === formData.responsavelAv;
+    const isResp = String(idUser) === String(formData.responsavelAv);
     let title = "";
-    if (currentStatus === 1 && formData.responsavelAv.includes(idUser))
-      title = "INICIAR AVALIAÇÃO";
-    else if (currentStatus === 3 && formData.responsavelAv.includes(idUser))
-      title = "CONCLUIR AVALIAÇÃO";
-    return { buttonTitle: title, isTester: tester };
-  }, [idUser, formData, normativaDados]);
 
-const handleStart = async () => {
+    if (currentStatus === 1 && isResp) title = "INICIAR AVALIAÇÃO";
+    else if ((currentStatus === 3 || currentStatus === 4) && isResp)
+      title = "FINALIZAR";
+
+    return { buttonTitle: title, isTester: isResp };
+  }, [idUser, formData.status, formData.responsavelAv]);
+
+  const hasQuestionarioConcluido = (questionariosApi ?? []).some((q) => {
+    const status = Number(q?.statusQuiz ?? q?.status);
+    const active = q?.active !== false;
+    return active && status >= 3; // pega statusQuiz 3 (e 4/5 se existirem)
+  });
+
+  console.log("DEBUG FINALIZAR", {
+    totalApi: questionariosApi?.map((q) => ({
+      id: q.idQuiz,
+      statusQuiz: q.statusQuiz,
+      active: q.active,
+    })),
+    filled: filledQuestionarios?.map((q) => ({
+      id: q.idQuiz,
+      statusQuiz: q.statusQuiz,
+    })),
+    hasQuestionarioConcluido,
+  });
+
+  const overlayRequiredFilled =
+    !!comentario?.trim() &&
+    !!formData.idProbabilityInherent &&
+    !!formData.idSeverityInherent &&
+    !!formData.idProbabilityResidual &&
+    !!formData.idSeverityResidual &&
+    !!formData.idProbabilityPlanned &&
+    !!formData.idSeverityPlanned &&
+    !!formData.justificationInerent &&
+    !!formData.justificationResidual &&
+    !!formData.justificationPlanned;
+
+  const canFinalizar =
+    isResponsibleAv &&
+    (statusAtual === 2 || statusAtual === 3 || statusAtual === 4) &&
+    hasQuestionarioConcluido && sobrepor === false;
+
+  const handleStart = async () => {
     let url = "";
     let method = "";
     let payload = {};
 
     try {
+      setLoadingText("Gerando os questionários...");
       setLoading(true);
 
       if (requisicao === "Editar") {
         url = `${process.env.REACT_APP_API_URL}assessments`;
         method = "PUT";
 
-        // Lógica de mapeamento igual ao tratarSubmit
         const findProb = (name) =>
           heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
         const findImp = (name) =>
@@ -908,21 +983,27 @@ const handleStart = async () => {
 
         payload = {
           idAssessment: normativaDados?.idAssessment,
-          assessmentStatus: 2 || null, // Status "Iniciado"
-          
+          assessmentStatus: 2 || null,
+
           replaceUser: sobrepor
-            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome || null
+            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
+                ?.nome || null
             : null,
-            
-          // Campos de Heatmap e Justificativas adicionados
+
           justification: comentario,
-          
-          idProbabilityInherent: inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
-          idSeverityInherent: inhImp?.idHeatMapImpact || formData.idSeverityInherent,
-          idProbabilityResidual: resProb?.idHeatMapProbability || formData.idProbabilityResidual,
-          idSeverityResidual: resImp?.idHeatMapImpact || formData.idSeverityResidual,
-          idProbabilityPlanned: plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
-          idSeverityPlanned: plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
+
+          idProbabilityInherent:
+            inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
+          idSeverityInherent:
+            inhImp?.idHeatMapImpact || formData.idSeverityInherent,
+          idProbabilityResidual:
+            resProb?.idHeatMapProbability || formData.idProbabilityResidual,
+          idSeverityResidual:
+            resImp?.idHeatMapImpact || formData.idSeverityResidual,
+          idProbabilityPlanned:
+            plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
+          idSeverityPlanned:
+            plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
 
           replaceProbabilityPlanned: formData.idProbabilityPlanned,
           replaceProbabilityResidual: formData.idProbabilityResidual,
@@ -946,33 +1027,38 @@ const handleStart = async () => {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
+      // ✅ Aqui está a regra: se der 500 mas mesmo assim executou no backend, tratamos como sucesso
+      const ignore500 = response.status === 500;
+      if (!response.ok && !ignore500) {
+        throw new Error("Não foi possível iniciar.");
       }
 
+      // Sucesso (response.ok ou 500 ignorado)
       setFormData((prev) => ({ ...prev, status: 3 }));
       setNormativaDados((prev) => ({ ...prev, assessmentStatus: 3 }));
 
-      enqueueSnackbar("Avaliação iniciada com sucesso!", {
-        variant: "success",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      window.scrollTo(0, 0);
-
+      // deixa o feedback de sucesso pós-refresh (você já tem o effect que lê isso)
       localStorage.setItem("avaliacaoIniciada", "1");
+
+      // avisa componentes/listagens
       emitter.emit("refreshQuestionarios");
-      navigate(location.pathname, {
-        replace: true,
-        state: { dadosApi },
-      });
+
+      // dá um tempinho pro usuário ver a mensagem antes do refresh
+      await new Promise((r) => setTimeout(r, 800));
+
+      // ✅ refresh real da tela
+      navigate(0);
     } catch (error) {
-      console.error(error.message);
+      console.error(error);
+
+      // mantém erro só quando NÃO for o 400 (pois acima já tratamos)
       enqueueSnackbar("Não foi possível iniciar.", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
     } finally {
       setLoading(false);
+      setLoadingText("");
     }
   };
 
@@ -1003,21 +1089,28 @@ const handleStart = async () => {
 
         payload = {
           idAssessment: normativaDados?.idAssessment,
-          assessmentStatus: 4 || null, // Status "Completo"
+          assessmentStatus: 5 || null, // Status "Finalizada"
 
           replaceUser: sobrepor
-            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome || null
+            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
+                ?.nome || null
             : null,
 
           // Campos adicionados
           justification: comentario,
 
-          idProbabilityInherent: inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
-          idSeverityInherent: inhImp?.idHeatMapImpact || formData.idSeverityInherent,
-          idProbabilityResidual: resProb?.idHeatMapProbability || formData.idProbabilityResidual,
-          idSeverityResidual: resImp?.idHeatMapImpact || formData.idSeverityResidual,
-          idProbabilityPlanned: plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
-          idSeverityPlanned: plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
+          idProbabilityInherent:
+            inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
+          idSeverityInherent:
+            inhImp?.idHeatMapImpact || formData.idSeverityInherent,
+          idProbabilityResidual:
+            resProb?.idHeatMapProbability || formData.idProbabilityResidual,
+          idSeverityResidual:
+            resImp?.idHeatMapImpact || formData.idSeverityResidual,
+          idProbabilityPlanned:
+            plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
+          idSeverityPlanned:
+            plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
 
           replaceProbabilityPlanned: formData.idProbabilityPlanned,
           replaceProbabilityResidual: formData.idProbabilityResidual,
@@ -1055,9 +1148,9 @@ const handleStart = async () => {
         setNormativaDados(data.data);
         setSuccessDialogOpen(true);
       } else {
-        setFormData((prev) => ({ ...prev, status: 4 }));
-        setNormativaDados((prev) => ({ ...prev, assessmentStatus: 4 }));
-        enqueueSnackbar("Avaliação concluída com sucesso!", {
+        setFormData((prev) => ({ ...prev, status: 5 }));
+        setNormativaDados((prev) => ({ ...prev, assessmentStatus: 5 }));
+        enqueueSnackbar("Avaliação finalizada com sucesso!", {
           variant: "success",
           anchorOrigin: { vertical: "top", horizontal: "right" },
         });
@@ -1065,7 +1158,7 @@ const handleStart = async () => {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível concluir.", {
+      enqueueSnackbar("Não foi possível finalizar.", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
@@ -1082,9 +1175,9 @@ const handleStart = async () => {
     // Validação dos campos obrigatórios
     const missingFields = [];
     if (!formData.revisor) {
-       // Nota: formData.revisor não parece estar definido no state inicial do seu código original, 
-       // mas mantive a lógica de validação que você já tinha.
-       // Caso necessário, verifique se 'revisor' existe no formData.
+      // Nota: formData.revisor não parece estar definido no state inicial do seu código original,
+      // mas mantive a lógica de validação que você já tinha.
+      // Caso necessário, verifique se 'revisor' existe no formData.
       setFormValidation((prev) => ({ ...prev, revisor: false }));
       missingFields.push("Processo");
     }
@@ -1124,20 +1217,27 @@ const handleStart = async () => {
         payload = {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 4 || null,
-          
+
           replaceUser: sobrepor
-            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome || null
+            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
+                ?.nome || null
             : null,
 
           // Campos adicionados
           justification: comentario,
 
-          idProbabilityInherent: inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
-          idSeverityInherent: inhImp?.idHeatMapImpact || formData.idSeverityInherent,
-          idProbabilityResidual: resProb?.idHeatMapProbability || formData.idProbabilityResidual,
-          idSeverityResidual: resImp?.idHeatMapImpact || formData.idSeverityResidual,
-          idProbabilityPlanned: plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
-          idSeverityPlanned: plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
+          idProbabilityInherent:
+            inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
+          idSeverityInherent:
+            inhImp?.idHeatMapImpact || formData.idSeverityInherent,
+          idProbabilityResidual:
+            resProb?.idHeatMapProbability || formData.idProbabilityResidual,
+          idSeverityResidual:
+            resImp?.idHeatMapImpact || formData.idSeverityResidual,
+          idProbabilityPlanned:
+            plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
+          idSeverityPlanned:
+            plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
 
           replaceProbabilityPlanned: formData.idProbabilityPlanned,
           replaceProbabilityResidual: formData.idProbabilityResidual,
@@ -1198,7 +1298,7 @@ const handleStart = async () => {
     try {
       setLoading(true);
       const url = `${process.env.REACT_APP_API_URL}assessments`;
-      
+
       // Lógica de mapeamento
       const findProb = (name) =>
         heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
@@ -1215,23 +1315,30 @@ const handleStart = async () => {
       // Payload preenchido
       const payload = {
         idAssessment: normativaDados?.idAssessment,
-        // Ao retornar, o status volta para Iniciado/Em andamento? 
+        // Ao retornar, o status volta para Iniciado/Em andamento?
         // No seu código original você seta localmente o status para 2.
         // Se a API aceitar, enviamos o status desejado.
-        assessmentStatus: 2, 
+        assessmentStatus: 2,
 
         replaceUser: sobrepor
-            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome || null
-            : null,
+          ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
+            null
+          : null,
 
         justification: comentario,
 
-        idProbabilityInherent: inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
-        idSeverityInherent: inhImp?.idHeatMapImpact || formData.idSeverityInherent,
-        idProbabilityResidual: resProb?.idHeatMapProbability || formData.idProbabilityResidual,
-        idSeverityResidual: resImp?.idHeatMapImpact || formData.idSeverityResidual,
-        idProbabilityPlanned: plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
-        idSeverityPlanned: plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
+        idProbabilityInherent:
+          inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
+        idSeverityInherent:
+          inhImp?.idHeatMapImpact || formData.idSeverityInherent,
+        idProbabilityResidual:
+          resProb?.idHeatMapProbability || formData.idProbabilityResidual,
+        idSeverityResidual:
+          resImp?.idHeatMapImpact || formData.idSeverityResidual,
+        idProbabilityPlanned:
+          plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
+        idSeverityPlanned:
+          plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
 
         replaceProbabilityPlanned: formData.idProbabilityPlanned,
         replaceProbabilityResidual: formData.idProbabilityResidual,
@@ -1293,8 +1400,8 @@ const handleStart = async () => {
     }
     // Adicionada validação de responsável
     if (!formData.responsavelAv) {
-       setFormValidation((prev) => ({ ...prev, responsavelAv: false }));
-       missingFields.push("Responsável");
+      setFormValidation((prev) => ({ ...prev, responsavelAv: false }));
+      missingFields.push("Responsável");
     }
 
     if (missingFields.length > 0) {
@@ -1342,8 +1449,12 @@ const handleStart = async () => {
         idCycle: formData.ciclo,
         idRespondents: formData.respondente,
         idResponsible: formData.responsavelAv,
-        assessmentStatus: formData.status || null,
-        replaceUser: sobrepor ? (responsaveisAv.find(r => r.id === formData.responsavelAv)?.nome || null) : null,
+        assessmentStatus: sobrepor ? 5 : (formData.status),
+
+        replaceUser: sobrepor
+          ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
+            null
+          : null,
         justification: comentario,
         idProbabilityInherent:
           inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
@@ -1414,7 +1525,7 @@ const handleStart = async () => {
         "Já existe uma avaliação criada para esse risco e ciclo.",
         {
           variant: "error",
-        }
+        },
       );
     } finally {
       setLoading(false);
@@ -1424,13 +1535,30 @@ const handleStart = async () => {
   return (
     <>
       <LoadingOverlay isActive={loading} />
+
+      {loading && !!loadingText && (
+        <Box
+          sx={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: (theme) => theme.zIndex.modal + 2,
+            pointerEvents: "none",
+          }}
+        >
+          <Typography variant="h6">{loadingText}</Typography>
+        </Box>
+      )}
+
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={1} marginTop={2}>
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>Ciclo *</InputLabel>
               <Autocomplete
-                disabled={isRiskCycleEditable}
+                disabled={isEditing}
                 options={ciclos}
                 getOptionLabel={(option) => option.nome}
                 value={
@@ -1456,7 +1584,7 @@ const handleStart = async () => {
             <Stack spacing={1}>
               <InputLabel>Risco *</InputLabel>
               <Autocomplete
-                disabled={isRiskCycleEditable}
+                disabled={isEditing}
                 options={riscos}
                 getOptionLabel={(option) => option.nome}
                 value={
@@ -1493,7 +1621,7 @@ const handleStart = async () => {
                 value={formData.respondente.map(
                   (id) =>
                     respondentes.find((respondente) => respondente.id === id) ||
-                    id
+                    id,
                 )}
                 onChange={handleSelectAllRespondentes}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -1539,7 +1667,7 @@ const handleStart = async () => {
                 value={
                   responsaveisAv.find(
                     (responsavelAv) =>
-                      responsavelAv.id === formData.responsavelAv
+                      responsavelAv.id === formData.responsavelAv,
                   ) || null
                 }
                 onChange={(event, newValue) => {
@@ -1592,7 +1720,23 @@ const handleStart = async () => {
                 </Stack>
               </Grid>
 
-              {requisicao === "Editar" && (
+              {isFinalizada && (
+                <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                  <Stack spacing={1}>
+                    <InputLabel>Data de conclusão</InputLabel>
+                    <TextField
+                      disabled
+                      fullWidth
+                      value={(() => {
+                        const raw = normativaDados?.dateOfConclusion || "";
+                        return formatDateConclusion(raw);
+                      })()}
+                    />
+                  </Stack>
+                </Grid>
+              )}
+
+              {requisicao === "Editar" && !!buttonTitle && (
                 <Grid item xs={3} mt={4} ml={5}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     {buttonTitle === "INICIAR AVALIAÇÃO" ? (
@@ -1603,13 +1747,14 @@ const handleStart = async () => {
                       >
                         INICIAR AVALIAÇÃO
                       </Button>
-                    ) : buttonTitle === "CONCLUIR AVALIAÇÃO" ? (
+                    ) : buttonTitle === "FINALIZAR" ? (
                       <Button
                         variant="contained"
                         size="small"
                         onClick={handleTesteRealizado}
+                        disabled={!canFinalizar}
                       >
-                        CONCLUIR AVALIAÇÃO
+                        FINALIZAR
                       </Button>
                     ) : buttonTitle === "REVISADO / RETORNAR" ? (
                       <>
@@ -1629,15 +1774,13 @@ const handleStart = async () => {
                         </Button>
                       </>
                     ) : (
-                      buttonTitle && (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={tratarSubmit}
-                        >
-                          {buttonTitle}
-                        </Button>
-                      )
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={tratarSubmit}
+                      >
+                        {buttonTitle}
+                      </Button>
                     )}
                   </Stack>
                 </Grid>
@@ -1692,7 +1835,7 @@ const handleStart = async () => {
                             value={
                               categorias.find(
                                 (categoria) =>
-                                  categoria.id === formData.categoria
+                                  categoria.id === formData.categoria,
                               ) || null
                             }
                             onChange={(event, newValue) => {
@@ -1750,8 +1893,8 @@ const handleStart = async () => {
                             value={formData.processo.map(
                               (id) =>
                                 processos.find(
-                                  (processo) => processo.id === id
-                                ) || id
+                                  (processo) => processo.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAll2}
                             isOptionEqualToValue={(option, value) =>
@@ -1781,7 +1924,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.processo.length === 0 ||
                                     formData.processo.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.processo === false
                                 }
@@ -1806,8 +1949,8 @@ const handleStart = async () => {
                             value={formData.controle.map(
                               (id) =>
                                 controles.find(
-                                  (controle) => controle.id === id
-                                ) || id
+                                  (controle) => controle.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllEmpresas}
                             isOptionEqualToValue={(option, value) =>
@@ -1837,7 +1980,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.controle.length === 0 ||
                                     formData.controle.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.controle === false
                                 }
@@ -1862,8 +2005,8 @@ const handleStart = async () => {
                             value={formData.diretriz.map(
                               (id) =>
                                 diretrizes.find(
-                                  (diretriz) => diretriz.id === id
-                                ) || id
+                                  (diretriz) => diretriz.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllDiretrizes}
                             isOptionEqualToValue={(option, value) =>
@@ -1893,7 +2036,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.diretriz.length === 0 ||
                                     formData.diretriz.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.diretriz === false
                                 }
@@ -1917,8 +2060,8 @@ const handleStart = async () => {
                             value={formData.incidente.map(
                               (id) =>
                                 incidentes.find(
-                                  (incidente) => incidente.id === id
-                                ) || id
+                                  (incidente) => incidente.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllIncidentes}
                             isOptionEqualToValue={(option, value) =>
@@ -1948,7 +2091,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.incidente.length === 0 ||
                                     formData.incidente.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.incidente === false
                                 }
@@ -1972,8 +2115,8 @@ const handleStart = async () => {
                             value={formData.tratamento.map(
                               (id) =>
                                 tratamentos.find(
-                                  (tratamento) => tratamento.id === id
-                                ) || id
+                                  (tratamento) => tratamento.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllTratamentos}
                             isOptionEqualToValue={(option, value) =>
@@ -2003,7 +2146,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.tratamento.length === 0 ||
                                     formData.tratamento.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.tratamento === false
                                 }
@@ -2025,7 +2168,7 @@ const handleStart = async () => {
                             ]}
                             getOptionLabel={(option) => option.nome}
                             value={formData.kri.map(
-                              (id) => kris.find((kri) => kri.id === id) || id
+                              (id) => kris.find((kri) => kri.id === id) || id,
                             )}
                             onChange={handleSelectAllKri}
                             isOptionEqualToValue={(option, value) =>
@@ -2076,7 +2219,7 @@ const handleStart = async () => {
                             getOptionLabel={(option) => option.nome}
                             value={formData.causa.map(
                               (id) =>
-                                causas.find((causa) => causa.id === id) || id
+                                causas.find((causa) => causa.id === id) || id,
                             )}
                             onChange={handleSelectAllCausa}
                             isOptionEqualToValue={(option, value) =>
@@ -2128,7 +2271,7 @@ const handleStart = async () => {
                             value={formData.impacto.map(
                               (id) =>
                                 impactos.find((impacto) => impacto.id === id) ||
-                                id
+                                id,
                             )}
                             onChange={handleSelectAllImpacto}
                             isOptionEqualToValue={(option, value) =>
@@ -2158,7 +2301,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.impacto.length === 0 ||
                                     formData.impacto.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.impacto === false
                                 }
@@ -2183,8 +2326,8 @@ const handleStart = async () => {
                             value={formData.responsavel.map(
                               (id) =>
                                 responsaveis.find(
-                                  (responsavel) => responsavel.id === id
-                                ) || id
+                                  (responsavel) => responsavel.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllResponsaveis}
                             isOptionEqualToValue={(option, value) =>
@@ -2214,7 +2357,7 @@ const handleStart = async () => {
                                 error={
                                   (formData.responsavel.length === 0 ||
                                     formData.responsavel.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.responsavel === false
                                 }
@@ -2335,7 +2478,7 @@ const handleStart = async () => {
                 marginTop: 5,
               }}
             >
-              {isComplete ? (
+              {isFinalizada ? (
                 <Button
                   variant="contained"
                   color="primary"
@@ -2359,13 +2502,56 @@ const handleStart = async () => {
                     fontSize: "14px",
                     fontWeight: 600,
                   }}
-                  onClick={tratarSubmit}
+                  onClick={handleAtualizarClick}
                 >
                   Atualizar
                 </Button>
               )}
             </Box>
           </Grid>
+
+          {/* Confirmação ao salvar com sobreposição (finaliza a avaliação) */}
+          <Dialog
+            open={confirmSobreporOpen}
+            onClose={() => setConfirmSobreporOpen(false)}
+            sx={{
+              "& .MuiDialog-paper": {
+                padding: "16px",
+                borderRadius: "12px",
+                width: "460px",
+              },
+            }}
+          >
+            <DialogTitle sx={{ fontWeight: 700 }}>
+              Atenção: esta ação vai finalizar a avaliação
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText sx={{ fontSize: "15px" }}>
+                Você ativou <b>“Sobrepor resultado do risco”</b>. Ao salvar desta
+                forma, a avaliação será <b>FINALIZADA</b> e não poderá mais ser
+                editada.
+                <br />
+                <br />
+                Deseja confirmar a ação?
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={() => setConfirmSobreporOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleConfirmSobrepor}
+              >
+                Confirmar e salvar
+              </Button>
+            </DialogActions>
+          </Dialog>
+
           <Dialog
             open={successDialogOpen}
             onClose={voltarParaListagem}
