@@ -859,24 +859,6 @@ function ReactTable({
             </Grid>
 
             {}
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                KRIs
-              </InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={krisOptions}
-                  value={draftFilters.kris}
-                  onChange={(event, value) =>
-                    setDraftFilters((prev) => ({ ...prev, kris: value }))
-                  }
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-
             {}
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
