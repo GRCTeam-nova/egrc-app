@@ -1,8 +1,6 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import * as React from "react";
 import {
   Accordion,
-  AccordionActions,
   AccordionDetails,
   AccordionSummary,
   Button,
@@ -16,8 +14,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  Typography,
-  Switch,
   DialogContentText,
   DialogTitle,
 } from "@mui/material";
@@ -26,32 +22,26 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 import { DatePicker } from "@mui/x-date-pickers";
-import HeatmapAvaliacaoRisco from "./avaliacaoRiscoGrafico";
 import HeatmapAvaliacaoRiscoQuestionario from "./avaliacaoRiscoGraficoQuestionario";
-import HeatmapAvaliacaoRiscoFixo from "./avaliacaoRiscoGraficoFixo";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ListagemAcionistas from "./listaQuestionarios";
-// ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { dadosApi } = location.state || {};
-  const [sobrepor, setSobrepor] = useState(false);
+  const { dadosApi, readOnly: readOnlyFromState, mode } = location.state || {};
+  const isReadOnly = Boolean(readOnlyFromState) || mode === "consultar";
   const [controles, setControle] = useState([]);
   const [diretrizes, setDiretriz] = useState([]);
   const [incidentes, setIncidente] = useState([]);
   const [responsaveis, setResponsaveis] = useState([]);
-  const [responsaveisAv, setResponsaveisAv] = useState([]);
   const [tratamentos, setTratamentos] = useState([]);
-  const [respondentes, setRespondentes] = useState([]);
   const [causas, setCausa] = useState([]);
   const [kris, setKris] = useState([]);
   const [inherentCoord, setInherentCoord] = React.useState("");
@@ -64,21 +54,18 @@ function ColumnsLayouts() {
   const [heatmapDataAv, setHeatmapData] = useState([]);
   const [nivelAv, setNivelAv] = useState([]);
   const [descricaoDoRisco, setDescricaoRisco] = useState("");
-  const [justificativa, setJustificativa] = useState("");
-  const [comentario, setComentario] = useState("");
   const [si, setSi] = useState({ prob: null, impact: null });
   const [sr, setSr] = useState({ prob: null, impact: null });
   const [sp, setSp] = useState({ prob: null, impact: null });
   const [ciclos, setCiclo] = useState([]);
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
-  const [mensagemFeedback, setMensagemFeedback] = useState("cadastrada");
   const [normativaDados, setNormativaDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [justificativaFilho, setJustificativaFilho] = useState("");
 
-  // handler genérico (já existe algo parecido para coords)
   const handleJustificativaChange = (novaJust) => {
+    if (isReadOnly) return;
     setJustificativaFilho(novaJust);
   };
   const [statuss] = useState([
@@ -132,7 +119,6 @@ function ColumnsLayouts() {
         },
       });
 
-      // Transformando os dados para alterar idRisk, idLedgerAccount e idProcess -> id, e name -> nome
       const transformedData = response.data.map((item) => ({
         id:
           item.idRisk ||
@@ -160,7 +146,7 @@ function ColumnsLayouts() {
           item.idStrategicGuideline ||
           item.idDeficiency,
         nome: item.name,
-        ...item, // Mantém os outros campos intactos
+        ...item,
       }));
 
       setState(transformedData);
@@ -170,60 +156,35 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}categories`,
-      setCategorias
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}categories`, setCategorias);
     fetchData(`${process.env.REACT_APP_API_URL}cycles`, setCiclo);
+
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setRespondentes
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsaveis
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsaveisAv
+      setResponsaveis,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}risks/treatments`,
-      setTratamentos
+      setTratamentos,
     );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}risks/causes`,
-      setCausa
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}risks/impacts`,
-      setImpactos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}risks/causes`, setCausa);
+    fetchData(`${process.env.REACT_APP_API_URL}risks/impacts`, setImpactos);
     fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
-    fetchData(
-      `${process.env.REACT_APP_API_URL}controls`,
-      setControle
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}controls`, setControle);
     fetchData(
       `${process.env.REACT_APP_API_URL}risks/strategic-guidelines`,
-      setDiretriz
+      setDiretriz,
     );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}incidents`,
-      setIncidente
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}incidents`, setIncidente);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
     fetchData(
       `${process.env.REACT_APP_API_URL}risks?onlyWithAnalisysProfile=true`,
-      setRiscos
+      setRiscos,
     );
     window.scrollTo(0, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Em caso de edição
   useEffect(() => {
     if (dadosApi && dadosApi.idAssessment) {
       const fetchAssessmentDados = async () => {
@@ -234,28 +195,19 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
             throw new Error("Erro ao buscar os dados de avaliações");
           }
 
-          const [resUsers] = await Promise.all([
-            fetch(
-              `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            ),
-          ]);
-
           const data = await response.json();
-          const users = await resUsers.json();
 
           const [resRisco] = await Promise.all([
-            fetch(
-              `${process.env.REACT_APP_API_URL}risks/${data.idRisk}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            ),
+            fetch(`${process.env.REACT_APP_API_URL}risks/${data.idRisk}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
 
           const dataRisk = await resRisco.json();
@@ -263,7 +215,7 @@ function ColumnsLayouts() {
           const [resCategoria] = await Promise.all([
             fetch(
               `${process.env.REACT_APP_API_URL}categories/${dataRisk.idCategory}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             ),
           ]);
 
@@ -272,22 +224,19 @@ function ColumnsLayouts() {
           const [resPerfil] = await Promise.all([
             fetch(
               `${process.env.REACT_APP_API_URL}analisys-profile/${dataCategory.idAnalysisProfile}`,
-              { headers: { Authorization: `Bearer ${token}` } }
+              { headers: { Authorization: `Bearer ${token}` } },
             ),
           ]);
 
           const dataProfile = await resPerfil.json();
 
           const [resQuestionario] = await Promise.all([
-            fetch(
-              ` ${process.env.REACT_APP_API_URL}quiz/${dadosApi.idQuiz}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            ),
+            fetch(` ${process.env.REACT_APP_API_URL}quiz/${dadosApi.idQuiz}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
           ]);
 
           const dataQuiz = await resQuestionario.json();
-          // -------------------------------------------------------
-          // 1) Preenche os IDs de probabilidade e impacto:
           setSi({
             prob: dataQuiz.idProbabilityInherent,
             impact: dataQuiz.idSeverityInherent,
@@ -301,43 +250,20 @@ function ColumnsLayouts() {
             impact: dataQuiz.idSeverityPlanned,
           });
 
-          // 2) Preenche também as coordenadas de justificativa:
           setInherentCoord(dataQuiz.coordinateInerent);
           setResidualCoord(dataQuiz.coordinateResidual);
           setPlannedCoord(dataQuiz.coordinatePlanned);
           setJustificativaFilho(dataQuiz.justification);
-          // -------------------------------------------------------
 
           setHeatmapData(dataProfile.heatMap || []);
           setNivelAv(dataProfile.assessmentLevel || []);
 
-          const respondentNames = data.respondents
-            ? data.respondents
-                .replace(/['"]/g, "")
-                .split(",")
-                .map((n) => n.trim())
-            : [];
-
-          const respondenteIds = respondentNames
-            .map((name) => {
-              const userObj = users.find((u) => u.name === name);
-              return userObj?.idCollaborator ?? null;
-            })
-            .filter((id) => id);
-
           setRequisicao("Editar");
-          setMensagemFeedback("editada");
 
-          // Se necessário, atualize outros estados individuais
           setDescricaoRisco(data.riskDescription || "");
-          setComentario(data.justification || "");
-          setSobrepor(data.replaceUser || false);
-
-          // Atualiza o formData garantindo que os campos que devem ser arrays, sejam arrays
           setFormData((prev) => ({
             ...prev,
             status: dadosApi.statusQuiz || null,
-            // Para campos que devem ser arrays, utiliza um fallback para []
             categoria: dataRisk.idCategory || null,
             dataIdentificacao: data.identificationDate
               ? new Date(data.identificationDate)
@@ -411,10 +337,8 @@ function ColumnsLayouts() {
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "prioridade") {
-      // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
-      // Para outros campos
       setFormData({ ...formData, [field]: value });
     }
   };
@@ -422,10 +346,8 @@ function ColumnsLayouts() {
   const handleSelectAllEmpresas = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.controle.length === controles.length) {
-        // Deselect all
         setFormData({ ...formData, controle: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           controle: controles.map((controle) => controle.id),
@@ -434,7 +356,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "controle",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -442,10 +364,8 @@ function ColumnsLayouts() {
   const handleSelectAllDiretrizes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.diretriz.length === diretrizes.length) {
-        // Deselect all
         setFormData({ ...formData, diretriz: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           diretriz: diretrizes.map((diretriz) => diretriz.id),
@@ -454,7 +374,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "diretriz",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -462,10 +382,8 @@ function ColumnsLayouts() {
   const handleSelectAllResponsaveis = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.responsavel.length === responsaveis.length) {
-        // Deselect all
         setFormData({ ...formData, responsavel: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           responsavel: responsaveis.map((responsavel) => responsavel.id),
@@ -474,7 +392,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "responsavel",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -482,10 +400,8 @@ function ColumnsLayouts() {
   const handleSelectAllCausa = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.causa.length === causas.length) {
-        // Deselect all
         setFormData({ ...formData, causa: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           causa: causas.map((causa) => causa.id),
@@ -494,7 +410,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "causa",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -502,10 +418,8 @@ function ColumnsLayouts() {
   const handleSelectAllKri = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.kri.length === kris.length) {
-        // Deselect all
         setFormData({ ...formData, kri: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           kri: kris.map((kri) => kri.id),
@@ -514,7 +428,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "kri",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -522,10 +436,8 @@ function ColumnsLayouts() {
   const handleSelectAllImpacto = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.impacto.length === impactos.length) {
-        // Deselect all
         setFormData({ ...formData, impacto: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           impacto: impactos.map((impacto) => impacto.id),
@@ -534,7 +446,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "impacto",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -542,10 +454,8 @@ function ColumnsLayouts() {
   const handleSelectAllIncidentes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.incidente.length === incidentes.length) {
-        // Deselect all
         setFormData({ ...formData, incidente: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           incidente: incidentes.map((incidente) => incidente.id),
@@ -554,7 +464,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "incidente",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -562,10 +472,8 @@ function ColumnsLayouts() {
   const handleSelectAllTratamentos = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.tratamento.length === tratamentos.length) {
-        // Deselect all
         setFormData({ ...formData, tratamento: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           tratamento: tratamentos.map((tratamento) => tratamento.id),
@@ -574,7 +482,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "tratamento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -582,10 +490,8 @@ function ColumnsLayouts() {
   const handleSelectAll2 = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.processo.length === processos.length) {
-        // Deselect all
         setFormData({ ...formData, processo: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           processo: processos.map((processo) => processo.id),
@@ -594,7 +500,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "processo",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -602,7 +508,6 @@ function ColumnsLayouts() {
   const voltarParaCadastroMenu = () => {
     navigate(-1);
     window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
   const continuarEdicao = () => {
@@ -610,7 +515,6 @@ function ColumnsLayouts() {
     setSuccessDialogOpen(false);
   };
 
-  // Função para voltar para a listagem
   const voltarParaListagem = () => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
@@ -649,37 +553,29 @@ function ColumnsLayouts() {
     formData.responsavel.length === responsaveis.length &&
     responsaveis.length > 0;
 
-  const isComplete = formData.status === 3;
-  const AvConcluida = localStorage.getItem("AvConcluida");
-
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const idUser = localStorage.getItem("id_user");
-
-  const { buttonTitle } = useMemo(() => {
-    const currentStatus = formData.status;
-    const tester = idUser === formData.respondente;
-    let title = "";
-    if (currentStatus === 1 && formData.respondente.includes(idUser))
-      title = "INICIAR";
-    else if (currentStatus === 2 && formData.respondente.includes(idUser))
-      title = "CONCLUIR";
-
-    return { buttonTitle: title, isTester: tester };
-  }, [idUser, formData, normativaDados]);
 
   const idQuiz = dadosApi?.idQuiz || normativaDados?.idQuiz;
 
   const tratarSubmit = async () => {
+    if (isReadOnly) {
+      enqueueSnackbar(
+        "Este questionário está em modo consulta e não pode ser alterado.",
+        {
+          variant: "info",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
     const missingFields = [];
     if (!si.prob || !si.impact) {
       missingFields.push("Probabilidade e Impacto Inerente");
     }
-    // 2. Validação do Risco Residual (condicional ao nível)
     if (nivelAv >= 2 && (!sr.prob || !sr.impact)) {
       missingFields.push("Probabilidade e Impacto Residual");
     }
 
-    // 3. Validação do Risco Planejado (condicional ao nível)
     if (nivelAv >= 3 && (!sp.prob || !sp.impact)) {
       missingFields.push("Probabilidade e Impacto Planejado");
     }
@@ -694,9 +590,9 @@ function ColumnsLayouts() {
         {
           variant: "error",
           anchorOrigin: { vertical: "top", horizontal: "right" },
-        }
+        },
       );
-      return; // interrompe o submit
+      return;
     }
     const payloadAnswer = {
       idQuiz,
@@ -712,7 +608,6 @@ function ColumnsLayouts() {
       justification: justificativaFilho,
     };
 
-    // O payload completo para o PUT em /quiz
     const payloadUpdate = {
       ...payloadAnswer,
       active: true,
@@ -721,22 +616,18 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
 
-      // 1) Responde ao quiz
       await axios.put(
         `${process.env.REACT_APP_API_URL}quiz/answer`,
         payloadAnswer,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       enqueueSnackbar("Questionário respondido com sucesso!", {
         variant: "success",
       });
 
-      // 2) Atualiza o quiz (ativa + mantém todas as outras infos)
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}quiz`,
-        payloadUpdate,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.put(`${process.env.REACT_APP_API_URL}quiz`, payloadUpdate, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       enqueueSnackbar("Questionário ativado com sucesso!", {
         variant: "success",
       });
@@ -845,7 +736,6 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              
               {formData.status === 3 && (
                 <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                   <Stack spacing={1}>
@@ -864,27 +754,28 @@ function ColumnsLayouts() {
                           normativaDados?.finished_at ||
                           "";
                         if (!raw) return "";
+
                         const s = String(raw);
+
                         const mm = s.match(
-                          /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/
+                          /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/,
                         );
-                        if (mm)
-                          return `${mm[3]}-${mm[2]}-${mm[1]} ${mm[4]}-${mm[5]}`;
+                        if (mm) return `${mm[3]}-${mm[2]}-${mm[1]}`;
+
                         const d = new Date(raw);
                         if (Number.isNaN(d.getTime())) return String(raw);
+
                         const pad = (n) => String(n).padStart(2, "0");
                         return `${pad(d.getDate())}-${pad(
-                          d.getMonth() + 1
-                        )}-${d.getFullYear()} ${pad(d.getHours())}-${pad(
-                          d.getMinutes()
-                        )}`;
+                          d.getMonth() + 1,
+                        )}-${d.getFullYear()}`;
                       })()}
                     />
                   </Stack>
                 </Grid>
               )}
 
-<Grid item xs={12} sx={{ paddingBottom: 3 }}>
+              <Grid item xs={12} sx={{ paddingBottom: 3 }}>
                 <Accordion>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     Dados do risco
@@ -916,7 +807,7 @@ function ColumnsLayouts() {
                             value={
                               categorias.find(
                                 (categoria) =>
-                                  categoria.id === formData.categoria
+                                  categoria.id === formData.categoria,
                               ) || null
                             }
                             onChange={(event, newValue) => {
@@ -974,8 +865,8 @@ function ColumnsLayouts() {
                             value={formData.processo.map(
                               (id) =>
                                 processos.find(
-                                  (processo) => processo.id === id
-                                ) || id
+                                  (processo) => processo.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAll2}
                             isOptionEqualToValue={(option, value) =>
@@ -1005,7 +896,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.processo.length === 0 ||
                                     formData.processo.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.processo === false
                                 }
@@ -1030,8 +921,8 @@ function ColumnsLayouts() {
                             value={formData.controle.map(
                               (id) =>
                                 controles.find(
-                                  (controle) => controle.id === id
-                                ) || id
+                                  (controle) => controle.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllEmpresas}
                             isOptionEqualToValue={(option, value) =>
@@ -1061,7 +952,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.controle.length === 0 ||
                                     formData.controle.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.controle === false
                                 }
@@ -1086,8 +977,8 @@ function ColumnsLayouts() {
                             value={formData.diretriz.map(
                               (id) =>
                                 diretrizes.find(
-                                  (diretriz) => diretriz.id === id
-                                ) || id
+                                  (diretriz) => diretriz.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllDiretrizes}
                             isOptionEqualToValue={(option, value) =>
@@ -1117,7 +1008,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.diretriz.length === 0 ||
                                     formData.diretriz.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.diretriz === false
                                 }
@@ -1141,8 +1032,8 @@ function ColumnsLayouts() {
                             value={formData.incidente.map(
                               (id) =>
                                 incidentes.find(
-                                  (incidente) => incidente.id === id
-                                ) || id
+                                  (incidente) => incidente.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllIncidentes}
                             isOptionEqualToValue={(option, value) =>
@@ -1172,7 +1063,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.incidente.length === 0 ||
                                     formData.incidente.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.incidente === false
                                 }
@@ -1196,8 +1087,8 @@ function ColumnsLayouts() {
                             value={formData.tratamento.map(
                               (id) =>
                                 tratamentos.find(
-                                  (tratamento) => tratamento.id === id
-                                ) || id
+                                  (tratamento) => tratamento.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllTratamentos}
                             isOptionEqualToValue={(option, value) =>
@@ -1227,7 +1118,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.tratamento.length === 0 ||
                                     formData.tratamento.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.tratamento === false
                                 }
@@ -1249,7 +1140,7 @@ function ColumnsLayouts() {
                             ]}
                             getOptionLabel={(option) => option.nome}
                             value={formData.kri.map(
-                              (id) => kris.find((kri) => kri.id === id) || id
+                              (id) => kris.find((kri) => kri.id === id) || id,
                             )}
                             onChange={handleSelectAllKri}
                             isOptionEqualToValue={(option, value) =>
@@ -1300,7 +1191,7 @@ function ColumnsLayouts() {
                             getOptionLabel={(option) => option.nome}
                             value={formData.causa.map(
                               (id) =>
-                                causas.find((causa) => causa.id === id) || id
+                                causas.find((causa) => causa.id === id) || id,
                             )}
                             onChange={handleSelectAllCausa}
                             isOptionEqualToValue={(option, value) =>
@@ -1352,7 +1243,7 @@ function ColumnsLayouts() {
                             value={formData.impacto.map(
                               (id) =>
                                 impactos.find((impacto) => impacto.id === id) ||
-                                id
+                                id,
                             )}
                             onChange={handleSelectAllImpacto}
                             isOptionEqualToValue={(option, value) =>
@@ -1382,7 +1273,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.impacto.length === 0 ||
                                     formData.impacto.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.impacto === false
                                 }
@@ -1407,8 +1298,8 @@ function ColumnsLayouts() {
                             value={formData.responsavel.map(
                               (id) =>
                                 responsaveis.find(
-                                  (responsavel) => responsavel.id === id
-                                ) || id
+                                  (responsavel) => responsavel.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllResponsaveis}
                             isOptionEqualToValue={(option, value) =>
@@ -1438,7 +1329,7 @@ function ColumnsLayouts() {
                                 error={
                                   (formData.responsavel.length === 0 ||
                                     formData.responsavel.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.responsavel === false
                                 }
@@ -1455,7 +1346,7 @@ function ColumnsLayouts() {
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <HeatmapAvaliacaoRiscoQuestionario
                   data={heatmapDataAv}
-                  disabledFields={formData.status === 3}
+                  disabledFields={formData.status === 3 || isReadOnly}
                   si={si}
                   sr={sr}
                   sp={sp}
@@ -1475,7 +1366,7 @@ function ColumnsLayouts() {
             </>
           )}
 
-          {/* Botões de ação */}
+          {}
           <Grid item xs={12} mt={-5}>
             <Box
               sx={{
@@ -1486,7 +1377,7 @@ function ColumnsLayouts() {
                 marginTop: 5,
               }}
             >
-              {formData.status === 3 ? (
+              {formData.status === 3 || isReadOnly ? (
                 <Button
                   variant="contained"
                   color="primary"
@@ -1531,19 +1422,19 @@ function ColumnsLayouts() {
               },
             }}
           >
-            {/* Ícone de Sucesso */}
+            {}
             <Box display="flex" justifyContent="center" mt={2}>
               <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
             </Box>
 
-            {/* Título Centralizado */}
+            {}
             <DialogTitle
               sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
             >
               Plano criado com sucesso!
             </DialogTitle>
 
-            {/* Mensagem */}
+            {}
             <DialogContent>
               <DialogContentText
                 sx={{ fontSize: "16px", color: "#555", px: 2 }}
@@ -1553,7 +1444,7 @@ function ColumnsLayouts() {
               </DialogContentText>
             </DialogContent>
 
-            {/* Botões */}
+            {}
             <DialogActions
               sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
             >
