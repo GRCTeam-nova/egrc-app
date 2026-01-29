@@ -456,7 +456,7 @@ ReactTable.propTypes = {
   refreshData: PropTypes.func,
 };
 
-function ActionCell({ row, refreshData, normativaDados }) {
+function ActionCell({ row, refreshData, normativaDados, canEdit = true }) {
   const navigation = useNavigate();
   const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -612,18 +612,22 @@ function ActionCell({ row, refreshData, normativaDados }) {
                 ...row.original,
                 idAssessment: normativaDados.idAssessment,
               };
+
               navigation(`/questionarios/criar`, {
                 state: {
                   indoPara: "NovoQuestionario",
                   dadosApi,
+                  readOnly: !canEdit,
+                  mode: canEdit ? "editar" : "consultar",
                 },
               });
+
               handleClose();
             }}
             color="primary"
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            Editar
+            {canEdit ? "Editar" : "Consultar"}
           </Button>
         </Stack>
       </Popover>
@@ -992,6 +996,8 @@ function ActionCell({ row, refreshData, normativaDados }) {
 ActionCell.propTypes = {
   row: PropTypes.object.isRequired,
   refreshData: PropTypes.func.isRequired,
+  normativaDados: PropTypes.object.isRequired,
+  canEdit: PropTypes.bool,
 };
 
 // ==============================|| LISTAGEM ||============================== //
@@ -1089,7 +1095,20 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
   };
 
   // logo acima do useMemo de columns
-  const isAssessmentComplete = normativaDados?.assessmentStatus === 4;
+  const assessmentStatus = Number(normativaDados?.assessmentStatus);
+  const isAssessmentComplete = assessmentStatus === 4;
+  const isAssessmentFinalizada = assessmentStatus === 5;
+
+  // responsável pela avaliação (fallbacks porque a API pode variar o nome do campo)
+  const idResponsibleAssessment =
+    normativaDados?.idResponsible ??
+    normativaDados?.responsibleId ??
+    normativaDados?.idUserResponsible ??
+    normativaDados?.responsavelAv;
+
+  const isResponsibleAssessment =
+    idResponsibleAssessment != null &&
+    String(idResponsibleAssessment) === String(idUser);
 
 const columns = useMemo(() => {
     // colunas fixas
@@ -1134,38 +1153,46 @@ const columns = useMemo(() => {
       },
     ];
 
-    // só acrescenta a coluna de ações se a avaliação NÃO estiver completa
+    // coluna de ações:
+// - se avaliação estiver COMPLETA (4): mantém sem ações (como já era)
+// - se avaliação estiver FINALIZADA (5) e usuário for o responsável: permite CONSULTAR todos
+// - caso contrário: só o dono do questionário vê ação
     if (!isAssessmentComplete) {
       baseColumns.push({
         header: " ",
         disableSortBy: true,
         cell: ({ row }) => {
-          // --- LÓGICA NOVA AQUI ---
-          // Verifica se o usuário logado é o dono do questionário
-          const isOwner = row.original.idRespondent === idUser;
+          const statusQuiz = Number(row.original.statusQuiz ?? row.original.status);
+          const isOwner = String(row.original.idRespondent) === String(idUser);
 
-          // Se não for o dono, não renderiza nada (nem o ActionCell)
-          if (!isOwner) {
-            return null; 
-          }
-          
-          // Se for o dono, renderiza as ações normalmente
+          const canSee =
+            isOwner || (isAssessmentFinalizada && isResponsibleAssessment);
+
+          if (!canSee) return null;
+
+          // Regra do botão:
+          // - se já estiver concluído (>=3) OU não for dono => apenas consultar (readOnly)
+          // - se for dono e ainda não concluído => editar
+          const canEdit = isOwner && statusQuiz < 3;
+
           return (
             <ActionCell
               row={row}
               normativaDados={normativaDados}
               refreshData={refreshOrgaos}
               onEdit={handleEditAcionista}
+              canEdit={canEdit}
             />
           );
         },
       });
     }
 
-    return baseColumns;
+
+return baseColumns;
     
     // ADICIONADO idUser NAS DEPENDÊNCIAS
-  }, [theme, isAssessmentComplete, idUser]);
+  }, [theme, isAssessmentComplete, isAssessmentFinalizada, isResponsibleAssessment, idUser]);
 
   useEffect(() => {
     if (isInitialLoad && !isLoading) {
