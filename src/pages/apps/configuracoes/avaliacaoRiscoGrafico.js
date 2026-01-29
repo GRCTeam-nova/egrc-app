@@ -219,6 +219,16 @@ function HeatmapAvaliacaoRisco({
   window.setHasChanges = setHasChanges;
 
   const chartContainerRef = useRef(null);
+  const labelUpdateTimersRef = useRef([]);
+  const scheduleUpdateLabelPositions = () => {
+    // O ApexCharts nem sempre injeta os dataLabels imediatamente ao montar/atualizar.
+    // Rodar algumas vezes evita o cenário em que as 'bolinhas' somem após alternar o Sobrepor.
+    labelUpdateTimersRef.current.forEach((t) => clearTimeout(t));
+    labelUpdateTimersRef.current = [0, 80, 180, 350, 600].map((ms) =>
+      setTimeout(updateLabelPositions, ms)
+    );
+  };
+
   const [labelPositions, setLabelPositions] = useState({});
 
   const heatmapData = useMemo(
@@ -246,8 +256,8 @@ function HeatmapAvaliacaoRisco({
         toolbar: { show: true },
         height: 400,
         events: {
-          mounted: () => setTimeout(updateLabelPositions, 50),
-          updated: () => setTimeout(updateLabelPositions, 50),
+          mounted: () => scheduleUpdateLabelPositions(),
+          updated: () => scheduleUpdateLabelPositions(),
         },
       },
       plotOptions: {
@@ -308,8 +318,14 @@ function HeatmapAvaliacaoRisco({
   }
 
   useEffect(() => {
-    const t = setTimeout(updateLabelPositions, 100);
-    return () => clearTimeout(t);
+    scheduleUpdateLabelPositions();
+    const onResize = () => scheduleUpdateLabelPositions();
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      labelUpdateTimersRef.current.forEach((t) => clearTimeout(t));
+      labelUpdateTimersRef.current = [];
+    };
   }, [heatmapData, si, sr, sp]);
 
   const getChipPosition = (sel) => {

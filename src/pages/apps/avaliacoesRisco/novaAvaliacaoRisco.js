@@ -136,25 +136,24 @@ function ColumnsLayouts() {
     responsavelAv: true,
   });
 
-  const formatDateConclusion = (raw) => {
-    if (!raw) return "";
+const formatDateConclusion = (raw) => {
+  if (!raw) return "";
 
-    // Normaliza frações de segundo longas: .0047459 -> .004
-    const normalized = String(raw).replace(/\.(\d{3})\d+/, ".$1");
+  // Normaliza frações de segundo longas: .0047459 -> .004
+  const normalized = String(raw).replace(/\.(\d{3})\d+/, ".$1");
 
-    const d = new Date(normalized);
-    if (Number.isNaN(d.getTime())) return String(raw);
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return String(raw);
 
-    const pad2 = (n) => String(n).padStart(2, "0");
+  const pad2 = (n) => String(n).padStart(2, "0");
 
-    const DD = pad2(d.getDate());
-    const MM = pad2(d.getMonth() + 1);
-    const YYYY = d.getFullYear();
-    const HH = pad2(d.getHours());
-    const MIN = pad2(d.getMinutes());
+  const DD = pad2(d.getDate());
+  const MM = pad2(d.getMonth() + 1);
+  const YYYY = d.getFullYear();
 
-    return `${DD}-${MM}-${YYYY} ${HH}-${MIN}`;
-  };
+  return `${DD}-${MM}-${YYYY}`;
+};
+
 
   // --- REGRAS DE PERMISSIONAMENTO (Baseado no PDF 1.1) ---
   const isEditing = requisicao === "Editar";
@@ -1154,7 +1153,7 @@ const { buttonTitle } = useMemo(() => {
           variant: "success",
           anchorOrigin: { vertical: "top", horizontal: "right" },
         });
-        window.scrollTo(0, 0);
+        navigate(0);
       }
     } catch (error) {
       console.error(error.message);
