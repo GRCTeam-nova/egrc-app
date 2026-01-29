@@ -828,7 +828,7 @@ function ReactTable({
 
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                Plataformas
+                Ativos
               </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
@@ -885,7 +885,7 @@ function ReactTable({
 
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                CAVRs
+                CAVR
               </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
@@ -1820,6 +1820,13 @@ const ListagemEmpresa = () => {
   const columns = useMemo(
     () => [
       {
+        header: "Código",
+        accessorKey: "code",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
+        ),
+      },
+      {
         header: "Controles",
         accessorKey: "name",
         cell: ({ row }) => (
@@ -1841,13 +1848,7 @@ const ListagemEmpresa = () => {
           </Typography>
         ),
       },
-      {
-        header: "Código",
-        accessorKey: "code",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
-        ),
-      },
+      
 
       {
         header: "Responsável",
@@ -1929,7 +1930,7 @@ const ListagemEmpresa = () => {
         ),
       },
       {
-        header: "Plataformas",
+        header: "Ativos",
         accessorKey: "platforms",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
@@ -1956,7 +1957,7 @@ const ListagemEmpresa = () => {
         ),
       },
       {
-        header: "CAVRs",
+        header: "CAVR",
         accessorKey: "cvars",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
@@ -1988,15 +1989,6 @@ const ListagemEmpresa = () => {
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
             {(row.original.elementCosos || []).join(", ")}
-          </Typography>
-        ),
-      },
-      {
-        header: "Objetivos",
-        accessorKey: "objectives",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>
-            {(row.original.objectives || []).join(", ")}
           </Typography>
         ),
       },
