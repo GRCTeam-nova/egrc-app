@@ -754,24 +754,6 @@ const filteredData = useMemo(() => {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                Dados
-              </InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={lgpdsOptions}
-                  value={draftFilters.lgpds}
-                  onChange={(event, value) =>
-                    setDraftFilters((prev) => ({ ...prev, lgpds: value }))
-                  }
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-
             <Grid item xs={6}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Data Inicial
@@ -1669,7 +1651,7 @@ const ListagemEmpresa = () => {
         ),
       },
       {
-        header: "Tipo de ativos",
+        header: "Tipo de ativo",
         accessorKey: "platformType",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
