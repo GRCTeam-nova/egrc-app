@@ -1,5 +1,4 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { API_URL } from "config";
 import {
   Accordion,
   AccordionDetails,
@@ -23,7 +22,7 @@ import {
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { enqueueSnackbar } from "notistack";
+import { enqueueSnackbar, closeSnackbar } from "notistack";
 import { useNavigate } from "react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import LoadingOverlay from "../configuracoes/LoadingOverlay";
@@ -136,32 +135,28 @@ function ColumnsLayouts() {
     responsavelAv: true,
   });
 
-const formatDateConclusion = (raw) => {
-  if (!raw) return "";
+  const formatDateConclusion = (raw) => {
+    if (!raw) return "";
 
-  // Normaliza frações de segundo longas: .0047459 -> .004
-  const normalized = String(raw).replace(/\.(\d{3})\d+/, ".$1");
+    // Normaliza frações de segundo longas: .0047459 -> .004
+    const normalized = String(raw).replace(/\.(\d{3})\d+/, ".$1");
 
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return String(raw);
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return String(raw);
 
-  const pad2 = (n) => String(n).padStart(2, "0");
+    const pad2 = (n) => String(n).padStart(2, "0");
 
-  const DD = pad2(d.getDate());
-  const MM = pad2(d.getMonth() + 1);
-  const YYYY = d.getFullYear();
+    const DD = pad2(d.getDate());
+    const MM = pad2(d.getMonth() + 1);
+    const YYYY = d.getFullYear();
 
-  return `${DD}-${MM}-${YYYY}`;
-};
-
+    return `${DD}-${MM}-${YYYY}`;
+  };
 
   // --- REGRAS DE PERMISSIONAMENTO (Baseado no PDF 1.1) ---
   const isEditing = requisicao === "Editar";
   const statusAtual = formData.status;
   const isResponsibleAv = String(idUser) === String(formData.responsavelAv);
-
-  // 1. Ciclo e Risco: Editáveis apenas na criação. Na alteração (mesmo status 1) são estáticos.
-  const isRiskCycleEditable = !isEditing;
 
   // 2. Respondentes e Responsável: Editáveis na criação e na alteração se status for "Não iniciada" (1) ou "Iniciada" (2).
   const isPeopleEditable =
@@ -171,7 +166,6 @@ const formatDateConclusion = (raw) => {
   const isEvaluationEditable =
     isResponsibleAv && (statusAtual === 3 || statusAtual === 4);
 
-  const isEmAvaliacao = statusAtual === 3;
   const isComplete = statusAtual === 4;
   const isFinalizada = statusAtual === 5;
   localStorage.setItem("AvConcluida", isComplete || isFinalizada);
@@ -835,9 +829,13 @@ const formatDateConclusion = (raw) => {
     // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
-  const continuarEdicao = () => {
+  const continuarEdicao = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
     setRequisicao("Editar");
     setSuccessDialogOpen(false);
+    navigate(0);
   };
 
   // Função para voltar para a listagem
@@ -845,8 +843,6 @@ const formatDateConclusion = (raw) => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
   };
-
-  
 
   // Ao salvar com "Sobrepor resultado do risco" ligado, a atualização FINALIZA a avaliação.
   const handleAtualizarClick = () => {
@@ -861,7 +857,7 @@ const formatDateConclusion = (raw) => {
     setConfirmSobreporOpen(false);
     tratarSubmit();
   };
-useEffect(() => {
+  useEffect(() => {
     if (localStorage.getItem("avaliacaoIniciada") === "1") {
       enqueueSnackbar("Avaliação iniciada com sucesso!", {
         variant: "success",
@@ -905,9 +901,8 @@ useEffect(() => {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  
   const [confirmSobreporOpen, setConfirmSobreporOpen] = useState(false);
-const { buttonTitle } = useMemo(() => {
+  const { buttonTitle } = useMemo(() => {
     const currentStatus = formData.status;
     const isResp = String(idUser) === String(formData.responsavelAv);
     let title = "";
@@ -938,22 +933,11 @@ const { buttonTitle } = useMemo(() => {
     hasQuestionarioConcluido,
   });
 
-  const overlayRequiredFilled =
-    !!comentario?.trim() &&
-    !!formData.idProbabilityInherent &&
-    !!formData.idSeverityInherent &&
-    !!formData.idProbabilityResidual &&
-    !!formData.idSeverityResidual &&
-    !!formData.idProbabilityPlanned &&
-    !!formData.idSeverityPlanned &&
-    !!formData.justificationInerent &&
-    !!formData.justificationResidual &&
-    !!formData.justificationPlanned;
-
   const canFinalizar =
     isResponsibleAv &&
     (statusAtual === 2 || statusAtual === 3 || statusAtual === 4) &&
-    hasQuestionarioConcluido && sobrepor === false;
+    hasQuestionarioConcluido &&
+    sobrepor === false;
 
   const handleStart = async () => {
     let url = "";
@@ -1448,7 +1432,7 @@ const { buttonTitle } = useMemo(() => {
         idCycle: formData.ciclo,
         idRespondents: formData.respondente,
         idResponsible: formData.responsavelAv,
-        assessmentStatus: sobrepor ? 5 : (formData.status),
+        assessmentStatus: sobrepor ? 5 : formData.status,
 
         replaceUser: sobrepor
           ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
@@ -2526,9 +2510,9 @@ const { buttonTitle } = useMemo(() => {
             </DialogTitle>
             <DialogContent>
               <DialogContentText sx={{ fontSize: "15px" }}>
-                Você ativou <b>“Sobrepor resultado do risco”</b>. Ao salvar desta
-                forma, a avaliação será <b>FINALIZADA</b> e não poderá mais ser
-                editada.
+                Você ativou <b>“Sobrepor resultado do risco”</b>. Ao salvar
+                desta forma, a avaliação será <b>FINALIZADA</b> e não poderá
+                mais ser editada.
                 <br />
                 <br />
                 Deseja confirmar a ação?
@@ -2604,14 +2588,13 @@ const { buttonTitle } = useMemo(() => {
                 Voltar para a listagem
               </Button>
               <Button
+                type="button"
                 onClick={continuarEdicao}
                 variant="contained"
                 sx={{
                   backgroundColor: "#007bff",
                   fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "#0056b3",
-                  },
+                  "&:hover": { backgroundColor: "#0056b3" },
                 }}
                 autoFocus
               >
