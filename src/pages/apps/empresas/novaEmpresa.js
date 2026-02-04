@@ -92,6 +92,7 @@ function ColumnsLayouts() {
   useEffect(() => {
     if (dadosApi) {
       const fetchEmpresaDados = async () => {
+        setLoading(true);
         try {
           const response = await fetch(
             `${process.env.REACT_APP_API_URL}companies/${dadosApi.idCompany}`,
@@ -140,6 +141,7 @@ function ColumnsLayouts() {
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
         } finally {
+          setLoading(false);
           console.log("Requisição finalizada");
         }
       };

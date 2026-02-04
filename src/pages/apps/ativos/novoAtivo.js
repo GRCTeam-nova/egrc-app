@@ -69,6 +69,7 @@ function ColumnsLayouts() {
   useEffect(() => {
     if (dadosApi) {
       const fetchDepartamentosDados = async () => {
+        setLoading(true)
         try {
           const response = await fetch(
             `${process.env.REACT_APP_API_URL}actives/${dadosApi.id}`,
@@ -107,6 +108,7 @@ function ColumnsLayouts() {
           console.error("Erro ao buscar os dados:", err.message);
         } finally {
           console.log("Requisição finalizada");
+          setLoading(false)
         }
       };
 

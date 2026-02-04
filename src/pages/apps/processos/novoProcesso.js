@@ -93,6 +93,7 @@ function ColumnsLayouts() {
   useEffect(() => {
     if (dadosApi && authToken) {
       const fetchDepartamentosDados = async () => {
+        setLoading(true);
         try {
           const response = await fetch(
             `${process.env.REACT_APP_API_URL}processes/${dadosApi.id}`,
@@ -153,6 +154,7 @@ processoPosterior: data.idProcessNext
           console.error("Erro ao buscar os dados:", err.message);
         } finally {
           console.log("Requisição finalizada");
+          setLoading(false);
         }
       };
 
@@ -866,11 +868,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
 
   return (
     <>
-      <LoadingOverlay
-        open={loading}
-        message="Preparando edição do processo..."
-        hint="Sincronizando empresas, departamentos, processos, riscos e dados LGPD"
-      />
+      <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={1} marginTop={2}>
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>

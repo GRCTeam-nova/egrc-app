@@ -252,6 +252,7 @@ function ColumnsLayoutsCorrigido() {
   useEffect(() => {
     if (dadosApi && authToken) {
       const fetchEmpresaDados = async () => {
+        setLoading(true);
         try {
           const response = await fetch(
             `${API_URL}risks/${dadosApi.id}`,
@@ -322,8 +323,8 @@ function ColumnsLayoutsCorrigido() {
           setRiscoDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
-        } finally {
-          console.log("Requisição finalizada");
+        }finally {
+          setLoading(false);
         }
       };
 
