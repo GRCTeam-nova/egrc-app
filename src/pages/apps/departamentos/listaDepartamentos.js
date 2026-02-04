@@ -85,16 +85,14 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 export const fuzzyFilter = (row, columnId, value) => {
-  // Obter o valor da célula na coluna especificada
   let cellValue = row.getValue(columnId);
 
-  // Verificar se o valor da célula e o valor do filtro não são undefined
-  if (cellValue === undefined || value === undefined) {
-    // Retornar false se algum valor for undefined
-    return false;
-  }
+  // Se o valor da busca estiver vazio, mostra a linha
+  if (!value) return true;
+  
+  // Se o valor da célula for nulo ou indefinido, não há o que comparar
+  if (cellValue === null || cellValue === undefined) return false;
 
-  // Função para normalizar o texto removendo acentos
   const normalizeText = (text) => {
     return text
       .toString()
@@ -103,11 +101,10 @@ export const fuzzyFilter = (row, columnId, value) => {
       .toLowerCase();
   };
 
-  // Converter valores para string, normalizar e realizar a comparação
-  cellValue = normalizeText(cellValue);
+  const cellValueStr = normalizeText(cellValue);
   const valueStr = normalizeText(value);
 
-  return cellValue.includes(valueStr);
+  return cellValueStr.includes(valueStr);
 };
 
 // ==============================|| REACT TABLE - LIST ||============================== //
