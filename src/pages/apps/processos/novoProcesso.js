@@ -126,12 +126,16 @@ function ColumnsLayouts() {
               ? data.processBottoms.map((u) => u.idProcessBottom)
               : [],
             kri: data.idKri || null,
-            processoAnterior: Array.isArray(data.idProcessPrevious)
-              ? data.idProcessPrevious.map((p) => p.idProcess)
-              : [],
-            processoPosterior: Array.isArray(data.idProcessNext)
-              ? data.idProcessNext.map((p) => p.idProcess)
-              : [],
+processoAnterior: data.idProcessPrevious 
+    ? (Array.isArray(data.idProcessPrevious) 
+        ? data.idProcessPrevious.map((p) => p.idProcess || p.id) 
+        : [data.idProcessPrevious.idProcess || data.idProcessPrevious.id || data.idProcessPrevious])
+    : [],
+processoPosterior: data.idProcessNext 
+    ? (Array.isArray(data.idProcessNext) 
+        ? data.idProcessNext.map((p) => p.idProcess || p.id) 
+        : [data.idProcessNext.idProcess || data.idProcessNext.id || data.idProcessNext])
+    : [],
             processoSuperior: data.idProcessSuperior || null,
             formatoUnidade: data.idProcessType || null,
             dado: data.idLgpds || null,
@@ -840,23 +844,25 @@ function ColumnsLayouts() {
     (f) => f.id === formData.formatoUnidade
   )?.nome;
 
-  const opcoesProcessoAnterior = formData.formatoUnidade
-    ? processosAnteriores.filter(
-        (p) =>
-          p.processType === tipoProcessoSelecionado &&
-          !formData.processoPosterior.includes(p.id) &&
-          p.id !== processosDados?.idProcess // Não permitir selecionar o próprio processo
-      )
-    : [];
+  // Localize estas variáveis antes do return do componente
+const opcoesProcessoAnterior = formData.formatoUnidade
+  ? processosAnteriores.filter(
+      (p) =>
+        // Compara o ID do tipo de processo para ser mais preciso
+        (p.idProcessType === formData.formatoUnidade || p.processType === tipoProcessoSelecionado) &&
+        !formData.processoPosterior.includes(p.id) &&
+        p.id !== processosDados?.idProcess
+    )
+  : [];
 
-  const opcoesProcessoPosterior = formData.formatoUnidade
-    ? processosPosteriores.filter(
-        (p) =>
-          p.processType === tipoProcessoSelecionado &&
-          !formData.processoAnterior.includes(p.id) &&
-          p.id !== processosDados?.idProcess // Não permitir selecionar o próprio processo
-      )
-    : [];
+const opcoesProcessoPosterior = formData.formatoUnidade
+  ? processosPosteriores.filter(
+      (p) =>
+        (p.idProcessType === formData.formatoUnidade || p.processType === tipoProcessoSelecionado) &&
+        !formData.processoAnterior.includes(p.id) &&
+        p.id !== processosDados?.idProcess
+    )
+  : [];
 
   return (
     <>
@@ -1304,7 +1310,6 @@ function ColumnsLayouts() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        placeholder="Selecione o processo anterior"
                       />
                     )}
                   />
@@ -1331,7 +1336,6 @@ function ColumnsLayouts() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        placeholder="Selecione o processo posterior"
                       />
                     )}
                   />

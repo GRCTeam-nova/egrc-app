@@ -296,7 +296,12 @@ function ColumnsLayouts() {
 
   const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
 
-  useEffect(() => {
+useEffect(() => {
+    // PROTEÇÃO: Se as listas ainda não carregaram, não faz a validação para evitar limpar o formData acidentalmente.
+    if (compensaControles.length === 0 || compensadoControles.length === 0) {
+      return;
+    }
+
     const nomeDigitado = formatarNome(nome);
 
     // Atualiza os departamentos inferiores removendo os que conflitam
@@ -304,9 +309,13 @@ function ColumnsLayouts() {
       const compensaControle = compensaControles.find(
         (departamento) => departamento.id === id
       );
-      if (!compensaControle) return false;
+      // Se não encontrou o objeto, mas a lista já existe, aí sim removemos (pode ser um ID antigo/inválido)
+      // Mas se o ID existe na lista e o nome não conflita, mantemos.
+      if (!compensaControle) return false; 
       return formatarNome(compensaControle.nome) !== nomeDigitado;
     });
+    
+    // Só atualiza o estado se houver diferença de tamanho para evitar loops infinitos
     if (inferioresAtualizadas.length !== formData.compensaControle.length) {
       setFormData((prev) => ({
         ...prev,
@@ -322,6 +331,7 @@ function ColumnsLayouts() {
       if (!compensadoControle) return false;
       return formatarNome(compensadoControle.nome) !== nomeDigitado;
     });
+
     if (lateraisAtualizadas.length !== formData.compensadoControle.length) {
       setFormData((prev) => ({
         ...prev,
@@ -330,8 +340,8 @@ function ColumnsLayouts() {
     }
   }, [
     nome,
-    compensaControles,
-    compensadoControles,
+    compensaControles, // Importante que isso esteja aqui para re-executar quando a lista carregar
+    compensadoControles, // Importante que isso esteja aqui para re-executar quando a lista carregar
     formData.compensaControle,
     formData.compensadoControle,
   ]);
