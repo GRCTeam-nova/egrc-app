@@ -211,6 +211,30 @@ function ReactTable({
 
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
+  const isYMD = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+  const formatDateDashed = (value) => {
+    if (!value) return "";
+
+    // vem do input type="date": YYYY-MM-DD (evita bug de fuso do new Date("YYYY-MM-DD"))
+    if (isYMD(value)) {
+      const [y, m, d] = value.split("-");
+      return `${d}-${m}-${y}`;
+    }
+
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return String(value);
+
+    const dd = String(dt.getDate()).padStart(2, "0");
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const yyyy = dt.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  };
+
+  const parseLocalStart = (ymd) => (ymd ? new Date(`${ymd}T00:00:00`) : null);
+  const parseLocalEnd = (ymd) => (ymd ? new Date(`${ymd}T23:59:59.999`) : null);
+
+
   useEffect(() => {
     const getUniqueValues = (key, isArray = false) => {
       const values = data.flatMap((item) => {
@@ -246,6 +270,13 @@ function ReactTable({
 
     if (draftFilters.status.length > 0) {
       newFilters.push({ type: "Status", values: draftFilters.status });
+    }
+    if (draftFilters.startDate) {
+      newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
+    }
+
+    if (draftFilters.endDate) {
+      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
     }
     if (draftFilters.controle.length > 0)
       newFilters.push({ type: "Controle", values: draftFilters.controle });
@@ -295,13 +326,6 @@ function ReactTable({
       });
     setSelectedFilters(newFilters);
 
-    if (draftFilters.startDate)
-      newFilters.push({
-        type: "Data Inicial",
-        values: [draftFilters.startDate],
-      });
-    if (draftFilters.endDate)
-      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
     if (draftFilters.hasRisks)
       newFilters.push({ type: "Com Riscos", values: [draftFilters.hasRisks] });
 
@@ -339,13 +363,20 @@ function ReactTable({
           Deficiências: "deficiencies",
           "Contas Contábeis": "ledgerAccounts",
           "Elementos COSO": "elementCosos",
+          "Data Inicial": "startDate",
+          "Data Final": "endDate",
         }[filterType];
 
         if (filterKey) {
-          updatedDraft[filterKey] = updatedDraft[filterKey].filter(
-            (value) => !filterToRemove.values.includes(value),
-          );
+          if (filterKey === "startDate" || filterKey === "endDate") {
+            updatedDraft[filterKey] = null;
+          } else {
+            updatedDraft[filterKey] = updatedDraft[filterKey].filter(
+              (value) => !filterToRemove.values.includes(value),
+            );
+          }
         }
+
         return updatedDraft;
       });
 
@@ -398,6 +429,26 @@ function ReactTable({
           if (showActive) return item.active === true;
           if (showInactive) return item.active === false;
           return true;
+        }
+
+        if (filterType === "Data Inicial") {
+          const start = parseLocalStart(filterValues?.[0]);
+          if (!start) return true;
+
+          const itemDate = new Date(item.date);
+          if (Number.isNaN(itemDate.getTime())) return false;
+
+          return itemDate.getTime() >= start.getTime();
+        }
+
+        if (filterType === "Data Final") {
+          const end = parseLocalEnd(filterValues?.[0]);
+          if (!end) return true;
+
+          const itemDate = new Date(item.date);
+          if (Number.isNaN(itemDate.getTime())) return false;
+
+          return itemDate.getTime() <= end.getTime();
         }
 
         if (filterType === "Controle") return filterValues.includes(item.name);
@@ -622,10 +673,20 @@ function ReactTable({
                 </Typography>
                 <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
                   {filter.values
-                    .map((v) =>
-                      v === true ? "Controle" : v === false ? "Inativo" : v,
-                    )
+                    .map((v) => {
+                      if (filter.type === "Data Inicial" || filter.type === "Data Final") {
+                        return formatDateDashed(v);
+                      }
+                      if (filter.type === "Com Riscos") {
+                        return v ? "Sim" : "Não";
+                      }
+                      if (typeof v === "boolean") {
+                        return v ? "Sim" : "Não";
+                      }
+                      return v;
+                    })
                     .join(", ")}
+
                 </Typography>
               </Box>
             }
@@ -1076,8 +1137,8 @@ function ReactTable({
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                  className: "cursor-pointer prevent-select",
-                                })}
+                                className: "cursor-pointer prevent-select",
+                              })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
@@ -1266,9 +1327,8 @@ function ActionCell({ row, refreshData }) {
       );
 
       setStatus(newStatus);
-      const message = `Controle ${
-        row.original.name
-      } ${newStatus.toLowerCase()}.`;
+      const message = `Controle ${row.original.name
+        } ${newStatus.toLowerCase()}.`;
 
       enqueueSnackbar(message, {
         variant: "success",
@@ -1848,7 +1908,7 @@ const ListagemEmpresa = () => {
           </Typography>
         ),
       },
-      
+
 
       {
         header: "Responsável",
