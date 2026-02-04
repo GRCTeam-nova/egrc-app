@@ -159,7 +159,7 @@ function ReactTable({
   const [globalFilter, setGlobalFilter] = useState("");
   const navigation = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-    const [selectedFilters, setSelectedFilters] = useState([
+  const [selectedFilters, setSelectedFilters] = useState([
     { type: "Status", values: ["Ativo"] },
   ]);
   useEffect(() => {
@@ -344,6 +344,11 @@ function ReactTable({
 
         if (filterType === "Data Inicial" || filterType === "Data Final")
           return true;
+
+        if (filterType === "Status") {
+          const statusLabel = item.active === true ? "Ativo" : "Inativo";
+          return filterValues.includes(statusLabel);
+        }
 
         if (filterType === "Responsável")
           return filterValues.includes(item.responsible);
@@ -570,7 +575,7 @@ function ReactTable({
         )}
       </Box>
 
-      {}
+      { }
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -613,7 +618,7 @@ function ReactTable({
                 />
               </FormControl>
             </Grid>
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Responsável
@@ -632,7 +637,7 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Tipo
@@ -651,7 +656,7 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Empresas
@@ -673,7 +678,7 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Assertions{" "}
@@ -692,7 +697,7 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Controles
@@ -711,7 +716,7 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Deficiências
@@ -733,7 +738,7 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {}
+            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Processos
@@ -802,7 +807,7 @@ function ReactTable({
         </Box>
       </Drawer>
 
-      {}
+      { }
       <MainCard content={false}>
         <ScrollX>
           <div ref={tableRef}>
@@ -846,8 +851,8 @@ function ReactTable({
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                  className: "cursor-pointer prevent-select",
-                                })}
+                                className: "cursor-pointer prevent-select",
+                              })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
