@@ -37,6 +37,8 @@ import DrawerDepartamentos from "./novoDepartamentoDrawerPlanos";
 import DrawerDeficiencia from "./novaDeficienciaDrawerPlanos";
 import DrawerProcesso from "./novoProcessoDrawerPlanos";
 import DrawerRisco from "./novoRiscoDrawerPlanos";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import FileUploader from "../configuracoes/FileUploader";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -58,6 +60,9 @@ function ColumnsLayouts() {
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrada");
   const [normativaDados, setNormativaDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [contas, setContas] = useState([]);
+  const [responsaveis, setResponsavel] = useState([]);
+  const [steps, setSteps] = useState([]); // para a RN das datas
   const [statuss] = useState([
     { id: 1, nome: "Não iniciada" },
     { id: 2, nome: "Em andamento" },
@@ -89,6 +94,13 @@ function ColumnsLayouts() {
     causa: [],
     risco: [],
     ameaca: [],
+    conta: [],
+
+    responsavel: null,
+    startDate: null,
+    endDate: null,
+    conclusionDate: null,
+    files: [],
     normativa: [],
     planoAcao: [],
     departamento: [],
@@ -129,6 +141,7 @@ function ColumnsLayouts() {
           item.idControl ||
           item.idActionPlanType ||
           item.idThreat ||
+          item.idCollaborator ||
           item.idDeficiency,
         nome: item.name,
         ...item, // Mantém os outros campos intactos
@@ -154,11 +167,14 @@ function ColumnsLayouts() {
       setProcessos
     );
     fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
-    
+
     fetchData(
       `${process.env.REACT_APP_API_URL}action-plans/types`,
       setTipoPlano
     );
+    fetchData(`${process.env.REACT_APP_API_URL}ledger-accounts`, setContas);
+    fetchData(`${process.env.REACT_APP_API_URL}collaborators/responsibles`, setResponsavel);
+
     window.scrollTo(0, 0);
   }, []);
 
@@ -193,10 +209,16 @@ function ColumnsLayouts() {
             prioridade: data.actionPlanPriority || null,
             tipoPlano: data.idActionPlanType || null,
             departamento: data.idDepartments || null,
-            deficiencia: data.idDeficiencies  || null,
+            deficiencia: data.idDeficiencies || null,
             processo: data.idProcesses || null,
             risco: data.idRisks || null,
-            
+            conta: data.idLedgerAccounts || [],
+            responsavel: data.idResponsible || null,
+            startDate: data.startDate ? new Date(data.startDate) : null,
+            endDate: data.endDate ? new Date(data.endDate) : null,
+            conclusionDate: data.conclusionDate ? new Date(data.conclusionDate) : null,
+            files: data.files || [],
+
           }));
 
           setNormativaDados(data);
@@ -217,7 +239,7 @@ function ColumnsLayouts() {
     setDepartamentos((prevDepartamentos) => [...prevDepartamentos, newDepartamento]);
     setFormData((prev) => ({
       ...prev,
-      departamento: [...prev.departamento, newDepartamento.id], 
+      departamento: [...prev.departamento, newDepartamento.id],
     }));
   };
 
@@ -363,20 +385,32 @@ function ColumnsLayouts() {
     nome: true,
   });
 
-  
+
   const allSelected2 =
     formData.processo.length === processos.length && processos.length > 0;
-  
+
   const allSelectedEmpresas =
     formData.deficiencia.length === deficiencias.length &&
     deficiencias.length > 0;
- 
+
   const allSelectedDepartamentos =
     formData.departamento.length === departamentos.length &&
     departamentos.length > 0;
 
   const allSelectedRisco =
     formData.risco.length === riscos.length && riscos.length > 0;
+
+  const allSelectedContas =
+    formData.conta.length === contas.length && contas.length > 0;
+
+  const handleSelectAllContas = (event, newValue) => {
+    const hasAll = newValue?.some((o) => o.id === "all");
+    setFormData((prev) => ({
+      ...prev,
+      conta: hasAll ? (allSelectedContas ? [] : contas.map((c) => c.id)) : newValue.map((o) => o.id),
+    }));
+  };
+
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
@@ -410,6 +444,45 @@ function ColumnsLayouts() {
       return; // Para a execução se a validação falhar
     }
 
+    let finalFilesPayload = formData.files || [];
+
+    if (requisicao === "Editar") {
+      const newFiles = (formData.files || []).filter((f) => f instanceof File);
+      const existingFiles = (formData.files || []).filter((f) => !(f instanceof File));
+
+      let uploadFilesResult = { files: [] };
+
+      if (newFiles.length > 0) {
+        const formDataUpload = new FormData();
+        formDataUpload.append("ContainerFolder", 11);
+        formDataUpload.append("IdContainer", normativaDados?.idActionPlan || "");
+
+        newFiles.forEach((file) => formDataUpload.append("Files", file, file.name));
+
+        const uploadResponse = await axios.post(
+          `${process.env.REACT_APP_API_URL}files/uploads`,
+          formDataUpload,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+
+        uploadFilesResult = uploadResponse.data;
+      }
+
+      const finalFiles = [...existingFiles, ...(uploadFilesResult.files || [])];
+
+      finalFilesPayload = finalFiles.map((file) => {
+        if (typeof file === "string") return file;
+        if (file?.path) return file.path;
+        return file;
+      });
+    }
+
+
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
       url = `${process.env.REACT_APP_API_URL}action-plans`;
@@ -427,18 +500,25 @@ function ColumnsLayouts() {
         code: codigo,
         name: nome,
         description: descricao,
+
+        startDate: formData.startDate ? formData.startDate.toISOString() : null,
+        endDate: formData.endDate ? formData.endDate.toISOString() : null,
+        conclusionDate: formData.conclusionDate ? formData.conclusionDate.toISOString() : null,
+
         actionPlanStatus: formData.status,
         actionPlanPriority: formData.prioridade,
         active: status,
-        idActionPlanType: formData.tipoPlano,
-        idDepartments: formData.departamento?.length
-          ? formData.departamento
-          : null,
-        idDeficiencies: formData.deficiencia?.length
-          ? formData.deficiencia
-          : null,
+
+        idActionPlanType: formData.tipoPlano || null,
+        idResponsible: formData.responsavel || null,
+
+        idDepartments: formData.departamento?.length ? formData.departamento : null,
+        idDeficiencies: formData.deficiencia?.length ? formData.deficiencia : null,
         idProcesses: formData.processo?.length ? formData.processo : null,
         idRisks: formData.risco?.length ? formData.risco : null,
+
+        idLedgerAccounts: formData.conta?.length ? formData.conta : null,
+        files: finalFilesPayload?.length ? finalFilesPayload : [],
       };
     }
 
@@ -590,6 +670,22 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
+                  <InputLabel>Responsável</InputLabel>
+                  <Autocomplete
+                    options={responsaveis}
+                    getOptionLabel={(option) => option.nome}
+                    value={responsaveis.find((r) => r.id === formData.responsavel) || null}
+                    onChange={(event, newValue) => {
+                      setFormData((prev) => ({ ...prev, responsavel: newValue ? newValue.id : null }));
+                    }}
+                    renderInput={(params) => <TextField {...params} />}
+                  />
+                </Stack>
+              </Grid>
+
+
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
                   <InputLabel>Tipo do plano</InputLabel>
                   <Autocomplete
                     options={tiposPlanos}
@@ -620,7 +716,34 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
-                <InputLabel>
+                  <InputLabel>Contas contábeis</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...contas]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.conta.map((id) => contas.find((c) => c.id === id) || id)}
+                    onChange={handleSelectAllContas}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Grid container alignItems="center">
+                          <Grid item>
+                            <Checkbox checked={option.id === "all" ? allSelectedContas : selected} />
+                          </Grid>
+                          <Grid item xs>{option.nome}</Grid>
+                        </Grid>
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                  />
+                </Stack>
+              </Grid>
+
+
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>
                     Departamentos{" "}
                     <DrawerDepartamentos
                       buttonSx={{
@@ -683,7 +806,7 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
-                <InputLabel>
+                  <InputLabel>
                     Deficiências{" "}
                     <DrawerDeficiencia
                       buttonSx={{
@@ -746,7 +869,7 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
-                <InputLabel>
+                  <InputLabel>
                     Processos{" "}
                     <DrawerProcesso
                       buttonSx={{
@@ -805,7 +928,7 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
-                <InputLabel>
+                  <InputLabel>
                     Riscos{" "}
                     <DrawerRisco
                       buttonSx={{
@@ -863,7 +986,45 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5}}>
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de início (RN)</InputLabel>
+                  <DatePicker
+                    value={formData.startDate}
+                    onChange={() => { }}
+                    
+                    slotProps={{ textField: { fullWidth: true } }}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de fim (RN)</InputLabel>
+                  <DatePicker
+                    value={formData.endDate}
+                    onChange={() => { }}
+                  
+                    slotProps={{ textField: { fullWidth: true } }}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de fim efetivo</InputLabel>
+                  <DatePicker
+                    value={formData.conclusionDate}
+                    onChange={(newValue) =>
+                      setFormData((prev) => ({ ...prev, conclusionDate: newValue }))
+                    }
+                    slotProps={{ textField: { fullWidth: true } }}
+                  />
+                </Stack>
+              </Grid>
+
+
+              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <Stack
                     direction="row"
@@ -880,15 +1041,26 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">Steps</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <ListagemSteps />
-            </AccordionDetails>
-          </Accordion>
-        </Grid>
+                <Stack spacing={1}>
+                  <InputLabel>Anexo</InputLabel>
+                  <FileUploader
+                    containerFolder={11}
+                    initialFiles={formData.files}
+                    onFilesChange={(files) => setFormData((prev) => ({ ...prev, files }))}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                <Accordion>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="h6">Steps</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <ListagemSteps />
+                  </AccordionDetails>
+                </Accordion>
+              </Grid>
             </>
           )}
 
