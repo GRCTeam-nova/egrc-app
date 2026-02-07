@@ -119,10 +119,10 @@ const defaultVisibility = {
   name: true,
   code: true,
   type: true,
+  superior: true,
   responsible: true,
   ledgerAccountCompanies: true,
-
-  ledgerAccountBottoms: false,
+  ledgerAccountBottoms: true, // Alterado para true para visibilidade inicial
   assertions: false,
   controls: false,
   deficiencies: false,
@@ -165,8 +165,10 @@ function ReactTable({
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility));
   }, [columnVisibility]);
+  
   const [typeOptions, setTypeOptions] = useState([]);
   const [responsibleOptions, setResponsibleOptions] = useState([]);
+  const [superiorOptions, setSuperiorOptions] = useState([]); // Nova opção
 
   const [ledgerAccountCompaniesOptions, setLedgerAccountCompaniesOptions] =
     useState([]);
@@ -181,6 +183,7 @@ function ReactTable({
     status: ["Ativo"],
     responsible: [],
     type: [],
+    superior: [], // Adicionado
     ledgerAccountCompanies: [],
     ledgerAccountBottoms: [],
     assertions: [],
@@ -210,6 +213,7 @@ function ReactTable({
 
     setTypeOptions(getUniqueValues("type"));
     setResponsibleOptions(getUniqueValues("responsible"));
+    setSuperiorOptions(getUniqueValues("superior")); // Populando Superior
 
     setLedgerAccountCompaniesOptions(
       getUniqueValues("ledgerAccountCompanies", true),
@@ -237,12 +241,22 @@ function ReactTable({
       });
     if (draftFilters.type.length > 0)
       newFilters.push({ type: "Tipo", values: draftFilters.type });
+    
+    if (draftFilters.superior.length > 0) // Adicionado
+      newFilters.push({ type: "Conta Superior", values: draftFilters.superior });
 
     if (draftFilters.ledgerAccountCompanies.length > 0)
       newFilters.push({
         type: "Empresas",
         values: draftFilters.ledgerAccountCompanies,
       });
+
+    if (draftFilters.ledgerAccountBottoms.length > 0) // Adicionado
+      newFilters.push({
+        type: "Contas Inferiores",
+        values: draftFilters.ledgerAccountBottoms,
+      });
+
     if (draftFilters.assertions.length > 0)
       newFilters.push({ type: "Assertions ", values: draftFilters.assertions });
     if (draftFilters.controls.length > 0)
@@ -287,7 +301,9 @@ function ReactTable({
           Status: "status",
           Responsável: "responsible",
           Tipo: "type",
+          "Conta Superior": "superior", // Adicionado
           Empresas: "ledgerAccountCompanies",
+          "Contas Inferiores": "ledgerAccountBottoms", // Adicionado
           "Assertions ": "assertions",
           Controles: "controls",
           Deficiências: "deficiencies",
@@ -319,8 +335,9 @@ function ReactTable({
       status: [],
       responsible: [],
       type: [],
+      superior: [], // Limpando Superior
       ledgerAccountCompanies: [],
-      ledgerAccountBottoms: [],
+      ledgerAccountBottoms: [], // Limpando Inferiores
       assertions: [],
       controls: [],
       deficiencies: [],
@@ -353,9 +370,11 @@ function ReactTable({
         if (filterType === "Responsável")
           return filterValues.includes(item.responsible);
         if (filterType === "Tipo") return filterValues.includes(item.type);
+        if (filterType === "Conta Superior") return filterValues.includes(item.superior); // Lógica Superior
 
         const arrayFilters = {
           Empresas: item.ledgerAccountCompanies,
+          "Contas Inferiores": item.ledgerAccountBottoms, // Lógica Inferiores
           "Assertions ": item.assertions,
           Controles: item.controls,
           Deficiências: item.deficiencies,
@@ -575,7 +594,6 @@ function ReactTable({
         )}
       </Box>
 
-      { }
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -618,7 +636,6 @@ function ReactTable({
                 />
               </FormControl>
             </Grid>
-            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Responsável
@@ -637,7 +654,6 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Tipo
@@ -656,7 +672,25 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            { }
+            {/* Novo Filtro: Conta Superior */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Conta Superior
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={superiorOptions}
+                  value={draftFilters.superior}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, superior: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Empresas
@@ -678,7 +712,28 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            { }
+            {/* Novo Filtro: Contas Inferiores */}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Contas Inferiores
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={ledgerAccountBottomsOptions}
+                  value={draftFilters.ledgerAccountBottoms}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      ledgerAccountBottoms: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Assertions{" "}
@@ -697,7 +752,6 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Controles
@@ -716,7 +770,6 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Deficiências
@@ -738,7 +791,6 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            { }
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Processos
@@ -807,7 +859,6 @@ function ReactTable({
         </Box>
       </Drawer>
 
-      { }
       <MainCard content={false}>
         <ScrollX>
           <div ref={tableRef}>
@@ -1526,8 +1577,6 @@ ActionCell.propTypes = {
   refreshData: PropTypes.func.isRequired,
 };
 
-
-
 const ListagemEmpresa = () => {
   const theme = useTheme();
   const location = useLocation();
@@ -1643,6 +1692,23 @@ const ListagemEmpresa = () => {
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
             {(row.original.ledgerAccountCompanies || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Conta superior",
+        accessorKey: "superior",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.superior}</Typography>
+        ),
+      },
+      // Nova Coluna: Contas Inferiores
+      {
+        header: "Contas inferiores",
+        accessorKey: "ledgerAccountBottoms",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.ledgerAccountBottoms || []).join(", ")}
           </Typography>
         ),
       },

@@ -254,6 +254,7 @@ function ColumnsLayouts() {
           projeto: data.idProject,
           controle: data.idControl,
           conclusaoTeste: data.testConclusion,
+          responsaveisTeste: data.idResponsible,
           // não setamos status aqui
         }));
 
@@ -502,42 +503,40 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  const tratarSubmit = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
+const tratarSubmit = async () => {
+  let url = "";
+  let method = "";
+  let payload = {};
 
-    // Validação dos campos obrigatórios para cadastro simples
-    const missingRequired = [];
-    if (!formData.projeto) missingRequired.push("Projeto");
-    if (!formData.controle) missingRequired.push("Controle");
-    if (!dataPrevistaConclusao)
-      missingRequired.push("Data Prevista de Conclusão");
-    if (missingRequired.length > 0) {
-      enqueueSnackbar(
-        `Os campos ${missingRequired.join(
-          ", "
-        )} são obrigatórios e devem estar preenchidos!`,
-        {
-          variant: "error",
-          anchorOrigin: { vertical: "top", horizontal: "right" },
-        }
-      );
-      return;
-    }
+  // Validação dos campos obrigatórios
+  const missingRequired = [];
+  if (!formData.projeto) missingRequired.push("Projeto");
+  if (!formData.controle) missingRequired.push("Controle");
+  if (!dataPrevistaConclusao) missingRequired.push("Data Prevista de Conclusão");
+  // NOVO: Validação do responsável
+  if (!formData.responsaveisTeste) missingRequired.push("Responsável pelo teste");
 
-    try {
-      setLoading(true);
-      if (requisicao === "Criar") {
-        url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
-        method = "POST";
-        payload = {
-          description: descricaoTeste,
-          expectedCompletionDate: dataPrevistaConclusao,
-          idProject: formData.projeto,
-          idControl: formData.controle,
-        };
-      } else if (requisicao === "Editar") {
+  if (missingRequired.length > 0) {
+    enqueueSnackbar(
+      `Os campos ${missingRequired.join(", ")} são obrigatórios!`,
+      { variant: "error", anchorOrigin: { vertical: "top", horizontal: "right" } }
+    );
+    return;
+  }
+
+  try {
+    setLoading(true);
+    if (requisicao === "Criar") {
+      url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
+      method = "POST";
+      payload = {
+        description: descricaoTeste,
+        expectedCompletionDate: dataPrevistaConclusao,
+        idProject: formData.projeto,
+        idControl: formData.controle,
+        idResponsible: formData.responsaveisTeste, // NOVO: Incluído no Criar
+      };
+    } else if (requisicao === "Editar") {
         url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
         method = "PUT";
         payload = {
@@ -548,6 +547,7 @@ function ColumnsLayouts() {
           idProject: formData.projeto,
           idControl: formData.controle,
           idProjectType: tiposControles,
+          idResponsible: formData.responsaveisTeste,
           descriptionTestCompletion: descricaoConclusao,
           completionDate: dataConclusao,
           testConclusion: formData.conclusaoTeste,
@@ -683,6 +683,33 @@ function ColumnsLayouts() {
             </Stack>
           </Grid>
 
+          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={1}>
+    <InputLabel>Responsável pelo teste *</InputLabel>
+    <Autocomplete
+      options={responsaveisTestes}
+      getOptionLabel={(option) => option.nome || ""}
+      value={
+        responsaveisTestes.find(
+          (resp) => resp.id === formData.responsaveisTeste
+        ) || null
+      }
+      onChange={(event, newValue) => {
+        setFormData((prev) => ({
+          ...prev,
+          responsaveisTeste: newValue ? newValue.id : "",
+        }));
+      }}
+      renderInput={(params) => (
+        <TextField 
+          {...params} 
+          error={!formData.responsaveisTeste && formValidation.processo === false} // Feedback de erro
+        />
+      )}
+    />
+  </Stack>
+</Grid>
+
           {requisicao === "Editar" && (
             <>
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
@@ -798,28 +825,6 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável pelo teste</InputLabel>
-                  <Autocomplete
-                    options={responsaveisTestes}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      responsaveisTestes.find(
-                        (responsaveisTeste) =>
-                          responsaveisTeste.id === formData.responsaveisTeste
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        responsaveisTeste: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => <TextField {...params} />}
-                  />
-                </Stack>
-              </Grid>
 
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <Accordion
