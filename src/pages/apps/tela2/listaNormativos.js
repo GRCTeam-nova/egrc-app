@@ -530,59 +530,76 @@ function ActionCell({ row, refreshData }) {
   };
 
 const toggleStatus = async () => {
-    const idProcess = row.original.idNormative ;
-    const newStatus = status === true ? "Inativo" : "Ativo";
-    
-    try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}normatives/${idProcess}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-  
-      const dadosEndpoint = getResponse.data;
+  const idNormative = row.original.idNormative;
+  const willBeActive = !status; // status é boolean
+  const statusLabel = willBeActive ? "Ativo" : "Inativo";
 
-      // --- CORREÇÃO AQUI ---
-      // Força a conversão de daysRevision para String se ele existir
-      if (dadosEndpoint.daysRevision !== null && dadosEndpoint.daysRevision !== undefined) {
-          dadosEndpoint.daysRevision = String(dadosEndpoint.daysRevision);
-      }
-      // ---------------------
-  
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
-  
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}normatives`, dadosAtualizados, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-  
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Normativa ${row.original.name} ${newStatus.toLowerCase()}.`;
-  
-      enqueueSnackbar(message, {
-        variant: "success",
-        autoHideDuration: 3000,
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        },
-      });
-  
-      refreshData();
-    } catch (error) {
-      console.error("Erro:", error);
-      // Dica extra: Adicione JSON.stringify para ver o erro detalhado no snackbar se necessário
-      enqueueSnackbar(`Erro: ${error.response?.data?.title || error.message}`, { variant: "error" });
+  try {
+    const getResponse = await axios.get(
+      `${process.env.REACT_APP_API_URL}normatives/${idNormative}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const dadosEndpoint = getResponse.data;
+
+    // daysRevision precisa ser string (você já tinha feito isso)
+    if (dadosEndpoint.daysRevision !== null && dadosEndpoint.daysRevision !== undefined) {
+      dadosEndpoint.daysRevision = String(dadosEndpoint.daysRevision);
     }
-  
-    handleDialogClose();
-  };
+
+    // ✅ Corrigir files: API espera string[] (id/url/nome), não object[]
+    if (Array.isArray(dadosEndpoint.files)) {
+      dadosEndpoint.files = dadosEndpoint.files
+        .filter(Boolean)
+        .map((f) => {
+          if (typeof f === "string") return f;
+
+          // tente casar com o que o backend espera (id/url/nome)
+          return (
+            f.id ||
+            f.fileId ||
+            f.idFile ||
+            f.idArquivo ||
+            f.url ||
+            f.path ||
+            f.fileName ||
+            f.name ||
+            ""
+          );
+        })
+        .filter((v) => typeof v === "string" && v.length > 0);
+    }
+
+    const dadosAtualizados = {
+      ...dadosEndpoint,
+      active: willBeActive,
+    };
+
+    await axios.put(`${process.env.REACT_APP_API_URL}normatives`, dadosAtualizados, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    // ✅ status deve continuar boolean
+    setStatus(willBeActive);
+
+    enqueueSnackbar(`Normativa ${row.original.name} ${statusLabel.toLowerCase()}.`, {
+      variant: "success",
+      autoHideDuration: 3000,
+      anchorOrigin: { vertical: "top", horizontal: "center" },
+    });
+
+    refreshData();
+  } catch (error) {
+    console.error("Erro:", error);
+    enqueueSnackbar(`Erro: ${error.response?.data?.title || error.message}`, { variant: "error" });
+  }
+
+  handleDialogClose();
+};
+
 
   const handleDelete = async () => {
     try {
