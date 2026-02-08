@@ -355,6 +355,8 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
       return;
     }
 
+    
+
     // Mapeia periodicidade para dias
     const diasMap = { 1: 180, 2: 360, 3: 720 };
     const periodoEmDias = diasMap[periodicidadeRevisao] || 0;
@@ -389,6 +391,30 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
       setFormData((prev) => ({ ...prev, dataRevogacao: null }));
     }
   };
+
+  useEffect(() => {
+  // Só no modo Criar
+  if (requisicao !== "Criar") return;
+
+  // Precisa ter id do usuário
+  if (!idUser) return;
+
+  // Não sobrescreve se já tiver algo selecionado
+  if (formData.revisor) return;
+
+  // Espera carregar as opções
+  if (!Array.isArray(responsaveis) || responsaveis.length === 0) return;
+
+  // Só seta se o usuário existir na lista de responsáveis
+  const exists = responsaveis.some((r) => String(r.id) === String(idUser));
+  if (!exists) return;
+
+  setFormData((prev) => ({
+    ...prev,
+    revisor: idUser,
+  }));
+}, [requisicao, idUser, responsaveis, formData.revisor]);
+
 
   // Função para salvar APENAS o comentário, ignorando outras alterações na tela
   const handleSalvarComentarioRapido = async () => {
@@ -964,6 +990,7 @@ const handleDenyReplication = () => {
   const [formValidation, setFormValidation] = useState({
     codigo: true,
     nome: true,
+    revisor: true
   });
 
   const allSelected =
@@ -1839,6 +1866,10 @@ const handleDenyReplication = () => {
       setFormValidation((prev) => ({ ...prev, codigo: false }));
       missingFields.push("Código");
     }
+    if (!formData.revisor || String(formData.revisor).trim() === "") {
+      setFormValidation((prev) => ({ ...prev, revisor: false }));
+      missingFields.push("Revisor");
+    }
     if (missingFields.length > 0) {
       const fieldsMessage = missingFields.join(" e ");
       const singularOrPlural =
@@ -1913,6 +1944,7 @@ const handleDenyReplication = () => {
       payload = {
         code: codigo,
         name: nome,
+        idReviewer: formData.revisor || null,
       };
     } else if (requisicao === "Editar") {
       url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
@@ -1926,6 +1958,7 @@ const handleDenyReplication = () => {
         //normativeInternType: formData.tipoNorma,
         publishDate: formData.dataPublicacao,
         initialVigency: formData.vigenciaInicial,
+        idReviwer: formData.revisor || null,
         lastRevision: formData.ultimaRevisao,
         conclusion: conclusaoRevisao,
         frequencyRevision:
@@ -2218,6 +2251,36 @@ const handleDenyReplication = () => {
         />
             </Stack>
           </Grid>
+
+           {/* Localize o Grid do Revisor (aprox. linha 1418) */}
+<Grid item xs={6} sx={{ paddingBottom: 5 }}>
+  <Stack spacing={1}>
+    <InputLabel>Revisor *</InputLabel>
+    <Autocomplete
+      options={responsaveis} // Assumindo que a lista de pessoas é a mesma
+      getOptionLabel={(option) => option.nome}
+      // AGORA vinculado ao formData.revisor
+      value={
+        responsaveis.find(
+          (r) => r.id === formData.revisor
+        ) || null
+      }
+      onChange={(event, newValue) => {
+        setFormData((prev) => ({
+          ...prev,
+          revisor: newValue ? newValue.id : "",
+        }));
+      }}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          // Adicione validação aqui se o campo Revisor for obrigatório
+        />
+      )}
+      disabled={isFormLocked}
+    />
+  </Stack>
+</Grid>
 
           <Grid item xs={6}>
             <Stack spacing={1}>
@@ -3094,7 +3157,7 @@ const handleDenyReplication = () => {
                 </Stack>
               </Grid>
 
-<Grid item xs={4} sx={{ paddingBottom: 5 }}>
+<Grid item xs={6} sx={{ paddingBottom: 5 }}>
   <Stack spacing={1}>
     <InputLabel>Responsável</InputLabel>
     <Autocomplete
@@ -3119,7 +3182,7 @@ const handleDenyReplication = () => {
   </Stack>
 </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Aprovadores</InputLabel>
                   <Autocomplete
@@ -3172,35 +3235,7 @@ const handleDenyReplication = () => {
                 </Stack>
               </Grid>
 
-              {/* Localize o Grid do Revisor (aprox. linha 1418) */}
-<Grid item xs={4} sx={{ paddingBottom: 5 }}>
-  <Stack spacing={1}>
-    <InputLabel>Revisor</InputLabel>
-    <Autocomplete
-      options={responsaveis} // Assumindo que a lista de pessoas é a mesma
-      getOptionLabel={(option) => option.nome}
-      // AGORA vinculado ao formData.revisor
-      value={
-        responsaveis.find(
-          (r) => r.id === formData.revisor
-        ) || null
-      }
-      onChange={(event, newValue) => {
-        setFormData((prev) => ({
-          ...prev,
-          revisor: newValue ? newValue.id : "",
-        }));
-      }}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          // Adicione validação aqui se o campo Revisor for obrigatório
-        />
-      )}
-      disabled={isFormLocked}
-    />
-  </Stack>
-</Grid>
+             
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>

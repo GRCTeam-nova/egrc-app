@@ -1030,7 +1030,7 @@ function ColumnsLayouts() {
                     direction="row"
                     alignItems="center"
                     spacing={1}
-                    style={{ marginTop: 0.5 }}
+                    style={{ marginTop: 35, marginLeft: 25 }}
                   >
                     <Switch
                       checked={status}
