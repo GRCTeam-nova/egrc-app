@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import * as React from "react";
 import {
   Button,
@@ -13,7 +12,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
@@ -35,7 +37,6 @@ import DrawerDeficiencia from "../configuracoes/novaDeficienciaDrawerProcessos";
 import DrawerPlanos from "../configuracoes/novoPlanoDrawerProcesso";
 import FileUploader from "../configuracoes/FileUploader";
 
-// ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
   const authToken = token || localStorage.getItem("access_token");
@@ -65,6 +66,15 @@ function ColumnsLayouts() {
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
   const [processosDados, setProcessosDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [tipoProcHelpOpen, setTipoProcHelpOpen] = useState(false);
+
+  const tipoProcessoHelpText = `O Tipo de processo define a hierarquia e controla quais opções aparecem nos campos relacionados.
+
+• Processo superior: só permite selecionar processos de nível acima do tipo escolhido.
+• Processos inferiores: só permite selecionar processos de nível abaixo do tipo escolhido.
+• Processo anterior / posterior: são filtrados para processos do mesmo tipo.
+• Ao trocar o Tipo de processo, as seleções de Superior, Inferiores, Anterior e Posterior são limpas para evitar inconsistências.`;
+
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
@@ -89,7 +99,40 @@ function ColumnsLayouts() {
     dataInicioOperacao: null,
   });
 
-  // Em caso de edição
+  const PROCESS_TYPE_HIERARCHY_BY_NAME = {
+    macroprocesso: 1,
+    processo: 2,
+    subprocesso: 3,
+    atividade: 4,
+  };
+
+  const normalizeProcTypeName = (v) =>
+    String(v || "")
+      .trim()
+      .toLowerCase();
+
+  const isAllZeroGuid = (v) =>
+    !v || String(v).trim() === "00000000-0000-0000-0000-000000000000";
+
+  const getHierarchyFromProcess = (p) => {
+    const nameKey = normalizeProcTypeName(p?.processType);
+    if (PROCESS_TYPE_HIERARCHY_BY_NAME[nameKey]) {
+      return PROCESS_TYPE_HIERARCHY_BY_NAME[nameKey];
+    }
+
+    if (p?.idProcessType && !isAllZeroGuid(p.idProcessType)) {
+      const ft = formatosUnidades.find((x) => x.id === p.idProcessType);
+      return ft?.hierarchy ?? null;
+    }
+
+    return null;
+  };
+
+  const selectedTipoObj = formatosUnidades.find(
+    (f) => f.id === formData.formatoUnidade,
+  );
+  const currentHierarchy = selectedTipoObj?.hierarchy ?? null;
+
   useEffect(() => {
     if (dadosApi && authToken) {
       const fetchDepartamentosDados = async () => {
@@ -101,7 +144,7 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${authToken}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -114,7 +157,7 @@ function ColumnsLayouts() {
           setNome(data.name);
           setCodigo(data.code);
           setDescricao(data.description);
-          // Garante que os valores estão definidos
+
           setFormData((prev) => ({
             ...prev,
             empresa: Array.isArray(data.companies)
@@ -127,16 +170,24 @@ function ColumnsLayouts() {
               ? data.processBottoms.map((u) => u.idProcessBottom)
               : [],
             kri: data.idKri || null,
-processoAnterior: data.idProcessPrevious 
-    ? (Array.isArray(data.idProcessPrevious) 
-        ? data.idProcessPrevious.map((p) => p.idProcess || p.id) 
-        : [data.idProcessPrevious.idProcess || data.idProcessPrevious.id || data.idProcessPrevious])
-    : [],
-processoPosterior: data.idProcessNext 
-    ? (Array.isArray(data.idProcessNext) 
-        ? data.idProcessNext.map((p) => p.idProcess || p.id) 
-        : [data.idProcessNext.idProcess || data.idProcessNext.id || data.idProcessNext])
-    : [],
+            processoAnterior: data.idProcessPrevious
+              ? Array.isArray(data.idProcessPrevious)
+                ? data.idProcessPrevious.map((p) => p.idProcess || p.id)
+                : [
+                    data.idProcessPrevious.idProcess ||
+                      data.idProcessPrevious.id ||
+                      data.idProcessPrevious,
+                  ]
+              : [],
+            processoPosterior: data.idProcessNext
+              ? Array.isArray(data.idProcessNext)
+                ? data.idProcessNext.map((p) => p.idProcess || p.id)
+                : [
+                    data.idProcessNext.idProcess ||
+                      data.idProcessNext.id ||
+                      data.idProcessNext,
+                  ]
+              : [],
             processoSuperior: data.idProcessSuperior || null,
             formatoUnidade: data.idProcessType || null,
             dado: data.idLgpds || null,
@@ -183,7 +234,6 @@ processoPosterior: data.idProcessNext
         formData.empresa.length > 0
       : true;
 
-  // 3) quando ambos estiverem OK, desligue o overlay
   useEffect(() => {
     if (
       requisicao === "Editar" &&
@@ -202,10 +252,10 @@ processoPosterior: data.idProcessNext
   ]);
 
   const handleCompanyCreated = (newCompany) => {
-    setDepartamentosLaterais((prevCompanies) => [...prevCompanies, newCompany]); // Adiciona o novo processo à lista
+    setDepartamentosLaterais((prevCompanies) => [...prevCompanies, newCompany]);
     setFormData((prev) => ({
       ...prev,
-      empresa: [...prev.empresa, newCompany.id], // Seleciona o novo processo automaticamente
+      empresa: [...prev.empresa, newCompany.id],
     }));
   };
 
@@ -213,10 +263,10 @@ processoPosterior: data.idProcessNext
     setDepartamentosInferiores((prevDepartments) => [
       ...prevDepartments,
       newDepartment,
-    ]); // Adiciona o novo processo à lista
+    ]);
     setFormData((prev) => ({
       ...prev,
-      departamentoInferior: [...prev.departamentoInferior, newDepartment.id], // Seleciona o novo processo automaticamente
+      departamentoInferior: [...prev.departamentoInferior, newDepartment.id],
     }));
   };
 
@@ -267,56 +317,41 @@ processoPosterior: data.idProcessNext
     if (!authToken) return;
     fetchData(
       `${process.env.REACT_APP_API_URL}departments`,
-      setDepartamentosInferiores
+      setDepartamentosInferiores,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}companies`,
-      setDepartamentosLaterais
+      setDepartamentosLaterais,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}processes`,
-      setDepartamentosSuperiores
+      setDepartamentosSuperiores,
     );
     fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
     fetchData(`${process.env.REACT_APP_API_URL}datas`, setDados);
-    fetchData(
-      `${process.env.REACT_APP_API_URL}ledger-accounts`,
-      setContas
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}action-plans`,
-      setPlanoAcao
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}deficiencies`,
-      setDeficiencias
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessoInferior
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}ledger-accounts`, setContas);
+    fetchData(`${process.env.REACT_APP_API_URL}action-plans`, setPlanoAcao);
+    fetchData(`${process.env.REACT_APP_API_URL}deficiencies`, setDeficiencias);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessoInferior);
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsavel
+      setResponsavel,
     );
     fetchData(`${process.env.REACT_APP_API_URL}risks/kris`, setKris);
-    // Carrega os mesmos processos para os novos campos
+
     fetchData(
       `${process.env.REACT_APP_API_URL}processes`,
-      setProcessosAnteriores
+      setProcessosAnteriores,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}processes`,
-      setProcessosPosteriores
+      setProcessosPosteriores,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}processes/types`,
-      setFormatoUnidades
+      setFormatoUnidades,
     );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}incidents`,
-      setIncidentes
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}incidents`, setIncidentes);
     window.scrollTo(0, 0);
   }, [authToken]);
 
@@ -328,7 +363,6 @@ processoPosterior: data.idProcessNext
         },
       });
 
-      // Transformando os dados para alterar idCompany, idLedgerAccount e idProcess -> id, e name -> nome
       const transformedData = response.data.map((item) => ({
         id:
           item.idCompany ||
@@ -349,8 +383,8 @@ processoPosterior: data.idProcessNext
           item.idCollaborator ||
           item.idResponsible,
         nome: item.name,
-        processType: item.processType, // Adiciona processType para filtragem
-        ...item, // Mantém os outros campos intactos
+        processType: item.processType,
+        ...item,
       }));
 
       setState(transformedData);
@@ -364,9 +398,8 @@ processoPosterior: data.idProcessNext
   useEffect(() => {
     const nomeDigitado = formatarNome(nomeDepartamento);
 
-    // Verifica e remove o departamento superior se necessário
     const superiorSelecionada = processosSuperiores.find(
-      (processo) => processo.id === formData.processoSuperior
+      (processo) => processo.id === formData.processoSuperior,
     );
     if (
       superiorSelecionada &&
@@ -378,10 +411,9 @@ processoPosterior: data.idProcessNext
       }));
     }
 
-    // Atualiza os departamentos inferiores removendo os que conflitam
     const inferioresAtualizadas = formData.processoInferior.filter((id) => {
       const processoInferior = processosInferiores.find(
-        (processo) => processo.id === id
+        (processo) => processo.id === id,
       );
       if (!processoInferior) return false;
       return formatarNome(processoInferior.nome) !== nomeDigitado;
@@ -402,10 +434,8 @@ processoPosterior: data.idProcessNext
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "processoSuperior") {
-      // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
-      // Para outros campos
       setFormData({ ...formData, [field]: value });
     }
   };
@@ -415,21 +445,19 @@ processoPosterior: data.idProcessNext
       if (
         formData.departamentoInferior.length === departamentosInferiores.length
       ) {
-        // Deselect all
         setFormData({ ...formData, departamentoInferior: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           departamentoInferior: departamentosInferiores.map(
-            (departamentoInferior) => departamentoInferior.id
+            (departamentoInferior) => departamentoInferior.id,
           ),
         });
       }
     } else {
       tratarMudancaInputGeral(
         "departamentoInferior",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -437,10 +465,8 @@ processoPosterior: data.idProcessNext
   const handleSelectAllKri = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.kri.length === kris.length) {
-        // Deselect all
         setFormData({ ...formData, kri: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           kri: kris.map((kri) => kri.id),
@@ -449,7 +475,7 @@ processoPosterior: data.idProcessNext
     } else {
       tratarMudancaInputGeral(
         "kri",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -457,10 +483,8 @@ processoPosterior: data.idProcessNext
   const handleSelectEmpresa = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.empresa.length === empresas.length) {
-        // Deselect all
         setFormData({ ...formData, empresa: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           empresa: empresas.map((empresa) => empresa.id),
@@ -469,7 +493,7 @@ processoPosterior: data.idProcessNext
     } else {
       tratarMudancaInputGeral(
         "empresa",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -477,16 +501,14 @@ processoPosterior: data.idProcessNext
   const handleSelectAllDado = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.dado.length === dados.length) {
-        // Deselect all
         setFormData({ ...formData, dado: [] });
       } else {
-        // Select all
         setFormData({ ...formData, dado: dados.map((dado) => dado.id) });
       }
     } else {
       tratarMudancaInputGeral(
         "dado",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -494,10 +516,8 @@ processoPosterior: data.idProcessNext
   const handleSelectAllDeficiencias = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.deficiencia.length === deficiencias.length) {
-        // Deselect all
         setFormData({ ...formData, deficiencia: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           deficiencia: deficiencias.map((deficiencia) => deficiencia.id),
@@ -506,65 +526,93 @@ processoPosterior: data.idProcessNext
     } else {
       tratarMudancaInputGeral(
         "deficiencia",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
 
+  const processosInferioresFiltrados = React.useMemo(() => {
+    if (!currentHierarchy) return [];
+
+    return processosInferiores.filter((processo) => {
+      const h = getHierarchyFromProcess(processo);
+      if (h == null) return false;
+
+      if (!(h > currentHierarchy)) return false;
+
+      const superiorId = formData.processoSuperior || null;
+
+      if (formData.processoInferior.includes(processo.id)) return true;
+
+      return (
+        processo.id !== superiorId &&
+        formatarNome(processo.nome) !== formatarNome(nomeDepartamento)
+      );
+    });
+  }, [
+    processosInferiores,
+    currentHierarchy,
+    formData.processoSuperior,
+    formData.processoInferior,
+    nomeDepartamento,
+  ]);
+
+  const opcoesProcessosInferiores = React.useMemo(() => {
+    if (processosInferioresFiltrados.length === 0) return [];
+    return [
+      { id: "all", nome: "Selecionar todos" },
+      ...processosInferioresFiltrados,
+    ];
+  }, [processosInferioresFiltrados]);
+
   const handleSelectAll2 = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      // Aplica o filtro: remove o item selecionado como processo superior e os que conflitam com o nome digitado
-      const filteredInferiores = processosInferiores.filter((processo) => {
-        const superiorId = formData.processoSuperior;
-        if (processo.id === superiorId) return false;
-        return formatarNome(processo.nome) !== formatarNome(nomeDepartamento);
-      });
-      if (formData.processoInferior.length === filteredInferiores.length) {
-        // Se já estiverem selecionados todos os itens filtrados, deseleciona todos
+      if (!currentHierarchy || processosInferioresFiltrados.length === 0)
+        return;
+
+      if (
+        formData.processoInferior.length === processosInferioresFiltrados.length
+      ) {
         setFormData({ ...formData, processoInferior: [] });
       } else {
-        // Seleciona somente os itens filtrados
         setFormData({
           ...formData,
-          processoInferior: filteredInferiores.map((processo) => processo.id),
+          processoInferior: processosInferioresFiltrados.map((p) => p.id),
         });
       }
     } else {
       tratarMudancaInputGeral(
         "processoInferior",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
 
-  // Handlers para os novos campos (Processo Anterior e Posterior)
   const handleSelectProcessoAnterior = (event, newValue) => {
     tratarMudancaInputGeral(
       "processoAnterior",
-      newValue.map((item) => item.id)
+      newValue.map((item) => item.id),
     );
   };
 
   const handleSelectProcessoPosterior = (event, newValue) => {
     tratarMudancaInputGeral(
       "processoPosterior",
-      newValue.map((item) => item.id)
+      newValue.map((item) => item.id),
     );
   };
 
   const handleSelectAllRisco = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.risco.length === riscos.length) {
-        // Deselect all
         setFormData({ ...formData, risco: [] });
       } else {
-        // Select all
         setFormData({ ...formData, risco: riscos.map((risco) => risco.id) });
       }
     } else {
       tratarMudancaInputGeral(
         "risco",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -572,16 +620,14 @@ processoPosterior: data.idProcessNext
   const handleSelectAllConta = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.conta.length === contas.length) {
-        // Deselect all
         setFormData({ ...formData, conta: [] });
       } else {
-        // Select all
         setFormData({ ...formData, conta: contas.map((conta) => conta.id) });
       }
     } else {
       tratarMudancaInputGeral(
         "conta",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -589,10 +635,8 @@ processoPosterior: data.idProcessNext
   const handleSelectAllIncidentes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.incidente.length === incidentes.length) {
-        // Deselect all
         setFormData({ ...formData, incidente: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           incidente: incidentes.map((incidente) => incidente.id),
@@ -601,7 +645,7 @@ processoPosterior: data.idProcessNext
     } else {
       tratarMudancaInputGeral(
         "incidente",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -609,10 +653,8 @@ processoPosterior: data.idProcessNext
   const handleSelectAllPlanoAcao = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.planoAcao.length === planosAcoes.length) {
-        // Deselect all
         setFormData({ ...formData, planoAcao: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           planoAcao: planosAcoes.map((planoAcao) => planoAcao.id),
@@ -621,7 +663,7 @@ processoPosterior: data.idProcessNext
     } else {
       tratarMudancaInputGeral(
         "planoAcao",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -637,7 +679,6 @@ processoPosterior: data.idProcessNext
   const voltarParaCadastroMenu = () => {
     navigate(-1);
     window.scrollTo(0, 0);
-    // navigate('/apps/processosInferiores/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
   const continuarEdicao = () => {
@@ -645,7 +686,6 @@ processoPosterior: data.idProcessNext
     setSuccessDialogOpen(false);
   };
 
-  // Função para voltar para a listagem
   const voltarParaListagem = () => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
@@ -663,8 +703,9 @@ processoPosterior: data.idProcessNext
   const allSelectedRiscos =
     formData.risco.length === riscos.length && riscos.length > 0;
   const allSelected2 =
-    formData.processoInferior.length === processosInferiores.length &&
-    processosInferiores.length > 0;
+    processosInferioresFiltrados.length > 0 &&
+    formData.processoInferior.length === processosInferioresFiltrados.length;
+
   const allSelected3 =
     formData.dado.length === dados.length && dados.length > 0;
   const allSelected4 =
@@ -704,23 +745,22 @@ processoPosterior: data.idProcessNext
       enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
         variant: "error",
       });
-      return; // Para a execução se a validação falhar
+      return;
     }
 
     const newFiles = formData.files.filter((file) => file instanceof File);
     const existingFiles = formData.files.filter(
-      (file) => !(file instanceof File)
+      (file) => !(file instanceof File),
     );
 
-    // Realiza upload dos novos arquivos, se houver
     let uploadFilesResult = { files: [] };
     if (newFiles.length > 0) {
       const formDataUpload = new FormData();
-      formDataUpload.append("ContainerFolder", 10); // 1 para empresa
-      // Em edição, já temos o id da empresa; em criação, envia string vazia
+      formDataUpload.append("ContainerFolder", 10);
+
       formDataUpload.append(
         "IdContainer",
-        requisicao === "Editar" ? processosDados?.idProcess : ""
+        requisicao === "Editar" ? processosDados?.idProcess : "",
       );
       newFiles.forEach((file) => {
         formDataUpload.append("Files", file, file.name);
@@ -734,23 +774,19 @@ processoPosterior: data.idProcessNext
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
-      uploadFilesResult = uploadResponse.data; // Supõe-se que seja um objeto do tipo { files: [...] }
+      uploadFilesResult = uploadResponse.data;
     }
 
-    // Combina os arquivos já existentes com os novos enviados (retornados pelo endpoint)
     const finalFiles = [...existingFiles, ...uploadFilesResult.files];
 
-    // Transforma cada item para que o payload contenha somente a URL (string)
     const finalFilesPayload = finalFiles.map((file) => {
-      // Se for uma string já, retorna-a; se for objeto e tiver a propriedade "path", retorna o valor dela.
       if (typeof file === "string") return file;
       if (file.path) return file.path;
       return file;
     });
 
-    // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
       url = `${process.env.REACT_APP_API_URL}processes`;
       method = "POST";
@@ -800,7 +836,6 @@ processoPosterior: data.idProcessNext
     try {
       setLoading(true);
 
-      // Primeira requisição (POST ou PUT inicial)
       const response = await fetch(url, {
         method,
         headers: {
@@ -825,7 +860,6 @@ processoPosterior: data.idProcessNext
       }
 
       if (requisicao === "Criar" && data.data.idProcess) {
-        // Atualiza o estado para modo de edição
         setProcessosDados(data.data);
         setSuccessDialogOpen(true);
       } else {
@@ -841,30 +875,29 @@ processoPosterior: data.idProcessNext
     }
   };
 
-  // Lógica de filtragem para os novos campos
   const tipoProcessoSelecionado = formatosUnidades.find(
-    (f) => f.id === formData.formatoUnidade
+    (f) => f.id === formData.formatoUnidade,
   )?.nome;
 
-  // Localize estas variáveis antes do return do componente
-const opcoesProcessoAnterior = formData.formatoUnidade
-  ? processosAnteriores.filter(
-      (p) =>
-        // Compara o ID do tipo de processo para ser mais preciso
-        (p.idProcessType === formData.formatoUnidade || p.processType === tipoProcessoSelecionado) &&
-        !formData.processoPosterior.includes(p.id) &&
-        p.id !== processosDados?.idProcess
-    )
-  : [];
+  const opcoesProcessoAnterior = formData.formatoUnidade
+    ? processosAnteriores.filter(
+        (p) =>
+          (p.idProcessType === formData.formatoUnidade ||
+            p.processType === tipoProcessoSelecionado) &&
+          !formData.processoPosterior.includes(p.id) &&
+          p.id !== processosDados?.idProcess,
+      )
+    : [];
 
-const opcoesProcessoPosterior = formData.formatoUnidade
-  ? processosPosteriores.filter(
-      (p) =>
-        (p.idProcessType === formData.formatoUnidade || p.processType === tipoProcessoSelecionado) &&
-        !formData.processoAnterior.includes(p.id) &&
-        p.id !== processosDados?.idProcess
-    )
-  : [];
+  const opcoesProcessoPosterior = formData.formatoUnidade
+    ? processosPosteriores.filter(
+        (p) =>
+          (p.idProcessType === formData.formatoUnidade ||
+            p.processType === tipoProcessoSelecionado) &&
+          !formData.processoAnterior.includes(p.id) &&
+          p.id !== processosDados?.idProcess,
+      )
+    : [];
 
   return (
     <>
@@ -911,12 +944,13 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 />
               </InputLabel>
               <Autocomplete
+                noOptionsText={"Dados não encontrados"}
                 multiple
                 disableCloseOnSelect
                 options={[{ id: "all", nome: "Selecionar todas" }, ...empresas]}
                 getOptionLabel={(option) => option.nome}
                 value={formData.empresa.map(
-                  (id) => empresas.find((empresa) => empresa.id === id) || id
+                  (id) => empresas.find((empresa) => empresa.id === id) || id,
                 )}
                 onChange={handleSelectEmpresa}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -964,6 +998,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -975,8 +1010,8 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                       (id) =>
                         departamentosInferiores.find(
                           (departamentoInferior) =>
-                            departamentoInferior.id === id
-                        ) || id
+                            departamentoInferior.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAll}
                     isOptionEqualToValue={(option, value) =>
@@ -1004,7 +1039,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                         error={
                           (formData.departamentoInferior.length === 0 ||
                             formData.departamentoInferior.every(
-                              (val) => val === 0
+                              (val) => val === 0,
                             )) &&
                           formValidation.departamentoInferior === false
                         }
@@ -1028,18 +1063,32 @@ const opcoesProcessoPosterior = formData.formatoUnidade
               </Grid>
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
-                  <InputLabel>Tipo de processo</InputLabel>
+                  <InputLabel
+                    sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
+                  >
+                    Tipo de processo
+                    <Tooltip
+                      title="Clique para ver as regras"
+                      arrow
+                      placement="right"
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() => setTipoProcHelpOpen(true)}
+                        aria-label="Ajuda sobre o Tipo de processo"
+                        sx={{ p: 0.25 }}
+                      >
+                        <HelpOutlineIcon
+                          sx={{ fontSize: 18, color: "rgba(0,0,0,0.6)" }}
+                        />
+                      </IconButton>
+                    </Tooltip>
+                  </InputLabel>
 
-                  {/* helper para rotular com o nível */}
-                  {/*
-      Coloque fora do return, junto dos outros helpers se preferir:
-      const formatTipoProcLabel = (opt) => opt?.hierarchy != null
-        ? `Nível ${opt.hierarchy} — ${opt.nome}`
-        : opt?.nome || '';
-    */}
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     options={[...formatosUnidades].sort(
-                      (a, b) => (a?.hierarchy ?? 999) - (b?.hierarchy ?? 999)
+                      (a, b) => (a?.hierarchy ?? 999) - (b?.hierarchy ?? 999),
                     )}
                     getOptionLabel={(option) =>
                       option?.hierarchy != null
@@ -1049,16 +1098,21 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     value={
                       formatosUnidades.find(
                         (formatoUnidade) =>
-                          formatoUnidade.id === formData.formatoUnidade
+                          formatoUnidade.id === formData.formatoUnidade,
                       ) || null
                     }
                     onChange={(event, newValue) => {
+                      const newTipoId = newValue ? newValue.id : "";
+
                       setFormData((prev) => ({
                         ...prev,
-                        formatoUnidade: newValue ? newValue.id : "",
-                        // Limpa dependentes ao mudar o tipo
+                        formatoUnidade: newTipoId,
+
                         processoAnterior: [],
                         processoPosterior: [],
+
+                        processoSuperior: null,
+                        processoInferior: [],
                       }));
                     }}
                     isOptionEqualToValue={(option, value) =>
@@ -1083,7 +1137,6 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                         </Grid>
                       </li>
                     )}
-                    // chips (tags) também exibem o nível
                     renderTags={(value, getTagProps) =>
                       value.map((option, index) => (
                         <span
@@ -1131,6 +1184,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -1139,7 +1193,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.risco.map(
-                      (id) => riscos.find((risco) => risco.id === id) || id
+                      (id) => riscos.find((risco) => risco.id === id) || id,
                     )}
                     onChange={handleSelectAllRisco}
                     isOptionEqualToValue={(option, value) =>
@@ -1181,16 +1235,22 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 <Stack spacing={1}>
                   <InputLabel>Processo superior</InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
+                    disabled={!currentHierarchy}
                     options={processosSuperiores.filter((processo) => {
-                      // IDs dos departamentos já selecionados nos outros campos:
+                      if (!currentHierarchy) return false;
+
+                      const h = getHierarchyFromProcess(processo);
+                      if (h == null) return false;
+
+                      if (!(h < currentHierarchy)) return false;
+
                       const selectedInferior = formData.processoInferior || [];
                       const selectedIds = [...selectedInferior];
 
-                      // Se for o valor atual selecionado, não filtra
                       if (formData.processoSuperior === processo.id)
                         return true;
 
-                      // Exclui se já estiver selecionado em outro campo ou se o nome for igual ao nome do departamento atual
                       return (
                         !selectedIds.includes(processo.id) &&
                         formatarNome(processo.nome) !==
@@ -1201,7 +1261,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     value={
                       processosSuperiores.find(
                         (processoSuperior) =>
-                          processoSuperior.id === formData.processoSuperior
+                          processoSuperior.id === formData.processoSuperior,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -1227,31 +1287,17 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 <Stack spacing={1}>
                   <InputLabel>Processos Inferiores</InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...processosInferiores.filter((processo) => {
-                        // IDs já selecionados em outros autocompletes:
-                        const superiorId = formData.processoSuperior || [];
-
-                        // Se o departamento estiver selecionado neste campo, mantenha-o
-                        if (formData.processoInferior.includes(processo.id))
-                          return true;
-
-                        return (
-                          processo.id !== superiorId &&
-                          formatarNome(processo.nome) !==
-                            formatarNome(nomeDepartamento)
-                        );
-                      }),
-                    ]}
+                    options={opcoesProcessosInferiores}
+                    disabled={!currentHierarchy}
                     getOptionLabel={(option) => option.nome}
                     value={formData.processoInferior.map(
                       (id) =>
                         processosInferiores.find(
-                          (processoInferior) => processoInferior.id === id
-                        ) || id
+                          (processoInferior) => processoInferior.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAll2}
                     isOptionEqualToValue={(option, value) =>
@@ -1279,7 +1325,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                         error={
                           (formData.processoInferior.length === 0 ||
                             formData.processoInferior.every(
-                              (val) => val === 0
+                              (val) => val === 0,
                             )) &&
                           formValidation.processoInferior === false
                         }
@@ -1293,23 +1339,21 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 <Stack spacing={1}>
                   <InputLabel>Processo Anterior</InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={opcoesProcessoAnterior}
                     getOptionLabel={(option) => option.nome}
                     value={formData.processoAnterior.map(
-                      (id) => processosAnteriores.find((p) => p.id === id) || id
+                      (id) =>
+                        processosAnteriores.find((p) => p.id === id) || id,
                     )}
                     onChange={handleSelectProcessoAnterior}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
-                    disabled={!formData.formatoUnidade} // Desabilita se o tipo de processo não estiver preenchido
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                      />
-                    )}
+                    disabled={!formData.formatoUnidade}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -1318,24 +1362,21 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 <Stack spacing={1}>
                   <InputLabel>Processo Posterior</InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={opcoesProcessoPosterior}
                     getOptionLabel={(option) => option.nome}
                     value={formData.processoPosterior.map(
                       (id) =>
-                        processosPosteriores.find((p) => p.id === id) || id
+                        processosPosteriores.find((p) => p.id === id) || id,
                     )}
                     onChange={handleSelectProcessoPosterior}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
-                    disabled={!formData.formatoUnidade} // Desabilita se o tipo de processo não estiver preenchido
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                      />
-                    )}
+                    disabled={!formData.formatoUnidade}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -1354,6 +1395,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -1362,7 +1404,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.dado.map(
-                      (id) => dados.find((dado) => dado.id === id) || id
+                      (id) => dados.find((dado) => dado.id === id) || id,
                     )}
                     onChange={handleSelectAllDado}
                     isOptionEqualToValue={(option, value) =>
@@ -1412,6 +1454,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -1422,8 +1465,8 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     value={formData.deficiencia.map(
                       (id) =>
                         deficiencias.find(
-                          (deficiencia) => deficiencia.id === id
-                        ) || id
+                          (deficiencia) => deficiencia.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAllDeficiencias}
                     isOptionEqualToValue={(option, value) =>
@@ -1473,6 +1516,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -1481,7 +1525,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.conta.map(
-                      (id) => contas.find((conta) => conta.id === id) || id
+                      (id) => contas.find((conta) => conta.id === id) || id,
                     )}
                     onChange={handleSelectAllConta}
                     isOptionEqualToValue={(option, value) =>
@@ -1533,6 +1577,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -1543,7 +1588,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     value={formData.incidente.map(
                       (id) =>
                         incidentes.find((incidente) => incidente.id === id) ||
-                        id
+                        id,
                     )}
                     onChange={handleSelectAllIncidentes}
                     isOptionEqualToValue={(option, value) =>
@@ -1595,6 +1640,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -1605,7 +1651,7 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     value={formData.planoAcao.map(
                       (id) =>
                         planosAcoes.find((planoAcao) => planoAcao.id === id) ||
-                        id
+                        id,
                     )}
                     onChange={handleSelectAllPlanoAcao}
                     isOptionEqualToValue={(option, value) =>
@@ -1647,15 +1693,10 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 <Stack spacing={1}>
                   <InputLabel>KRI</InputLabel>
                   <Autocomplete
-                    // REMOVIDO: multiple
-                    // REMOVIDO: disableCloseOnSelect
-
-                    // Opções: removemos a opção "Selecionar todos" pois é seleção única
+                    noOptionsText={"Dados não encontrados"}
                     options={kris}
                     getOptionLabel={(option) => option.nome}
-                    // VALUE: Busca o objeto inteiro baseado no ID salvo no state
                     value={kris.find((kri) => kri.id === formData.kri) || null}
-                    // ONCHANGE: Atualiza o state com apenas o ID (GUID) ou null
                     onChange={(event, newValue) => {
                       setFormData((prev) => ({
                         ...prev,
@@ -1668,7 +1709,6 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        // Ajuste a validação conforme necessário (se for obrigatório ou não)
                         error={!formData.kri && formValidation.kri === false}
                       />
                     )}
@@ -1680,11 +1720,13 @@ const opcoesProcessoPosterior = formData.formatoUnidade
                 <Stack spacing={1}>
                   <InputLabel>Responsável</InputLabel>
                   <Autocomplete
+                    noOptionsText={"Dados não encontrados"}
                     options={responsaveis}
                     getOptionLabel={(option) => option.nome}
                     value={
                       responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
+                        (responsavel) =>
+                          responsavel.id === formData.responsavel,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -1741,6 +1783,32 @@ const opcoesProcessoPosterior = formData.formatoUnidade
             </Stack>
           </Grid>
         </Grid>
+
+        <Dialog
+          open={tipoProcHelpOpen}
+          onClose={() => setTipoProcHelpOpen(false)}
+          aria-labelledby="tipo-proc-help-title"
+          aria-describedby="tipo-proc-help-desc"
+        >
+          <DialogTitle id="tipo-proc-help-title">
+            Regras do Tipo de processo
+          </DialogTitle>
+
+          <DialogContent>
+            <DialogContentText
+              id="tipo-proc-help-desc"
+              sx={{ whiteSpace: "pre-line" }}
+            >
+              {tipoProcessoHelpText}
+            </DialogContentText>
+          </DialogContent>
+
+          <DialogActions>
+            <Button onClick={() => setTipoProcHelpOpen(false)} autoFocus>
+              Entendi
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog
           open={successDialogOpen}
