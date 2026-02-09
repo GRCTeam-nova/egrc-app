@@ -20,7 +20,7 @@ import ControlDashboard from "../../sections/dashboard/default/ControlDashboard"
 
 export default function DashboardWithTabs() {
   // tab selection state
-  const [currentTab, setCurrentTab] = useState("incidentes");
+  const [currentTab, setCurrentTab] = useState("dados");
   // slot state for the area chart
   const [slot, setSlot] = useState("week");
 
@@ -45,9 +45,6 @@ export default function DashboardWithTabs() {
         <Tab label="Ativos" value="ativos" />
         <Tab label="Riscos" value="riscos" />
         <Tab label="Controle" value="controle" />
-        <Tab label="Incidentes e Riscos" value="incidentes" />
-        <Tab label="Resumo Semanal" value="resumo" />
-        <Tab label="Outro Gráfico" value="outro" />
       </Tabs>
 
       {/* Aba Empresas */}
