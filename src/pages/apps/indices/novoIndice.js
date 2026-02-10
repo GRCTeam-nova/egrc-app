@@ -66,7 +66,7 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}indexs/${dadosApi.idIndex}`,
+            `${process.env.REACT_APP_API_URL}indexs/${dadosApi.id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -140,7 +140,7 @@ function ColumnsLayouts() {
         }
       };
 
-      if (dadosApi.idIndex) {
+      if (dadosApi.id) {
         fetchEmpresaDados();
       }
     }

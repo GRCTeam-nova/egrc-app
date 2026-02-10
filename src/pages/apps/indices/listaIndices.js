@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
-import { Fragment, useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect, useRef } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useNavigate } from "react-router";
@@ -11,12 +11,9 @@ import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDe
 import { useGetIndices } from "../../../api/indices";
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useRef } from "react";
 import emitter from "../tela2/eventEmitter";
-// project import
 import MainCard from "../../../components/MainCard";
 
-// material-ui
 import { useTheme } from "@mui/material/styles";
 
 import {
@@ -42,29 +39,25 @@ import {
   useMediaQuery,
 } from "@mui/material";
 
-// third-party
 import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
   getFilteredRowModel,
-  getExpandedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 
-// project-import
 import ScrollX from "../../../components/ScrollX";
 import IconButton from "../../../components/@extended/IconButton";
 import CircularProgress from "@mui/material/CircularProgress";
 import Drawer from "@mui/material/Drawer";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
-import CloseIcon from '@mui/icons-material/Close';
+import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
   faXmark,
-  faBan,
   faTrash,
   faExclamation,
 } from "@fortawesome/free-solid-svg-icons";
@@ -75,104 +68,247 @@ import {
   EmptyTable,
   RowSelection,
   TablePagination,
-} from "../../../components/third-party/react-table"; import axios from "axios";
+  SelectColumnVisibility,
+} from "../../../components/third-party/react-table";
 import { useToken } from "../../../api/TokenContext";
 
-// assets
-import { PlusOutlined } from "@ant-design/icons";
-import {
-  faFilter,
-} from "@fortawesome/free-solid-svg-icons";
+import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
+import { faFilter } from "@fortawesome/free-solid-svg-icons";
+import InputAdornment from "@mui/material/InputAdornment";
 
 export const fuzzyFilter = (row, columnId, value) => {
-  // Obter o valor da célula na coluna especificada
-  let cellValue = row.getValue(columnId);
+  const cellValue = row.getValue(columnId);
 
-  // Verificar se o valor da célula e o valor do filtro não são undefined
-  if (cellValue === undefined || value === undefined) {
-    // Retornar false se algum valor for undefined
+  if (
+    cellValue === undefined ||
+    cellValue === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return false;
   }
 
-  // Função para normalizar o texto removendo acentos
-  const normalizeText = (text) => {
-    return text
-      .toString()
+  const normalize = (val) => {
+    if (val === null || val === undefined) return "";
+    return String(val)
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
   };
 
-  // Converter valores para string, normalizar e realizar a comparação
-  cellValue = normalizeText(cellValue);
-  const valueStr = normalizeText(value);
+  let cellString = "";
+  if (Array.isArray(cellValue)) {
+    cellString = cellValue.map((item) => normalize(item)).join(" ");
+  } else {
+    cellString = normalize(cellValue);
+  }
 
-  return cellValue.includes(valueStr);
+  const searchTerms = normalize(value)
+    .split(" ")
+    .filter((term) => term.trim() !== "");
+
+  return searchTerms.every((term) => cellString.includes(term));
 };
 
-// ==============================|| REACT TABLE - LIST ||============================== //
+const defaultVisibility = {
+  name: true,
+  description: true,
+  value: true,
+  date: true,
+  active: true,
+  actions: true,
+};
 
-function ReactTable({ data, columns, processosTotal, isLoading }) {
+function ReactTable({
+  data,
+  columns,
+  totalRows,
+  isLoading,
+  onApplyFilters,
+  onExportExcel,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
-  const [columnVisibility, setColumnVisibility] = useState({});
+  const STORAGE_KEY = "egrc_table_visibility_indices";
+
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const parsed = saved ? JSON.parse(saved) : {};
+      // Merge: mantém defaults e aplica preferências salvas (mesmo que antigas existam)
+      return { ...defaultVisibility, ...parsed };
+    } catch (error) {
+      console.error("Erro ao carregar visibilidade das colunas", error);
+      return defaultVisibility;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
   const recordType = "Índices";
   const tableRef = useRef(null);
-  const [sorting, setSorting] = useState([{ id: "nome", asc: true }]);
+  const [sorting, setSorting] = useState([{ id: "name", asc: true }]);
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const navigation = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState([]);
-  const [indicesOptions, setIndicesOptions] = useState([]);
-  const [statusOptions] = useState([
-    { label: "Ativo", value: true },
-    { label: "Inativo", value: false },
+  const [selectedFilters, setSelectedFilters] = useState([
+    { type: "Status", values: ["Ativo"] },
   ]);
-  const [draftFilters, setDraftFilters] = useState({ indice: [], status: [], });
+  const [indexOptions, setIndexOptions] = useState([]);
 
-  // Abre ou fecha o drawer
+
+  const formatCurrencyBRL = (raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return String(raw ?? "");
+    return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
+  const formatDateDDMMYYYYDash = (ymd) => {
+    if (!ymd) return "";
+    const [y, m, d] = String(ymd).split("-");
+    if (!y || !m || !d) return String(ymd);
+    return `${d}-${m}-${y}`;
+  };
+
+  const formatFilterValuesForChip = (type, values = []) => {
+    if (type === "Valor mínimo" || type === "Valor máximo") {
+      return values.map(formatCurrencyBRL);
+    }
+    if (type === "Data Inicial" || type === "Data Final") {
+      return values.map(formatDateDDMMYYYYDash);
+    }
+    return values;
+  };
+
+  const [draftFilters, setDraftFilters] = useState({
+    status: ["Ativo"],
+    indices: [],
+    description: "",
+    valueMin: "",
+    valueMax: "",
+    startDate: null,
+    endDate: null,
+  });
+
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
   useEffect(() => {
-    const indices = [...new Set(data.map((item) => item.name))];
-    setIndicesOptions(indices);
+    const getUniqueValues = (key, isArray = false) => {
+      if (!data) return [];
+      const values = data.flatMap((item) => {
+        const value = item[key];
+        if (isArray && Array.isArray(value)) {
+          return value.filter((v) => v !== null && v !== undefined && v !== "");
+        }
+        return value !== null && value !== undefined && value !== ""
+          ? [value]
+          : [];
+      });
+      return [...new Set(values)].sort();
+    };
+
+    setIndexOptions(getUniqueValues("name"));
   }, [data]);
 
-  // Aplica os filtros selecionados
   const applyFilters = () => {
     const newFilters = [];
-    if (draftFilters.indice.length > 0) {
-      newFilters.push({ type: "Indice", values: draftFilters.indice });
+
+    if (draftFilters.status?.length > 0) {
+      newFilters.push({ type: "Status", values: draftFilters.status });
     }
-    if (draftFilters.status.length > 0) {
-      newFilters.push({ type: "Status", values: draftFilters.status.map((s) => s.value) });
+
+    if (draftFilters.indices?.length > 0) {
+      newFilters.push({ type: "Índice", values: draftFilters.indices });
     }
+
+    if (draftFilters.description && String(draftFilters.description).trim()) {
+      newFilters.push({
+        type: "Descrição",
+        values: [String(draftFilters.description).trim()],
+      });
+    }
+
+    if (draftFilters.valueMin !== "" && draftFilters.valueMin !== null) {
+      newFilters.push({
+        type: "Valor mínimo",
+        values: [String(draftFilters.valueMin)],
+      });
+    }
+
+    if (draftFilters.valueMax !== "" && draftFilters.valueMax !== null) {
+      newFilters.push({
+        type: "Valor máximo",
+        values: [String(draftFilters.valueMax)],
+      });
+    }
+
+    if (draftFilters.startDate) {
+      newFilters.push({
+        type: "Data Inicial",
+        values: [draftFilters.startDate],
+      });
+    }
+    if (draftFilters.endDate) {
+      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
+    }
+
     setSelectedFilters(newFilters);
+
+    // Mantive igual ao seu: backend só recebe StartDate/EndDate
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: draftFilters.startDate,
+        EndDate: draftFilters.endDate,
+      });
+    }
+
     toggleDrawer();
   };
 
-  // Remove filtro selecionado
   const removeFilter = (index) => {
     setSelectedFilters((prev) => {
       const filterToRemove = prev[index];
-      
+
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
-        if (filterToRemove.type === "Indice") {
-          updatedDraft.indice = updatedDraft.indice.filter(
-            (value) => !filterToRemove.values.includes(value)
-          );
-        } else if (filterToRemove.type === "Status") {
+        const filterType = filterToRemove.type;
+
+        const mapTypeToKey = {
+          Status: "status",
+          Índice: "indices",
+          Descrição: "description",
+          "Valor mínimo": "valueMin",
+          "Valor máximo": "valueMax",
+        };
+
+        const key = mapTypeToKey[filterType];
+
+        if (key === "status") {
           updatedDraft.status = updatedDraft.status.filter(
-            (value) => !filterToRemove.values.includes(value.value)
+            (v) => !filterToRemove.values.includes(v),
           );
+        } else if (key === "indices") {
+          updatedDraft.indices = (updatedDraft.indices || []).filter(
+            (v) => !filterToRemove.values.includes(v),
+          );
+        } else if (key === "description") {
+          updatedDraft.description = "";
+        } else if (key === "valueMin") {
+          updatedDraft.valueMin = "";
+        } else if (key === "valueMax") {
+          updatedDraft.valueMax = "";
+        } else if (filterType === "Data Inicial") {
+          updatedDraft.startDate = null;
+        } else if (filterType === "Data Final") {
+          updatedDraft.endDate = null;
         }
+
         return updatedDraft;
       });
-  
-      // Remove o filtro da lista de filtros selecionados
+
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -180,15 +316,109 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const handleRemoveAllFilters = () => {
     setSelectedFilters([]);
     setGlobalFilter("");
-    setDraftFilters({ indice: [], status: [] });
+
+    setDraftFilters({
+      status: [],
+      indices: [],
+      description: "",
+      valueMin: "",
+      valueMax: "",
+      startDate: null,
+      endDate: null,
+    });
+
+    if (onApplyFilters) {
+      onApplyFilters({ StartDate: null, EndDate: null });
+    }
   };
 
-  // Filtra os indices com base nos filtros selecionados
+  const normalize = (val) =>
+    String(val ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const parseYMDLocalStart = (ymd) => {
+    if (!ymd) return null;
+    const [y, m, d] = String(ymd).split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  };
+
+  const parseYMDLocalEnd = (ymd) => {
+    if (!ymd) return null;
+    const [y, m, d] = String(ymd).split("-").map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 23, 59, 59, 999);
+  };
+
   const filteredData = useMemo(() => {
-    return data.filter((item) => {
+    return (data || []).filter((item) => {
       return selectedFilters.every((filter) => {
-        if (filter.type === "Indice") return filter.values.includes(item.name);
-        if (filter.type === "Status") return filter.values.includes(item.active);
+        const filterType = filter.type;
+        const filterValues = filter.values || [];
+
+        if (filterType === "Status") {
+          const showActive = filterValues.includes("Ativo");
+          const showInactive = filterValues.includes("Inativo");
+          if (showActive && showInactive) return true;
+          if (showActive) return item.active === true;
+          if (showInactive) return item.active === false;
+          return true;
+        }
+
+        if (filterType === "Índice") {
+          // múltiplos índices: OR (qualquer um selecionado)
+          if (filterValues.length === 0) return true;
+          const name = normalize(item.name);
+          return filterValues.some((v) => normalize(v) === name);
+        }
+
+        if (filterType === "Descrição") {
+          const search = normalize(filterValues[0]);
+          if (!search) return true;
+
+          const hay = normalize(item.description);
+          // suporta múltiplas palavras
+          return search
+            .split(" ")
+            .filter(Boolean)
+            .every((t) => hay.includes(t));
+        }
+
+        if (filterType === "Valor mínimo") {
+          const min = Number(String(filterValues[0]).replace(",", "."));
+          const val = Number(item.value);
+          if (!Number.isFinite(min)) return true;
+          if (!Number.isFinite(val)) return false;
+          return val >= min;
+        }
+
+        if (filterType === "Valor máximo") {
+          const max = Number(String(filterValues[0]).replace(",", "."));
+          const val = Number(item.value);
+          if (!Number.isFinite(max)) return true;
+          if (!Number.isFinite(val)) return false;
+          return val <= max;
+        }
+
+        if (filterType === "Data Inicial") {
+          const start = parseYMDLocalStart(filterValues[0]);
+          if (!start) return true;
+          const dt = item.date ? new Date(item.date) : null;
+          if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return false;
+          return dt >= start;
+        }
+
+        if (filterType === "Data Final") {
+          const end = parseYMDLocalEnd(filterValues[0]);
+          if (!end) return true;
+          const dt = item.date ? new Date(item.date) : null;
+          if (!(dt instanceof Date) || Number.isNaN(dt.getTime())) return false;
+          return dt <= end;
+        }
+
         return true;
       });
     });
@@ -203,30 +433,17 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
-    getRowCanExpand: () => true,
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     globalFilterFn: fuzzyFilter,
     debugTable: true,
   });
 
-  useEffect(
-    () =>
-      setColumnVisibility({
-        comarca: false,
-        instancia: false,
-        dataDistribuicao: false,
-        orgao: false,
-        valorCausa: false,
-        acao: false,
-        posicaoProcessual: false,
-        area: false,
-      }),
-    []
-  );
+  const getAllColumnsFiltered = () => {
+    return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
+  };
 
   const verticalDividerStyle = {
     width: "0.5px",
@@ -238,21 +455,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
     marginLeft: "7px",
   };
 
-  let headers = [];
-  table.getVisibleLeafColumns().map((columns) =>
-    headers.push({
-      label:
-        typeof columns.columnDef.header === "string"
-          ? columns.columnDef.header
-          : "#",
-      key: columns.columnDef.accessorKey,
-    })
-  );
-
-  // Função para realizar a marcação de texto
   useEffect(() => {
     const markInstance = new Mark(tableRef.current);
-
     if (globalFilter) {
       markInstance.unmark({
         done: () => {
@@ -286,6 +490,15 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         }}
       >
         <Stack direction="row" spacing={1} alignItems="center">
+          <SelectColumnVisibility
+            {...{
+              getVisibleLeafColumns: table.getVisibleLeafColumns,
+              getIsAllColumnsVisible: table.getIsAllColumnsVisible,
+              getToggleAllColumnsVisibilityHandler:
+                table.getToggleAllColumnsVisibilityHandler,
+              getAllColumns: getAllColumnsFiltered,
+            }}
+          />
           <DebouncedInput
             value={globalFilter ?? ""}
             onFilterChange={(value) => setGlobalFilter(String(value))}
@@ -306,7 +519,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
             style={{
               width: "90px",
               color: "#00000080",
-              backgroundColor: 'white',
+              backgroundColor: "white",
               fontSize: "13px",
               marginLeft: 24,
               fontWeight: 400,
@@ -325,10 +538,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           alignItems="center"
           sx={{ width: { xs: "100%", sm: "auto" } }}
         >
-          <div style={verticalDividerStyle}></div>
-
+          <div style={{ verticalDividerStyle }}></div>
           <Stack direction="row" spacing={2} alignItems="center">
-            {/* Inserir o botão aqui */}
             <Box
               sx={{
                 display: "flex",
@@ -352,6 +563,26 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
               </Button>
             </Box>
           </Stack>
+          <Stack>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+                ml: 0.75,
+              }}
+            >
+              <Button
+                variant="outlined"
+                onClick={onExportExcel}
+                startIcon={<DownloadOutlined />}
+                disabled={isLoading}
+                style={{ borderRadius: "20px", height: "32px" }}
+              >
+                Exportar Excel
+              </Button>
+            </Box>
+          </Stack>
         </Stack>
       </Stack>
 
@@ -367,9 +598,9 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                   {filter.type}:
                 </Typography>
                 <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
-                  {filter.values
-                    .map((v) => (v === true ? "Indice" : v === false ? "Inativo" : v))
-                    .join(", ")}
+                  {formatFilterValuesForChip(filter.type, filter.values).join(
+                    ", ",
+                  )}
                 </Typography>
               </Box>
             }
@@ -397,54 +628,188 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         )}
       </Box>
 
-
-      {/* Drawer para filtros */}
-      <Drawer anchor="right" open={drawerOpen} onClose={toggleDrawer} PaperProps={{ sx: { width: 670 } }}>
+      {}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 670 } }}
+      >
         <Box sx={{ width: 650, p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Box component="h2" sx={{ color: '#1C5297', fontWeight: 600, fontSize: '16px' }}>Filtros</Box>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box
+              component="h2"
+              sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
+            >
+              Filtros
+            </Box>
             <IconButton onClick={toggleDrawer}>
-              <CloseIcon sx={{ color: '#1C5297', fontSize: '18px' }} />
+              <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
             </IconButton>
           </Stack>
 
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Índice</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
-                  options={indicesOptions}
-                  value={draftFilters.indice}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, indice: value }))}
+                  options={["Ativo", "Inativo"]}
+                  value={draftFilters.status}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, status: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
+
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Status</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Índice
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
-                  options={statusOptions}
-                  value={draftFilters.status}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, status: value }))}
-                  getOptionLabel={(option) => option.label}
-                  renderInput={(params) => <TextField {...params} />}
+                  disableCloseOnSelect
+                  options={indexOptions}
+                  value={draftFilters.indices}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, indices: value }))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                    />
+                  )}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Descrição
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  value={draftFilters.description}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  placeholder="Digite para filtrar pela descrição"
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Valor mínimo (R$)
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="number"
+                  value={draftFilters.valueMin}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      valueMin: e.target.value,
+                    }))
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">R$</InputAdornment>
+                    ),
+                  }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Valor máximo (R$)
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="number"
+                  value={draftFilters.valueMax}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      valueMax: e.target.value,
+                    }))
+                  }
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">R$</InputAdornment>
+                    ),
+                  }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Inicial
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.startDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Final
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.endDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
             </Grid>
           </Grid>
 
           <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
-            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
           </Stack>
         </Box>
-      </Drawer >
+      </Drawer>
 
+      {}
       <MainCard content={false}>
         <ScrollX>
           <div ref={tableRef}>
@@ -488,8 +853,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                className: "cursor-pointer prevent-select",
-                              })}
+                                  className: "cursor-pointer prevent-select",
+                                })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
@@ -500,7 +865,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                   <Box>
                                     {flexRender(
                                       header.column.columnDef.header,
-                                      header.getContext()
+                                      header.getContext(),
                                     )}
                                   </Box>
                                   {header.column.getCanSort() && (
@@ -528,7 +893,12 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                       data.length > 0 ? (
                         table.getRowModel().rows.map((row) => (
                           <Fragment key={row.id}>
-                            <TableRow>
+                            <TableRow
+                              sx={{
+                                "&:last-child td": { borderBottom: "none" },
+                                backgroundColor: isDarkMode ? "#14141" : "#fff",
+                              }}
+                            >
                               {row.getVisibleCells().map((cell) => (
                                 <TableCell
                                   key={cell.id}
@@ -549,7 +919,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                 >
                                   {flexRender(
                                     cell.column.columnDef.cell,
-                                    cell.getContext()
+                                    cell.getContext(),
                                   )}
                                 </TableCell>
                               ))}
@@ -585,7 +955,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                       setPageIndex: table.setPageIndex,
                       getState: table.getState,
                       getPageCount: table.getPageCount,
-                      totalItems: processosTotal,
+                      totalItems: totalRows,
                       recordType: recordType,
                     }}
                   />
@@ -602,19 +972,16 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
 ReactTable.propTypes = {
   columns: PropTypes.array,
   data: PropTypes.array,
-  getHeaderProps: PropTypes.func,
-  handleAdd: PropTypes.func,
-  modalToggler: PropTypes.func,
-  renderRowSubComponent: PropTypes.any,
-  refreshData: PropTypes.func,
+  totalRows: PropTypes.number,
+  isLoading: PropTypes.bool,
+  onApplyFilters: PropTypes.func,
+  onExportExcel: PropTypes.func,
 };
 
 function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
   const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [status, setStatus] = useState(row.original.active);
-  const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openErrorDialog, setOpenErrorDialog] = useState(false);
 
@@ -626,79 +993,110 @@ function ActionCell({ row, refreshData }) {
     setAnchorEl(null);
   };
 
-  const handleDialogOpen = () => {
-    setOpenDialog(true);
-  };
-
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    handleClose();
-  };
-
-
   const handleDeleteDialogClose = () => {
     setOpenDeleteDialog(false);
     handleClose();
   };
 
-  const toggleStatus = async () => {
-    const idIndex = row.original.idIndex;
-    const newStatus = status === true ? "Inativo" : "Ativo";
-    
+  const handleToggleActive = async () => {
+    handleClose();
+    const authToken = token || localStorage.getItem("access_token");
+
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}indexs/${idIndex}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const responseGet = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/indexs/${row.original.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
         },
-      });
-  
-      const dadosEndpoint = getResponse.data;
-  
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
-  
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}indexs`, dadosAtualizados, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      );
+
+      if (!responseGet.ok) throw new Error("Erro ao buscar dados do índice.");
+      const data = await responseGet.json();
+
+      const payload = {
+        idProcess: data.idProcess,
+        active: !data.active,
+        name: data.name,
+        code: data.code,
+        description: data.description,
+        files: data.files || [],
+        idProcessType: data.idProcessType || null,
+        idProcessSuperior: data.idProcessSuperior || null,
+
+        idCompanies: Array.isArray(data.companies)
+          ? data.companies.map((u) => u.idCompany)
+          : [],
+        idDepartments: Array.isArray(data.departments)
+          ? data.departments.map((u) => u.idDepartment)
+          : [],
+        idProcessBottoms: Array.isArray(data.processBottoms)
+          ? data.processBottoms.map((u) => u.idProcessBottom)
+          : [],
+
+        idProcessPrevious:
+          Array.isArray(data.idProcessPrevious) &&
+          data.idProcessPrevious.length > 0
+            ? data.idProcessPrevious[0].idProcess
+            : null,
+        idProcessNext:
+          Array.isArray(data.idProcessNext) && data.idProcessNext.length > 0
+            ? data.idProcessNext[0].idProcess
+            : null,
+
+        idLgpds: data.idLgpds || [],
+        idKri: data.idKri || null,
+        idResponsible: data.idResponsible || null,
+        idDeficiencies: data.idDeficiencies || [],
+        idIncidents: data.idIncidents || [],
+        idActionPlans: data.idActionPlans || [],
+        idRisks: data.idRisks || [],
+        idLedgerAccounts: data.idLedgerAccounts || [],
+      };
+
+      const responsePut = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/indexs`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify(payload),
         },
-      });
-  
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Índice ${row.original.name} ${newStatus.toLowerCase()}.`;
-  
-      enqueueSnackbar(message, {
-        variant: "success",
-        autoHideDuration: 3000,
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        },
-      });
-  
+      );
+
+      if (!responsePut.ok) {
+        throw new Error("Erro ao atualizar status do índice.");
+      }
+
+      enqueueSnackbar(
+        `Índice ${data.active ? "inativado" : "ativado"} com sucesso!`,
+        { variant: "success" },
+      );
+
       refreshData();
     } catch (error) {
-      console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, { variant: "error" });
+      console.error(error);
+      enqueueSnackbar("Erro ao alterar o status do índice.", {
+        variant: "error",
+      });
     }
-  
-    handleDialogClose();
   };
 
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+        `${API_COMMAND}/api/Índices/${row.original.id}`,
         {
           method: "DELETE",
-        }
+          headers: { Authorization: `Bearer ${token}` },
+        },
       );
 
       if (response.ok) {
-        enqueueSnackbar(`Empresa ${row.original.nome} excluído.`, {
+        enqueueSnackbar(`Índice ${row.original.name} excluído.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
@@ -710,7 +1108,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o empresa: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o índice: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -730,6 +1128,8 @@ function ActionCell({ row, refreshData }) {
 
   const open = Boolean(anchorEl);
   const id = open ? "simple-popover" : undefined;
+
+  const isActive = row.original.active !== false;
 
   return (
     <Stack
@@ -774,143 +1174,18 @@ function ActionCell({ row, refreshData }) {
             Editar
           </Button>
 
+          {}
           <Button
-            onClick={() => {
-              if (row.original.active === true) handleDialogOpen();
-              else toggleStatus();
-            }}
+            onClick={handleToggleActive}
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            {row.original.active === true ? "Inativar" : "Ativar"}
+            {isActive ? "Inativar" : "Ativar"}
           </Button>
-          
+
+          {}
         </Stack>
       </Popover>
-      <Dialog
-        open={openDialog}
-        onClose={handleDialogClose}
-        sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            background: "#ED5565",
-            width: "auto",
-            height: "42px",
-            borderRadius: "4px 4px 0px 0px",
-            display: "flex",
-            alignItems: "center",
-            padding: "10px",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              aria-label="delete"
-              sx={{
-                fontSize: "16px",
-                marginRight: "2px",
-                color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
-              }}
-            >
-              <FontAwesomeIcon icon={faBan} />
-            </IconButton>
 
-            <Typography
-              variant="body1"
-              sx={{
-                fontFamily: '"Open Sans", Helvetica, sans-serif',
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
-                color: "rgba(255, 255, 255, 1)",
-                flexGrow: 1,
-              }}
-            >
-              Inativar
-            </Typography>
-          </div>
-          <IconButton
-            aria-label="close"
-            onClick={handleDialogClose}
-            sx={{
-              color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
-            }}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Tem certeza que deseja inativar o índice "{row.original.name}"?
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            Ao inativar, esse índice não aparecerá mais no cadastro manual.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={toggleStatus}
-            color="primary"
-            autoFocus
-            style={{
-              marginTop: "-55px",
-              width: "162px",
-              height: "32px",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              background: "#ED5565",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              textTransform: "none",
-            }}
-          >
-            Sim, inativar
-          </Button>
-          <Button
-            onClick={handleDialogClose}
-            style={{
-              marginTop: "-55px",
-              padding: "8px 16px",
-              width: "91px",
-              height: "32px",
-              borderRadius: "4px",
-              border: "1px solid rgba(0, 0, 0, 0.40)",
-              background: "#FFF",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
-            }}
-          >
-            Cancelar
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Dialog
         open={openDeleteDialog}
         onClose={handleDeleteDialogClose}
@@ -945,7 +1220,6 @@ function ActionCell({ row, refreshData }) {
                   backgroundColor: "transparent",
                   boxShadow: "none",
                   color: "white",
-                  cursor: "default",
                 },
               }}
             >
@@ -988,14 +1262,13 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja excluir o empresa "{row.original.nome}"?
+            Tem certeza que deseja excluir o índice "{row.original.name}"?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Esse empresa não será mais disponibilizado ao cadastrar um novo
-            processo.
+            Esta ação não poderá ser desfeita.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1071,7 +1344,6 @@ function ActionCell({ row, refreshData }) {
                   backgroundColor: "transparent",
                   boxShadow: "none",
                   color: "white",
-                  cursor: "default",
                 },
               }}
             >
@@ -1091,7 +1363,7 @@ function ActionCell({ row, refreshData }) {
                 flexGrow: 1,
               }}
             >
-              Exclusão não permitida
+              Erro na Exclusão
             </Typography>
           </div>
           <IconButton
@@ -1114,14 +1386,7 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Não é possível excluir o Empresa.
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            O empresa não pode ser excluído pois está vinculado a processos. É
-            possível inativar o empresa nas configurações de edição.
+            Não foi possível excluir.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1153,33 +1418,36 @@ ActionCell.propTypes = {
   refreshData: PropTypes.func.isRequired,
 };
 
-// ==============================|| LISTAGEM ||============================== //
-
-// Componente principal da página de listagem de registros
-const ListagemEmpresa = () => {
+const ListagemIndices = () => {
   const theme = useTheme();
-  const navigation = useNavigate();
   const location = useLocation();
+  const navigation = useNavigate();
   const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-  } = useGetIndices(formData, processoSelecionadoId);
-  const processosTotal = lists ? lists.length : 0;
+  const [backendFilters, setBackendFilters] = useState({});
+  const { acoesJudiciais: resultData, isLoading } = useGetIndices(
+    { ...formData, ...backendFilters },
+    processoSelecionadoId,
+  );
+
+  const lists = resultData || [];
+
+  const handleBackendFiltersChange = (newFilters) => {
+    setBackendFilters(newFilters);
+  };
+
+  const totalRows = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Handler para atualizar 'formData' e disparar uma nova consulta
   const refreshOrgaos = () => {
     setFormData((currentData) => ({
       ...currentData,
       refreshCount: currentData.refreshCount + 1,
     }));
-    
   };
 
   useEffect(() => {
@@ -1194,45 +1462,98 @@ const ListagemEmpresa = () => {
     };
   }, []);
 
-  // Função para fechar modais
   const handleClose = () => {
     setOpen(!open);
   };
 
-  // Função callback para atualizar formData
   const handleFormDataChange = (newFormData) => {
     setFormData(newFormData);
   };
 
-  // Definição das colunas da tabela
+  const handleExportExcel = () => {
+    setFormData((prev) => ({
+      ...prev,
+      ...backendFilters,
+      GenerateExcel: true,
+      refreshCount: prev.refreshCount + 1,
+    }));
+  };
+
   const columns = useMemo(
     () => [
       {
-        header: "Índices",
+        header: "Índice",
         accessorKey: "name",
         cell: ({ row }) => (
           <Typography
-          sx={{
-            fontSize: '13px',
-            cursor: "pointer",
-          }}
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
             onClick={() => {
               const dadosApi = row.original;
               navigation(`/indices/criar`, {
-                state: {
-                  indoPara: "NovoIndice",
-                  dadosApi,
-                },
+                state: { indoPara: "NovoIndice", dadosApi },
               });
             }}
           >
-            {row.original.name}
+            {row.original.name ?? "—"}
           </Typography>
         ),
       },
+
+      {
+        header: "Descrição",
+        accessorKey: "description",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.description && String(row.original.description).trim()
+              ? row.original.description
+              : "—"}
+          </Typography>
+        ),
+      },
+
+      {
+        header: "Valor",
+        accessorKey: "value",
+        cell: ({ row }) => {
+          const value = row.original.value;
+
+          const formatted =
+            typeof value === "number" && Number.isFinite(value)
+              ? value.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })
+              : "—";
+
+          return <Typography sx={{ fontSize: "13px" }}>{formatted}</Typography>;
+        },
+      },
+
+      {
+        header: "Data",
+        accessorKey: "date",
+        cell: ({ row }) => {
+          const raw = row.original.date;
+
+          const dt = raw ? new Date(raw) : null;
+          const isValid = dt instanceof Date && !Number.isNaN(dt.getTime());
+
+          return (
+            <Typography sx={{ fontSize: "13px" }}>
+              {isValid ? dt.toLocaleDateString("pt-BR") : "—"}
+            </Typography>
+          );
+        },
+      },
+
       {
         header: "Status",
-        accessorKey: "ativo",
+        accessorKey: "active",
         cell: ({ row }) => (
           <Chip
             label={row.original.active === true ? "Ativo" : "Inativo"}
@@ -1266,15 +1587,15 @@ const ListagemEmpresa = () => {
           />
         ),
       },
+
       {
+        id: "actions",
         header: " ",
-        disableSortBy: true,
-        cell: ({ row }) => (
-          <ActionCell row={row} refreshData={refreshOrgaos} />
-        ), // Passa refreshData
+        enableHiding: false,
+        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
       },
     ],
-    [theme]
+    [theme],
   );
 
   useEffect(() => {
@@ -1283,11 +1604,15 @@ const ListagemEmpresa = () => {
     }
   }, [isLoading, isInitialLoad]);
 
+  useEffect(() => {
+    if (!isLoading && formData.GenerateExcel) {
+      setFormData((prev) => ({ ...prev, GenerateExcel: false }));
+    }
+  }, [isLoading, formData.GenerateExcel]);
+
   return (
     <>
-      
       {isInitialLoad && isLoading ? (
-        // Exibir indicador de carregamento apenas no carregamento inicial
         <div
           style={{
             display: "flex",
@@ -1309,10 +1634,12 @@ const ListagemEmpresa = () => {
                   setCustomerModal(true);
                   setSelectedCustomer(null);
                 },
-                processosTotal,
+                totalRows,
                 onFormDataChange: handleFormDataChange,
                 isLoading,
                 refreshData: refreshOrgaos,
+                onApplyFilters: handleBackendFiltersChange,
+                onExportExcel: handleExportExcel,
               }}
             />
           )}
@@ -1333,4 +1660,4 @@ const ListagemEmpresa = () => {
   );
 };
 
-export default ListagemEmpresa;
+export default ListagemIndices;
