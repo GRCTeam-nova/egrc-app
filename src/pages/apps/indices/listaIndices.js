@@ -695,24 +695,6 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                Descrição
-              </InputLabel>
-              <FormControl fullWidth margin="normal">
-                <TextField
-                  value={draftFilters.description}
-                  onChange={(e) =>
-                    setDraftFilters((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Digite para filtrar pela descrição"
-                />
-              </FormControl>
-            </Grid>
-
             <Grid item xs={6}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Valor mínimo (R$)
@@ -1016,43 +998,13 @@ function ActionCell({ row, refreshData }) {
       const data = await responseGet.json();
 
       const payload = {
-        idProcess: data.idProcess,
-        active: !data.active,
-        name: data.name,
+        idIndex: data.idIndex,
         code: data.code,
+        name: data.name,
         description: data.description,
-        files: data.files || [],
-        idProcessType: data.idProcessType || null,
-        idProcessSuperior: data.idProcessSuperior || null,
-
-        idCompanies: Array.isArray(data.companies)
-          ? data.companies.map((u) => u.idCompany)
-          : [],
-        idDepartments: Array.isArray(data.departments)
-          ? data.departments.map((u) => u.idDepartment)
-          : [],
-        idProcessBottoms: Array.isArray(data.processBottoms)
-          ? data.processBottoms.map((u) => u.idProcessBottom)
-          : [],
-
-        idProcessPrevious:
-          Array.isArray(data.idProcessPrevious) &&
-          data.idProcessPrevious.length > 0
-            ? data.idProcessPrevious[0].idProcess
-            : null,
-        idProcessNext:
-          Array.isArray(data.idProcessNext) && data.idProcessNext.length > 0
-            ? data.idProcessNext[0].idProcess
-            : null,
-
-        idLgpds: data.idLgpds || [],
-        idKri: data.idKri || null,
-        idResponsible: data.idResponsible || null,
-        idDeficiencies: data.idDeficiencies || [],
-        idIncidents: data.idIncidents || [],
-        idActionPlans: data.idActionPlans || [],
-        idRisks: data.idRisks || [],
-        idLedgerAccounts: data.idLedgerAccounts || [],
+        date: data.date,
+        value: data.value,
+        active: !data.active,
       };
 
       const responsePut = await fetch(

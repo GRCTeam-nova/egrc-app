@@ -312,7 +312,7 @@ const AuthLogin = ({ isDemo = false }) => {
                             component={RouterLink}
                             to={
                               isDemo
-                                ? '/auth/forgot-password'
+                                ? '/forgot-password'
                                 : '/forgot-password'
                             }
                             sx={{

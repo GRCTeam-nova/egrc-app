@@ -699,42 +699,6 @@ function ReactTable({
                 />
               </FormControl>
             </Grid>
-
-            {/* ORIGEM */}
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Origem</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={originOptions}
-                  value={draftFilters.origin}
-                  onChange={(event, value) =>
-                    setDraftFilters((prev) => ({ ...prev, origin: value }))
-                  }
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-
-            {/* CAUSA */}
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Causa</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={causeOptions}
-                  value={draftFilters.cause}
-                  onChange={(event, value) =>
-                    setDraftFilters((prev) => ({ ...prev, cause: value }))
-                  }
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-
-
             {/* DATAS */}
             <Grid item xs={6}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Data Inicial</InputLabel>
