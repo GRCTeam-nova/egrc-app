@@ -11,7 +11,6 @@ import AuthForgotPassword from '../../sections/auth/auth-forms/AuthForgotPasswor
 // ================================|| FORGOT PASSWORD ||================================ //
 
 const ForgotPassword = () => {
-  const { isLoggedIn } = useAuth();
 
   return (
     <AuthWrapper>
@@ -21,7 +20,7 @@ const ForgotPassword = () => {
             <Typography variant="h3">Recuperar senha</Typography>
             <Typography
               component={Link}
-              to={isLoggedIn ? '/auth/login' : '/login'}
+              to="/login"
               variant="body1"
               sx={{ textDecoration: 'none' }}
               color="#9d72ff"
