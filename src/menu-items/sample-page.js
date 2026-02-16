@@ -41,7 +41,7 @@ const pages = {
       icon: icons.ListIcon,
       children: [
         {
-          id: 'customer-list278',
+          id: '43546554358',
           title: <FormattedMessage id="Libre Office" />,
           type: 'item',
           url: '/libreOffice/lista',

@@ -40,98 +40,98 @@ const pages = {
       icon: icons.PublicIcon,
       children: [
         {
-          id: 'customer-list278',
+          id: '546543565',
           title: <FormattedMessage id="ODS" />,
           type: 'item',
           url: '/ods/lista',
           
         },
         {
-          id: 'customer-list2345',
+          id: '45466576',
           title: <FormattedMessage id="Temas" />,
           type: 'item',
           url: '/tema/lista',
           
         },
         {
-          id: 'customer-list24345',
+          id: '45678976543',
           title: <FormattedMessage id="Grupo temas" />,
           type: 'item',
           url: '/grupoTemas/lista',
           
         },
         {
-          id: 'customer-list25345',
+          id: '45467654',
           title: <FormattedMessage id="Impacto ESG" />,
           type: 'item',
           url: '/impactoEsg/lista',
           
         },
         {
-          id: 'customer-list',
+          id: '3456786',
           title: <FormattedMessage id="Perfil ESG" />,
           type: 'item',
           url: '/esg/lista',
           
         },
         {
-          id: 'customer-list2',
+          id: '9876543',
           title: <FormattedMessage id="Ciclo priorização" />,
           type: 'item',
           url: '/priorizacao/lista',
           
         },
         {
-          id: 'customer-list3',
+          id: '345467',
           title: <FormattedMessage id="Indicadores" />,
           type: 'item',
           url: '/indicadores/lista',
           
         },
         {
-          id: 'customer-list4',
+          id: '098765554768',
           title: <FormattedMessage id="Métrica com coleta" />,
           type: 'item',
           url: '/coleta/lista',
           
         },
         {
-          id: 'customer-list4',
+          id: '324567887654',
           title: <FormattedMessage id="Gestão de coleta" />,
           type: 'item',
           url: '/gestaoColeta/lista',
           
         },
         {
-          id: 'customer-list34',
+          id: '55786754652',
           title: <FormattedMessage id="Padrões e frameworks" />,
           type: 'item',
           url: '/padroesFrameworks/lista',
           
         },
         {
-          id: 'customer-list344',
+          id: '345657898',
           title: <FormattedMessage id="Medidas" />,
           type: 'item',
           url: '/medida/lista',
           
         },
         {
-          id: 'customer-list3445',
+          id: '3243567897',
           title: <FormattedMessage id="Dimensões" />,
           type: 'item',
           url: '/dimensao/lista',
           
         },
         {
-          id: 'customer-list34645',
+          id: '345685765343',
           title: <FormattedMessage id="Fonte de dados" />,
           type: 'item',
           url: '/fonteDeDados/lista',
           
         },
         {
-          id: 'customer-list346645',
+          id: '4356786654',
           title: <FormattedMessage id="Fatores de emissão" />,
           type: 'item',
           url: '/fatoresEmissao/lista',

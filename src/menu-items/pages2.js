@@ -37,7 +37,7 @@ const pages = {
       icon: icons.SignalCellularAltIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '45678654354654',
           title: <FormattedMessage id="Dashboard" />,
           type: 'item',
           url: '/dashboard/resumo',

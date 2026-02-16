@@ -36,28 +36,28 @@ const pages = {
       icon: icons.WarningAmberIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '1',
           title: <FormattedMessage id="Riscos" />,
           type: 'item',
           url: '/riscos/lista',
           
         },
         {
-          id: 'customer-list3',
+          id: '2',
           title: <FormattedMessage id="Ciclos de avaliação" />,
           type: 'item',
           url: '/ciclos/lista',
           // Este item será escondido pelo CSS injetado acima
         },
         {
-          id: 'customer-list13',
+          id: '3',
           title: <FormattedMessage id="Avaliação de risco" />,
           type: 'item',
           url: '/avaliacoes/lista',
           // Este item será escondido pelo CSS injetado acima
         },
         {
-          id: 'customer-list5',
+          id: '4',
           title: <FormattedMessage id="Índice" />,
           type: 'item',
           url: '/indices/lista',
@@ -65,21 +65,21 @@ const pages = {
         },
         
         {
-          id: 'customer-list7',
+          id: '5',
           title: <FormattedMessage id="Incidentes" />,
           type: 'item',
           url: '/incidentes/lista',
           // Este item será escondido pelo CSS injetado acima
         },
         {
-          id: 'customer-list8',
+          id: '6',
           title: <FormattedMessage id="Categorias" />,
           type: 'item',
           url: '/categorias/lista',
           // Este item será escondido pelo CSS injetado acima
         },
         {
-          id: 'customer-list9',
+          id: '7',
           title: <FormattedMessage id="Perfil de análise" />,
           type: 'item',
           url: '/perfis/lista',

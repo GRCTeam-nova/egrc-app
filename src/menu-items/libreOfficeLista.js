@@ -38,14 +38,14 @@ const pages = {
       icon: icons.BookmarkIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '455675654324565',
           title: <FormattedMessage id="Lista Arquivos" />,
           type: 'item',
           url: '/libreOffice/lista',
           
         },
         {
-          id: 'customer-list',
+          id: '2345678976543',
           title: <FormattedMessage id="Iframe" />,
           type: 'item',
           url: '/libreOffice/iframe',  

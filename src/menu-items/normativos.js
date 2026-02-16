@@ -38,7 +38,7 @@ const pages = {
       icon: icons.BookmarkIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '4567665345567543',
           title: <FormattedMessage id="Normativos" />,
           type: 'item',
           url: '/normativas/lista',
