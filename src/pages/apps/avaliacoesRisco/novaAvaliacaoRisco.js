@@ -47,7 +47,7 @@ function ColumnsLayouts() {
   const [questionariosApi, setQuestionariosApi] = useState([]); // <- NOVO
   const [filledQuestionarios, setFilledQuestionarios] = useState([]);
   const [loadingText, setLoadingText] = useState("");
-
+  const [status, setStatus] = useState(true);
   const [tipoConsolidacao, setTipoConsolidacao] = useState(1);
 
   const [sobrepor, setSobrepor] = useState(false);
@@ -371,7 +371,7 @@ function ColumnsLayouts() {
 
           setRequisicao("Editar");
           setMensagemFeedback("editada");
-
+          setStatus(data.active);
           // Se necessário, atualize outros estados individuais
           setDescricaoRisco(data.riskDescription || "");
           setComentario(data.justification || "");
@@ -967,7 +967,7 @@ function ColumnsLayouts() {
         payload = {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 2 || null,
-
+          active: status,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1073,7 +1073,7 @@ function ColumnsLayouts() {
         payload = {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 5 || null, // Status "Finalizada"
-
+          active: status,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1200,7 +1200,7 @@ function ColumnsLayouts() {
         payload = {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 4 || null,
-
+          active: status,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1302,7 +1302,7 @@ function ColumnsLayouts() {
         // No seu código original você seta localmente o status para 2.
         // Se a API aceitar, enviamos o status desejado.
         assessmentStatus: 2,
-
+        active: status,
         replaceUser: sobrepor
           ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
             null
@@ -1433,7 +1433,7 @@ function ColumnsLayouts() {
         idRespondents: formData.respondente,
         idResponsible: formData.responsavelAv,
         assessmentStatus: sobrepor ? 5 : formData.status,
-
+        active: status,
         replaceUser: sobrepor
           ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
             null
