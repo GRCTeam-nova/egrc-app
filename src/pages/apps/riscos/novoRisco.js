@@ -52,9 +52,12 @@ function SectionCard({ title, icon, children, ...props }) {
   return (
     <Card sx={{ mb: 3, ...props.sx }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
           {icon}
-          <Typography variant="h6" sx={{ ml: 1, color: 'primary.main', fontWeight: 600 }}>
+          <Typography
+            variant="h6"
+            sx={{ ml: 1, color: "primary.main", fontWeight: 600 }}
+          >
             {title}
           </Typography>
         </Box>
@@ -72,7 +75,7 @@ function ColumnsLayoutsCorrigido() {
   const navigate = useNavigate();
   const location = useLocation();
   const { dadosApi } = location.state || {};
-  
+
   // Estados existentes (mantidos do código original)
   const [planosAcoes, setPlanoAcao] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -120,6 +123,7 @@ function ColumnsLayoutsCorrigido() {
     incidente: [],
     departamento: [],
     categoria: "",
+    idCategories: [],
     processo: [],
     riscoAssociado: [],
     conta: [],
@@ -172,71 +176,23 @@ function ColumnsLayoutsCorrigido() {
 
   useEffect(() => {
     if (!authToken) return;
-    fetchData(
-      `${API_URL}categories`,
-      setCategorias
-    );
-    fetchData(
-      `${API_URL}action-plans`,
-      setPlanoAcao
-    );
-    fetchData(
-      `${API_URL}departments`,
-      setDepartamentos
-    );
-    fetchData(
-      `${API_URL}risks`,
-      setRiscoAssociados
-    );
-    fetchData(
-      `${API_URL}risks/frameworks`,
-      setFrameworks
-    );
-    fetchData(
-      `${API_URL}risks/treatments`,
-      setTratamentos
-    );
-    fetchData(
-      `${API_URL}risks/strategic-guidelines`,
-      setDiretrizes
-    );
-    fetchData(
-      `${API_URL}risks/factors`,
-      setFatores
-    );
-    fetchData(
-      `${API_URL}risks/causes`,
-      setCausas
-    );
-    fetchData(
-      `${API_URL}risks/impacts`,
-      setImpactos
-    );
+    fetchData(`${API_URL}categories`, setCategorias);
+    fetchData(`${API_URL}action-plans`, setPlanoAcao);
+    fetchData(`${API_URL}departments`, setDepartamentos);
+    fetchData(`${API_URL}risks`, setRiscoAssociados);
+    fetchData(`${API_URL}risks/frameworks`, setFrameworks);
+    fetchData(`${API_URL}risks/treatments`, setTratamentos);
+    fetchData(`${API_URL}risks/strategic-guidelines`, setDiretrizes);
+    fetchData(`${API_URL}risks/factors`, setFatores);
+    fetchData(`${API_URL}risks/causes`, setCausas);
+    fetchData(`${API_URL}risks/impacts`, setImpactos);
     fetchData(`${API_URL}risks/kris`, setKris);
-    fetchData(
-      `${API_URL}risks/threats`,
-      setAmeacas
-    );
-    fetchData(
-      `${API_URL}normatives`,
-      setNormativas
-    );
-    fetchData(
-      `${API_URL}controls`,
-      setControles
-    );
-    fetchData(
-      `${API_URL}processes`,
-      setProcessos
-    );
-    fetchData(
-      `${API_URL}incidents`,
-      setIncidentes
-    );
-    fetchData(
-      `${API_URL}collaborators/responsibles`,
-      setResponsavel
-    );
+    fetchData(`${API_URL}risks/threats`, setAmeacas);
+    fetchData(`${API_URL}normatives`, setNormativas);
+    fetchData(`${API_URL}controls`, setControles);
+    fetchData(`${API_URL}processes`, setProcessos);
+    fetchData(`${API_URL}incidents`, setIncidentes);
+    fetchData(`${API_URL}collaborators/responsibles`, setResponsavel);
     window.scrollTo(0, 0);
   }, [authToken]);
 
@@ -254,14 +210,11 @@ function ColumnsLayoutsCorrigido() {
       const fetchEmpresaDados = async () => {
         setLoading(true);
         try {
-          const response = await fetch(
-            `${API_URL}risks/${dadosApi.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${authToken}`,
-              },
-            }
-          );
+          const response = await fetch(`${API_URL}risks/${dadosApi.id}`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
 
           if (!response.ok) {
             throw new Error("Erro ao buscar os dados de empresas");
@@ -274,11 +227,18 @@ function ColumnsLayoutsCorrigido() {
           setCodigo(data.code);
           setDescricao(data.description);
           setDescricaoTratamento(data.treatmentDescription);
-          
+
           // CORREÇÃO: Aguardar que os dados sejam carregados antes de definir formData
           setFormData((prev) => ({
             ...prev,
-            planoAcao: Array.isArray(data.idActionPlans) ? data.idActionPlans : [],
+            planoAcao: Array.isArray(data.idActionPlans)
+              ? data.idActionPlans
+              : [],
+            idCategories: Array.isArray(data.idCategories)
+              ? data.idCategories
+              : Array.isArray(data.categories)
+                ? data.categories.map((c) => c.idCategory || c.id)
+                : [],
             causa: Array.isArray(data.causes)
               ? data.causes.map((u) => u.idCause)
               : [],
@@ -323,7 +283,7 @@ function ColumnsLayoutsCorrigido() {
           setRiscoDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
-        }finally {
+        } finally {
           setLoading(false);
         }
       };
@@ -392,7 +352,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "planoAcao",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -404,7 +364,7 @@ function ColumnsLayoutsCorrigido() {
 
     // Verifica e remove o departamento superior se necessário
     const superiorSelecionada = riscoAssociados.find(
-      (risco) => risco.id === formData.riscoAssociado
+      (risco) => risco.id === formData.riscoAssociado,
     );
     if (
       superiorSelecionada &&
@@ -437,14 +397,14 @@ function ColumnsLayoutsCorrigido() {
         setFormData({
           ...formData,
           riscoAssociado: riscoAssociados.map(
-            (riscoAssociado) => riscoAssociado.id
+            (riscoAssociado) => riscoAssociado.id,
           ),
         });
       }
     } else {
       tratarMudancaInputGeral(
         "riscoAssociado",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -465,7 +425,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "framework",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -482,7 +442,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "causa",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -502,7 +462,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "impacto",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -522,7 +482,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "normativa",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -542,7 +502,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "departamento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -562,7 +522,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "controle",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -579,7 +539,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "kri",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -599,7 +559,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "incidente",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -619,7 +579,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "diretriz",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -639,7 +599,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "ameaca",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -656,7 +616,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "fator",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -676,7 +636,7 @@ function ColumnsLayoutsCorrigido() {
     } else {
       tratarMudancaInputGeral(
         "processo",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -776,7 +736,7 @@ function ColumnsLayoutsCorrigido() {
         // Em edição, já temos o id do risco; em criação, envia string vazia
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? riscoDados?.idRisk : ""
+          requisicao === "Editar" ? riscoDados?.idRisk : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -790,7 +750,7 @@ function ColumnsLayoutsCorrigido() {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         // Espera-se que o endpoint retorne um objeto do tipo { files: [...] }
         uploadFilesResult = uploadResponse.data;
@@ -823,6 +783,9 @@ function ColumnsLayoutsCorrigido() {
           code: codigo,
           name: nome,
           description: descricao,
+          idCategories: formData.idCategories?.length
+            ? formData.idCategories
+            : null,
           idActionPlans: formData.planoAcao?.length ? formData.planoAcao : null,
           treatmentDescription: descricaoTratamento,
           date: formData.dataInicioOperacao
@@ -900,10 +863,10 @@ function ColumnsLayoutsCorrigido() {
     <>
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
-        <Box sx={{ width: '100%', marginTop: 2 }}>
+        <Box sx={{ width: "100%", marginTop: 2 }}>
           {/* Seção 1: Informações Básicas */}
-          <SectionCard 
-            title="Informações Básicas" 
+          <SectionCard
+            title="Informações Básicas"
             icon={<InfoIcon color="primary" />}
           >
             <Grid container spacing={3}>
@@ -916,7 +879,11 @@ function ColumnsLayoutsCorrigido() {
                     placeholder="Código do risco"
                     value={codigo}
                     error={!codigo && formValidation.codigo === false}
-                    helperText={!codigo && formValidation.codigo === false ? "Campo obrigatório" : ""}
+                    helperText={
+                      !codigo && formValidation.codigo === false
+                        ? "Campo obrigatório"
+                        : ""
+                    }
                   />
                 </Stack>
               </Grid>
@@ -930,7 +897,11 @@ function ColumnsLayoutsCorrigido() {
                     placeholder="Nome do risco"
                     value={nome}
                     error={!nome && formValidation.nome === false}
-                    helperText={!nome && formValidation.nome === false ? "Campo obrigatório" : ""}
+                    helperText={
+                      !nome && formValidation.nome === false
+                        ? "Campo obrigatório"
+                        : ""
+                    }
                   />
                 </Stack>
               </Grid>
@@ -953,7 +924,7 @@ function ColumnsLayoutsCorrigido() {
                     getOptionLabel={(option) => option.nome}
                     value={
                       categorias.find(
-                        (categoria) => categoria.id === formData.categoria
+                        (categoria) => categoria.id === formData.categoria,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -967,11 +938,13 @@ function ColumnsLayoutsCorrigido() {
                         {...params}
                         placeholder="Selecione uma categoria"
                         error={
-                          !formData.categoria && formValidation.categoria === false
+                          !formData.categoria &&
+                          formValidation.categoria === false
                         }
                         helperText={
-                          !formData.categoria && formValidation.categoria === false 
-                            ? "Campo obrigatório" 
+                          !formData.categoria &&
+                          formValidation.categoria === false
+                            ? "Campo obrigatório"
                             : ""
                         }
                       />
@@ -979,6 +952,7 @@ function ColumnsLayoutsCorrigido() {
                   />
                 </Stack>
               </Grid>
+
 
               {requisicao === "Editar" && (
                 <Grid item xs={12} md={6}>
@@ -1025,7 +999,8 @@ function ColumnsLayoutsCorrigido() {
                     getOptionLabel={(option) => option.nome}
                     value={
                       responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
+                        (responsavel) =>
+                          responsavel.id === formData.responsavel,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -1047,7 +1022,7 @@ function ColumnsLayoutsCorrigido() {
               <Grid item xs={12} md={6} mt={1}>
                 <Stack spacing={1}>
                   <InputLabel>Status</InputLabel>
-                  <Stack direction="row" alignItems="center" spacing={1} >
+                  <Stack direction="row" alignItems="center" spacing={1}>
                     <Switch
                       checked={status}
                       onChange={(event) => setStatus(event.target.checked)}
@@ -1062,8 +1037,8 @@ function ColumnsLayoutsCorrigido() {
           {requisicao === "Editar" && (
             <>
               {/* Seção 2: Análise de Risco */}
-              <SectionCard 
-                title="Análise de Risco" 
+              <SectionCard
+                title="Análise de Risco"
                 icon={<AssessmentIcon color="primary" />}
               >
                 <Grid container spacing={3}>
@@ -1073,10 +1048,13 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...causas]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...causas,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.causa.map(
-                          (id) => causas.find((causa) => causa.id === id) || id
+                          (id) => causas.find((causa) => causa.id === id) || id,
                         )}
                         onChange={handleSelectAllCausas}
                         isOptionEqualToValue={(option, value) =>
@@ -1088,7 +1066,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedCausas : selected
+                                    option.id === "all"
+                                      ? allSelectedCausas
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1098,9 +1078,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1111,10 +1089,14 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...impactos]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...impactos,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.impacto.map(
-                          (id) => impactos.find((impacto) => impacto.id === id) || id
+                          (id) =>
+                            impactos.find((impacto) => impacto.id === id) || id,
                         )}
                         onChange={handleSelectAllImpactos}
                         isOptionEqualToValue={(option, value) =>
@@ -1126,7 +1108,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedImpactos : selected
+                                    option.id === "all"
+                                      ? allSelectedImpactos
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1136,9 +1120,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1149,10 +1131,14 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todas" }, ...ameacas]}
+                        options={[
+                          { id: "all", nome: "Selecionar todas" },
+                          ...ameacas,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.ameaca.map(
-                          (id) => ameacas.find((ameaca) => ameaca.id === id) || id
+                          (id) =>
+                            ameacas.find((ameaca) => ameaca.id === id) || id,
                         )}
                         onChange={handleSelectAllAmeacas}
                         isOptionEqualToValue={(option, value) =>
@@ -1164,7 +1150,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedAmeacas : selected
+                                    option.id === "all"
+                                      ? allSelectedAmeacas
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1174,9 +1162,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params}/>
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1187,10 +1173,14 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...fatores]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...fatores,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.fator.map(
-                          (id) => fatores.find((fator) => fator.id === id) || id
+                          (id) =>
+                            fatores.find((fator) => fator.id === id) || id,
                         )}
                         onChange={handleSelectAllFatores}
                         isOptionEqualToValue={(option, value) =>
@@ -1202,7 +1192,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedFatores : selected
+                                    option.id === "all"
+                                      ? allSelectedFatores
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1212,9 +1204,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1235,10 +1225,16 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...incidentes]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...incidentes,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.incidente.map(
-                          (id) => incidentes.find((incidente) => incidente.id === id) || id
+                          (id) =>
+                            incidentes.find(
+                              (incidente) => incidente.id === id,
+                            ) || id,
                         )}
                         onChange={handleSelectAllIncidentes}
                         isOptionEqualToValue={(option, value) =>
@@ -1250,7 +1246,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedIncidente : selected
+                                    option.id === "all"
+                                      ? allSelectedIncidente
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1260,9 +1258,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1270,8 +1266,8 @@ function ColumnsLayoutsCorrigido() {
               </SectionCard>
 
               {/* Seção 3: Tratamento e Controle */}
-              <SectionCard 
-                title="Tratamento e Controle" 
+              <SectionCard
+                title="Tratamento e Controle"
                 icon={<SecurityIcon color="primary" />}
               >
                 <Grid container spacing={3}>
@@ -1283,7 +1279,8 @@ function ColumnsLayoutsCorrigido() {
                         getOptionLabel={(option) => option.nome}
                         value={
                           tratamentos.find(
-                            (tratamento) => tratamento.id === formData.tratamento
+                            (tratamento) =>
+                              tratamento.id === formData.tratamento,
                           ) || null
                         }
                         onChange={(event, newValue) => {
@@ -1293,7 +1290,10 @@ function ColumnsLayoutsCorrigido() {
                           }));
                         }}
                         renderInput={(params) => (
-                          <TextField {...params} placeholder="Selecione um tratamento" />
+                          <TextField
+                            {...params}
+                            placeholder="Selecione um tratamento"
+                          />
                         )}
                       />
                     </Stack>
@@ -1315,10 +1315,16 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...planosAcoes]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...planosAcoes,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.planoAcao.map(
-                          (id) => planosAcoes.find((planoAcao) => planoAcao.id === id) || id
+                          (id) =>
+                            planosAcoes.find(
+                              (planoAcao) => planoAcao.id === id,
+                            ) || id,
                         )}
                         onChange={handleSelectAllPlanoAcao}
                         isOptionEqualToValue={(option, value) =>
@@ -1330,7 +1336,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedPlanoAcao : selected
+                                    option.id === "all"
+                                      ? allSelectedPlanoAcao
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1340,9 +1348,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1351,7 +1357,9 @@ function ColumnsLayoutsCorrigido() {
                     <Stack spacing={1}>
                       <InputLabel>Descrição do tratamento</InputLabel>
                       <TextField
-                        onChange={(event) => setDescricaoTratamento(event.target.value)}
+                        onChange={(event) =>
+                          setDescricaoTratamento(event.target.value)
+                        }
                         fullWidth
                         multiline
                         rows={4}
@@ -1377,10 +1385,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...controles]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...controles,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.controle.map(
-                          (id) => controles.find((controle) => controle.id === id) || id
+                          (id) =>
+                            controles.find((controle) => controle.id === id) ||
+                            id,
                         )}
                         onChange={handleSelectAllControles}
                         isOptionEqualToValue={(option, value) =>
@@ -1392,7 +1405,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedControles : selected
+                                    option.id === "all"
+                                      ? allSelectedControles
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1402,9 +1417,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1415,10 +1428,13 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...kris]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...kris,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.kri.map(
-                          (id) => kris.find((kri) => kri.id === id) || id
+                          (id) => kris.find((kri) => kri.id === id) || id,
                         )}
                         onChange={handleSelectAllKris}
                         isOptionEqualToValue={(option, value) =>
@@ -1430,7 +1446,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedKris : selected
+                                    option.id === "all"
+                                      ? allSelectedKris
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1440,9 +1458,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1450,8 +1466,8 @@ function ColumnsLayoutsCorrigido() {
               </SectionCard>
 
               {/* Seção 4: Governança e Compliance */}
-              <SectionCard 
-                title="Governança e Compliance" 
+              <SectionCard
+                title="Governança e Compliance"
                 icon={<AccountBalanceIcon color="primary" />}
               >
                 <Grid container spacing={3}>
@@ -1461,10 +1477,13 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...frameworks]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...frameworks,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.framework.map(
-                          (id) => frameworks.find((fw) => fw.id === id) || id
+                          (id) => frameworks.find((fw) => fw.id === id) || id,
                         )}
                         onChange={handleSelectAllFrameworks}
                         isOptionEqualToValue={(option, value) =>
@@ -1476,7 +1495,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedFrameworks : selected
+                                    option.id === "all"
+                                      ? allSelectedFrameworks
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1486,9 +1507,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1499,10 +1518,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...diretrizes]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...diretrizes,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.diretriz.map(
-                          (id) => diretrizes.find((diretriz) => diretriz.id === id) || id
+                          (id) =>
+                            diretrizes.find((diretriz) => diretriz.id === id) ||
+                            id,
                         )}
                         onChange={handleSelectAllDiretrizes}
                         isOptionEqualToValue={(option, value) =>
@@ -1514,7 +1538,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedDiretrizes : selected
+                                    option.id === "all"
+                                      ? allSelectedDiretrizes
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1524,9 +1550,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1538,10 +1562,16 @@ function ColumnsLayoutsCorrigido() {
                         multiple
                         disabled
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...normativas]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...normativas,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.normativa.map(
-                          (id) => normativas.find((normativa) => normativa.id === id) || id
+                          (id) =>
+                            normativas.find(
+                              (normativa) => normativa.id === id,
+                            ) || id,
                         )}
                         onChange={handleSelectAllNormativas}
                         isOptionEqualToValue={(option, value) =>
@@ -1553,7 +1583,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedNormativas : selected
+                                    option.id === "all"
+                                      ? allSelectedNormativas
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1563,9 +1595,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1586,10 +1616,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todas" }, ...processos]}
+                        options={[
+                          { id: "all", nome: "Selecionar todas" },
+                          ...processos,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.processo.map(
-                          (id) => processos.find((processo) => processo.id === id) || id
+                          (id) =>
+                            processos.find((processo) => processo.id === id) ||
+                            id,
                         )}
                         onChange={handleSelectAll2}
                         isOptionEqualToValue={(option, value) =>
@@ -1601,7 +1636,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelected2 : selected
+                                    option.id === "all"
+                                      ? allSelected2
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1611,9 +1648,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1634,10 +1669,16 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[{ id: "all", nome: "Selecionar todos" }, ...departamentos]}
+                        options={[
+                          { id: "all", nome: "Selecionar todos" },
+                          ...departamentos,
+                        ]}
                         getOptionLabel={(option) => option.nome}
                         value={formData.departamento.map(
-                          (id) => departamentos.find((departamento) => departamento.id === id) || id
+                          (id) =>
+                            departamentos.find(
+                              (departamento) => departamento.id === id,
+                            ) || id,
                         )}
                         onChange={handleSelectAllDepartamentos}
                         isOptionEqualToValue={(option, value) =>
@@ -1649,7 +1690,9 @@ function ColumnsLayoutsCorrigido() {
                               <Grid item>
                                 <Checkbox
                                   checked={
-                                    option.id === "all" ? allSelectedDepartamentos : selected
+                                    option.id === "all"
+                                      ? allSelectedDepartamentos
+                                      : selected
                                   }
                                 />
                               </Grid>
@@ -1659,9 +1702,7 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
@@ -1669,8 +1710,8 @@ function ColumnsLayoutsCorrigido() {
               </SectionCard>
 
               {/* Seção 5: Relacionamentos */}
-              <SectionCard 
-                title="Relacionamentos" 
+              <SectionCard
+                title="Relacionamentos"
                 icon={<LinkIcon color="primary" />}
               >
                 <Grid container spacing={3}>
@@ -1683,14 +1724,17 @@ function ColumnsLayoutsCorrigido() {
                         options={[
                           { id: "all", nome: "Selecionar todos" },
                           ...riscoAssociados.filter((risco) => {
-                            const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
-                            return formatarNome(risco.nome) !== formatarNome(nome);
+                            const formatarNome = (nome) =>
+                              nome.replace(/\s+/g, "").toLowerCase();
+                            return (
+                              formatarNome(risco.nome) !== formatarNome(nome)
+                            );
                           }),
                         ]}
                         getOptionLabel={(option) => option.nome}
-                        value={formData.riscoAssociado.map(
-                          (id) => riscoAssociados.find((r) => r.id === id)
-                        ).filter(Boolean)}
+                        value={formData.riscoAssociado
+                          .map((id) => riscoAssociados.find((r) => r.id === id))
+                          .filter(Boolean)}
                         onChange={handleSelectAll}
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
@@ -1711,12 +1755,40 @@ function ColumnsLayoutsCorrigido() {
                             </Grid>
                           </li>
                         )}
-                        renderInput={(params) => (
-                          <TextField {...params} />
-                        )}
+                        renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
                   </Grid>
+
+                  
+              {requisicao === "Editar" && (
+                <Grid item xs={12} md={12}>
+                  <Stack spacing={1}>
+                    <InputLabel>Outras categorias</InputLabel>
+
+                    <Autocomplete
+                      multiple
+                      disableCloseOnSelect
+                      options={categorias}
+                      getOptionLabel={(option) => option.nome}
+                      value={formData.idCategories
+                        .map((id) => categorias.find((c) => c.id === id))
+                        .filter(Boolean)}
+                      onChange={(event, newValue) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          idCategories: newValue.map((c) => c.id),
+                        }));
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                        />
+                      )}
+                    />
+                  </Stack>
+                </Grid>
+              )}
 
                   <Grid item xs={12}>
                     <Stack spacing={1}>
@@ -1736,7 +1808,7 @@ function ColumnsLayoutsCorrigido() {
           )}
 
           {/* Botões de ação */}
-          <Paper sx={{ p: 3, mt: 3, backgroundColor: 'grey.50' }}>
+          <Paper sx={{ p: 3, mt: 3, backgroundColor: "grey.50" }}>
             <Stack direction="row" spacing={2} justifyContent="flex-start">
               <Button
                 variant="contained"
@@ -1787,9 +1859,7 @@ function ColumnsLayoutsCorrigido() {
             Risco Criado com Sucesso!
           </DialogTitle>
           <DialogContent>
-            <DialogContentText
-              sx={{ fontSize: "16px", color: "#555", px: 2 }}
-            >
+            <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>
               O risco foi cadastrado com sucesso. Você pode voltar para a
               listagem ou adicionar mais informações a esse risco.
             </DialogContentText>
@@ -1832,4 +1902,3 @@ function ColumnsLayoutsCorrigido() {
 }
 
 export default ColumnsLayoutsCorrigido;
-

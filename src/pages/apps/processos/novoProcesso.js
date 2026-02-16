@@ -133,6 +133,18 @@ function ColumnsLayouts() {
   );
   const currentHierarchy = selectedTipoObj?.hierarchy ?? null;
 
+  const normalizeIdArray = (arr, key) => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((x) => {
+      if (!x) return null;
+      if (typeof x === "string") return x; // API já manda GUID
+      return x[key] || x.id || null;       // fallback caso venha objeto
+    })
+    .filter(Boolean);
+};
+
+
   useEffect(() => {
     if (dadosApi && authToken) {
       const fetchDepartamentosDados = async () => {
@@ -170,24 +182,8 @@ function ColumnsLayouts() {
               ? data.processBottoms.map((u) => u.idProcessBottom)
               : [],
             kri: data.idKri || null,
-            processoAnterior: data.idProcessPrevious
-              ? Array.isArray(data.idProcessPrevious)
-                ? data.idProcessPrevious.map((p) => p.idProcess || p.id)
-                : [
-                    data.idProcessPrevious.idProcess ||
-                      data.idProcessPrevious.id ||
-                      data.idProcessPrevious,
-                  ]
-              : [],
-            processoPosterior: data.idProcessNext
-              ? Array.isArray(data.idProcessNext)
-                ? data.idProcessNext.map((p) => p.idProcess || p.id)
-                : [
-                    data.idProcessNext.idProcess ||
-                      data.idProcessNext.id ||
-                      data.idProcessNext,
-                  ]
-              : [],
+           processoAnterior: normalizeIdArray(data.idProcessPrevious, "idProcessPrevious"),
+  processoPosterior: normalizeIdArray(data.idProcessNext, "idProcessNext"),
             processoSuperior: data.idProcessSuperior || null,
             formatoUnidade: data.idProcessType || null,
             dado: data.idLgpds || null,
@@ -810,15 +806,9 @@ function ColumnsLayouts() {
             ? formData.formatoUnidade
             : null,
         idProcessSuperior: formData.processoSuperior || null,
-        idProcessPrevious:
-          formData.processoAnterior.length > 0
-            ? formData.processoAnterior[0]
-            : null,
+        idProcessPrevious: formData.processoAnterior || null,
 
-        idProcessNext:
-          formData.processoPosterior.length > 0
-            ? formData.processoPosterior[0]
-            : null,
+        idProcessNext: formData.processoPosterior || null,
         idProcessBottoms: formData.processoInferior || null,
         idCompanies: formData.empresa,
         idDepartments: formData.departamentoInferior,
@@ -1061,7 +1051,7 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={6} sx={{ paddingBottom: 5, marginTop: -1 }}>
                 <Stack spacing={1}>
                   <InputLabel
                     sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
