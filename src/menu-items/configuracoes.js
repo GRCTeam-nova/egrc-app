@@ -46,12 +46,6 @@ const pages = {
           url: '/colaboradores/lista',
         },
         {
-          id: 'customer-list352457',
-          title: <FormattedMessage id="Detalhes do usuário" />,
-          type: 'item',
-          url: '/colaboradores/detalhes-usuario',
-        },
-        {
           id: 'customer-list2457',
           title: <FormattedMessage id="Troca de senha" />,
           type: 'item',
