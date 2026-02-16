@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { API_URL} from 'config';
+import { API_URL } from "config";
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
@@ -61,7 +61,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Drawer from "@mui/material/Drawer";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
-import CloseIcon from '@mui/icons-material/Close';
+import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
   faXmark,
@@ -76,7 +76,8 @@ import {
   EmptyTable,
   RowSelection,
   TablePagination,
-} from "../../../components/third-party/react-table"; import axios from "axios";
+} from "../../../components/third-party/react-table";
+import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
 // assets
@@ -128,7 +129,11 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
     { label: "Ativo", value: true },
     { label: "Inativo", value: false },
   ]);
-  const [draftFilters, setDraftFilters] = useState({ avaliacaoRisco: [], cnpj: [], status: [], });
+  const [draftFilters, setDraftFilters] = useState({
+    avaliacaoRisco: [],
+    cnpj: [],
+    status: [],
+  });
 
   // Abre ou fecha o drawer
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
@@ -142,10 +147,16 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const applyFilters = () => {
     const newFilters = [];
     if (draftFilters.avaliacaoRisco.length > 0) {
-      newFilters.push({ type: "Avaliação de risco", values: draftFilters.avaliacaoRisco });
+      newFilters.push({
+        type: "Avaliação de risco",
+        values: draftFilters.avaliacaoRisco,
+      });
     }
     if (draftFilters.status.length > 0) {
-      newFilters.push({ type: "Status", values: draftFilters.status.map((s) => s.value) });
+      newFilters.push({
+        type: "Status",
+        values: draftFilters.status.map((s) => s.value),
+      });
     }
     setSelectedFilters(newFilters);
     toggleDrawer();
@@ -155,31 +166,31 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const removeFilter = (index) => {
     setSelectedFilters((prev) => {
       const filterToRemove = prev[index];
-  
+
       // Atualiza os filtros no drawer com base no tipo de filtro removido
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
         if (filterToRemove.type === "Avaliação de risco") {
           updatedDraft.avaliacaoRisco = updatedDraft.avaliacaoRisco.filter(
-            (value) => !filterToRemove.values.includes(value)
+            (value) => !filterToRemove.values.includes(value),
           );
         } else if (filterToRemove.type === "CNPJ") {
           updatedDraft.cnpj = updatedDraft.cnpj.filter(
-            (value) => !filterToRemove.values.includes(value)
+            (value) => !filterToRemove.values.includes(value),
           );
         } else if (filterToRemove.type === "Status") {
           updatedDraft.status = updatedDraft.status.filter(
-            (value) => !filterToRemove.values.includes(value.value)
+            (value) => !filterToRemove.values.includes(value.value),
           );
         }
         return updatedDraft;
       });
-  
+
       // Remove o filtro da lista de filtros selecionados
       return prev.filter((_, i) => i !== index);
     });
   };
-  
+
   const handleRemoveAllFilters = () => {
     setSelectedFilters([]);
     setGlobalFilter("");
@@ -190,8 +201,10 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       return selectedFilters.every((filter) => {
-        if (filter.type === "Avaliação de risco") return filter.values.includes(item.name);
-        if (filter.type === "Status") return filter.values.includes(item.active);
+        if (filter.type === "Avaliação de risco")
+          return filter.values.includes(item.name);
+        if (filter.type === "Status")
+          return filter.values.includes(item.active);
         return true;
       });
     });
@@ -228,7 +241,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         posicaoProcessual: false,
         area: false,
       }),
-    []
+    [],
   );
 
   const verticalDividerStyle = {
@@ -249,7 +262,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           ? columns.columnDef.header
           : "#",
       key: columns.columnDef.accessorKey,
-    })
+    }),
   );
 
   // Função para realizar a marcação de texto
@@ -371,7 +384,9 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                 </Typography>
                 <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
                   {filter.values
-                    .map((v) => (v === true ? "Ativo" : v === false ? "Inativo" : v))
+                    .map((v) =>
+                      v === true ? "Ativo" : v === false ? "Inativo" : v,
+                    )
                     .join(", ")}
                 </Typography>
               </Box>
@@ -400,40 +415,65 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         )}
       </Box>
 
-
       {/* Drawer para filtros */}
-      <Drawer anchor="right" open={drawerOpen} onClose={toggleDrawer} PaperProps={{ sx: { width: 670 } }}>
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 670 } }}
+      >
         <Box sx={{ width: 650, p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Box component="h2" sx={{ color: '#1C5297', fontWeight: 600, fontSize: '16px' }}>Filtros</Box>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box
+              component="h2"
+              sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
+            >
+              Filtros
+            </Box>
             <IconButton onClick={toggleDrawer}>
-              <CloseIcon sx={{ color: '#1C5297', fontSize: '18px' }} />
+              <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
             </IconButton>
           </Stack>
 
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Avaliação de risco</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Avaliação de risco
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={empresaOptions}
                   value={draftFilters.avaliacaoRisco}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, avaliacaoRisco: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      avaliacaoRisco: value,
+                    }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Status</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   options={statusOptions}
                   value={draftFilters.status}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, status: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, status: value }))
+                  }
                   getOptionLabel={(option) => option.label}
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -442,11 +482,15 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           </Grid>
 
           <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
-            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
           </Stack>
         </Box>
-      </Drawer >
+      </Drawer>
 
       <MainCard content={false}>
         <ScrollX>
@@ -491,8 +535,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                className: "cursor-pointer prevent-select",
-                              })}
+                                  className: "cursor-pointer prevent-select",
+                                })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
@@ -503,7 +547,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                   <Box>
                                     {flexRender(
                                       header.column.columnDef.header,
-                                      header.getContext()
+                                      header.getContext(),
                                     )}
                                   </Box>
                                   {header.column.getCanSort() && (
@@ -552,7 +596,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                 >
                                   {flexRender(
                                     cell.column.columnDef.cell,
-                                    cell.getContext()
+                                    cell.getContext(),
                                   )}
                                 </TableCell>
                               ))}
@@ -646,32 +690,42 @@ function ActionCell({ row, refreshData }) {
   const toggleStatus = async () => {
     const idAssessment = row.original.idAssessment;
     const newStatus = status === true ? "Inativo" : "Ativo";
-    
+
     try {
       // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}assessments/${idAssessment}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const getResponse = await axios.get(
+        `${process.env.REACT_APP_API_URL}assessments/${idAssessment}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
-  
+      );
+
       const dadosEndpoint = getResponse.data;
-  
+
       // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
-  
+      const dadosAtualizados = {
+        ...dadosEndpoint,
+        active: newStatus === "Ativo",
+      };
+
       // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}assessments`, dadosAtualizados, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}assessments`,
+        dadosAtualizados,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
-  
+      );
+
       // Atualizar o estado e exibir mensagem de sucesso
       setStatus(newStatus);
       const message = `Avaliação de risco ${newStatus.toLowerCase()}.`;
-  
+
       enqueueSnackbar(message, {
         variant: "success",
         autoHideDuration: 3000,
@@ -680,36 +734,47 @@ function ActionCell({ row, refreshData }) {
           horizontal: "center",
         },
       });
-  
+
       refreshData();
-        } catch (error) {
+    } catch (error) {
       console.error("Erro:", error);
 
       const apiData = error?.response?.data;
-      const apiMessage =
-        typeof apiData === "string"
-          ? apiData
-          : apiData?.message || apiData?.Message || apiData?.error || apiData?.title;
 
-      const message = apiMessage || error.message || "Erro inesperado.";
+      // Variável para armazenar a mensagem tratada
+      let apiMessage;
 
-      // Caso específico: tentar reativar e já existir avaliação para o ciclo
-      if (message === "Já existe uma avaliação para este ciclo") {
-        enqueueSnackbar(message, {
-          variant: "error",
-          autoHideDuration: 4000,
-          anchorOrigin: { vertical: "top", horizontal: "center" },
-        });
-      } else {
-        enqueueSnackbar(`Erro: ${message}`, {
-          variant: "error",
-          autoHideDuration: 4000,
-          anchorOrigin: { vertical: "top", horizontal: "center" },
-        });
+      // Verifica se a API retornou o array 'notifications' e se ele tem conteúdo
+      if (
+        apiData?.notifications &&
+        Array.isArray(apiData.notifications) &&
+        apiData.notifications.length > 0
+      ) {
+        apiMessage = apiData.notifications[0].message;
       }
+      // Fallbacks originais para outros tipos de erro
+      else if (typeof apiData === "string") {
+        apiMessage = apiData;
+      } else {
+        apiMessage =
+          apiData?.message ||
+          apiData?.Message ||
+          apiData?.error ||
+          apiData?.title;
+      }
+
+      // Define a mensagem final (com fallback para erro genérico se a API não retornar nada)
+      const message =
+        apiMessage || error.message || "Erro inesperado ao alterar o status.";
+
+      // Dispara o snackbar com a mensagem exata retornada pela API
+      enqueueSnackbar(message, {
+        variant: "error",
+        autoHideDuration: 4000,
+        anchorOrigin: { vertical: "top", horizontal: "center" },
+      });
     }
 
-  
     handleDialogClose();
   };
 
@@ -719,7 +784,7 @@ function ActionCell({ row, refreshData }) {
         `${API_COMMAND}/api/Orgao/${row.original.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (response.ok) {
@@ -735,7 +800,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o avaliacaoRisco: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o avaliacaoRisco: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -808,7 +873,6 @@ function ActionCell({ row, refreshData }) {
           >
             {row.original.active === true ? "Inativar" : "Ativar"}
           </Button>
-          
         </Stack>
       </Popover>
       <Dialog
@@ -1013,14 +1077,15 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja excluir o avaliacaoRisco "{row.original.nome}"?
+            Tem certeza que deseja excluir o avaliacaoRisco "{row.original.nome}
+            "?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Esse avaliacaoRisco não será mais disponibilizado ao cadastrar um novo
-            processo.
+            Esse avaliacaoRisco não será mais disponibilizado ao cadastrar um
+            novo processo.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1145,8 +1210,9 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            O avaliacaoRisco não pode ser excluído pois está vinculado a processos. É
-            possível inativar o avaliacaoRisco nas configurações de edição.
+            O avaliacaoRisco não pode ser excluído pois está vinculado a
+            processos. É possível inativar o avaliacaoRisco nas configurações de
+            edição.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1181,16 +1247,16 @@ ActionCell.propTypes = {
 // ==============================|| LISTAGEM ||============================== //
 
 // Componente principal da página de listagem de registros
-const ListagemEmpresa = () => {
+const ListagemAvRisco = () => {
   const theme = useTheme();
   const navigation = useNavigate();
   const location = useLocation();
   const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-  } = useGetPlanos(formData, processoSelecionadoId);
+  const { acoesJudiciais: lists, isLoading } = useGetPlanos(
+    formData,
+    processoSelecionadoId,
+  );
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1204,7 +1270,6 @@ const ListagemEmpresa = () => {
       ...currentData,
       refreshCount: currentData.refreshCount + 1,
     }));
-    
   };
 
   useEffect(() => {
@@ -1233,31 +1298,30 @@ const ListagemEmpresa = () => {
   const columns = useMemo(
     () => [
       {
-      header: "Ciclo",
-      accessorKey: "cycle",
-      cell: ({ row }) => {
-        
-        return (
-          <Typography
-            sx={{
-            fontSize: '13px',
-            cursor: "pointer",
-          }}
-            onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/avaliacoes/criar`, {
-                state: {
-                  indoPara: "NovoPlano",
-                  dadosApi,
-                },
-              });
-            }}
-          >
-            {row.original.cycle}
-          </Typography>
-        );
+        header: "Ciclo",
+        accessorKey: "cycle",
+        cell: ({ row }) => {
+          return (
+            <Typography
+              sx={{
+                fontSize: "13px",
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                const dadosApi = row.original;
+                navigation(`/avaliacoes/criar`, {
+                  state: {
+                    indoPara: "NovoPlano",
+                    dadosApi,
+                  },
+                });
+              }}
+            >
+              {row.original.cycle}
+            </Typography>
+          );
+        },
       },
-    },
       {
         header: "Risco",
         accessorKey: "risk",
@@ -1301,12 +1365,10 @@ const ListagemEmpresa = () => {
       {
         header: " ",
         disableSortBy: true,
-        cell: ({ row }) => (
-          <ActionCell row={row} refreshData={refreshOrgaos} />
-        ), // Passa refreshData
+        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />, // Passa refreshData
       },
     ],
-    [theme]
+    [theme],
   );
 
   useEffect(() => {
@@ -1317,7 +1379,6 @@ const ListagemEmpresa = () => {
 
   return (
     <>
-
       {isInitialLoad && isLoading ? (
         // Exibir indicador de carregamento apenas no carregamento inicial
         <div
@@ -1333,13 +1394,23 @@ const ListagemEmpresa = () => {
       ) : (
         <Box>
           <ReactTable
-            {...{ data: lists, columns, onFormDataChange: handleFormDataChange, isLoading, processosTotal, refreshData: refreshOrgaos }}
+            {...{
+              data: lists,
+              columns,
+              onFormDataChange: handleFormDataChange,
+              isLoading,
+              processosTotal,
+              refreshData: refreshOrgaos,
+            }}
           />
           <Grid container spacing={2}>
             {/* ReactTable com tamanho reduzido */}
             <Grid item xs={12}>
-              <Box sx={{ transform: "scale(0.9)", transformOrigin: "top left" }}> {/* Redução de tamanho */}
-
+              <Box
+                sx={{ transform: "scale(0.9)", transformOrigin: "top left" }}
+              >
+                {" "}
+                {/* Redução de tamanho */}
               </Box>
             </Grid>
 
@@ -1365,7 +1436,6 @@ const ListagemEmpresa = () => {
             </Grid>
           </Grid> */}
         </Box>
-
       )}
       <AlertCustomerDelete
         id={customerDeleteId}
@@ -1382,4 +1452,4 @@ const ListagemEmpresa = () => {
   );
 };
 
-export default ListagemEmpresa;
+export default ListagemAvRisco;
