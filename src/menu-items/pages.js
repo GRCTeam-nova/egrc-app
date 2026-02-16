@@ -36,41 +36,41 @@ const pages = {
       icon: icons.CorporateFareIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '676876543546',
           title: <FormattedMessage id="Empresas" />,
           type: 'item',
           url: '/empresas/lista',
           
         },
         {
-          id: 'customer-list2',
+          id: '543325356455423',
           title: <FormattedMessage id="Departamentos" />,
           type: 'item',
           url: '/departamentos/lista',
           
         },
         {
-          id: 'customer-list3',
+          id: '342536423453',
           title: <FormattedMessage id="Processos" />,
           type: 'item',
           url: '/processos/lista',
         },
         {
-          id: 'customer-list4',
+          id: '35436423242534',
           title: <FormattedMessage id="Dados" />,
           type: 'item',
           url: '/dados/lista',
           // Este item será escondido pelo CSS injetado acima
         },
         {
-          id: 'customer-list5',
+          id: '324535423536423536',
           title: <FormattedMessage id="Contas" />,
           type: 'item',
           url: '/contas/lista',
           // Este item será escondido pelo CSS injetado acima
         },
         {
-          id: 'customer-list6',
+          id: '56452353654324',
           title: <FormattedMessage id="Ativos" />,
           type: 'item',
           url: '/ativos/lista',

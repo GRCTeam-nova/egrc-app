@@ -36,14 +36,14 @@ const pages = {
       icon: icons.SettingsIcon,
       children: [
         {
-          id: 'customer-list5464',
+          id: '5675432567655465',
           title: <FormattedMessage id="Colaboradores" />,
           type: 'item',
           url: '/riscos/lista',
           
         },
         {
-          id: 'customer-list3342',
+          id: '3454567543546756534544',
           title: <FormattedMessage id="Perfi" />,
           type: 'item',
           url: '/ciclos/lista',

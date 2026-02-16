@@ -39,14 +39,14 @@ const pages = {
       icon: icons.CreateIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '90876543565',
           title: <FormattedMessage id="Planos de Ação" />,
           type: 'item',
           url: '/planos/lista',
           
         },
         {
-          id: 'customer-list2',
+          id: '456768667544554',
           title: <FormattedMessage id="Deficiências" />,
           type: 'item',
           url: '/deficiencias/lista',

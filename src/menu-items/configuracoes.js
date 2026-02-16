@@ -40,13 +40,13 @@ const pages = {
       icon: icons.CorporateFareIcon,
       children: [
         {
-          id: 'customer-list278',
+          id: '8',
           title: <FormattedMessage id="Colaboradores" />,
           type: 'item',
           url: '/colaboradores/lista',
         },
         {
-          id: 'customer-list2457',
+          id: '9',
           title: <FormattedMessage id="Troca de senha" />,
           type: 'item',
           url: '/colaboradores/trocar-senha',

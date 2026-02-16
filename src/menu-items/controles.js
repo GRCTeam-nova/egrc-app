@@ -37,35 +37,35 @@ const pages = {
       icon: icons.AssessmentIcon,
       children: [
         {
-          id: 'customer-list',
+          id: '5675',
           title: <FormattedMessage id="Controles" />,
           type: 'item',
           url: '/controles/lista',
           
         },
         {
-          id: 'customer-list2',
+          id: '876654',
           title: <FormattedMessage id="Informação da atividade" />,
           type: 'item',
           url: '/ipes/lista',
           
         },
         {
-          id: 'customer-list3',
+          id: '45645',
           title: <FormattedMessage id="Objetivos de controle" />,
           type: 'item',
           url: '/objetivos/lista',
           
         },
         {
-          id: 'customer-list4',
+          id: '345568765',
           title: <FormattedMessage id="Projetos" />,
           type: 'item',
           url: '/projetos/lista',
           
         },
         {
-          id: 'customer-list4',
+          id: '4567654',
           title: <FormattedMessage id="Testes" />,
           type: 'item',
           url: '/testes/lista',
