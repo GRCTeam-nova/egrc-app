@@ -48,7 +48,7 @@ const MainDrawer = ({ window }) => {
               boxSizing: 'border-box',
               width: DRAWER_WIDTH,
               borderRight: `1px solid ${theme.palette.divider}`,
-              backgroundColor: 'blue',
+              backgroundColor: `${theme.palette.primary.main}`,
               boxShadow: 'inherit'
             }
           }}
