@@ -1268,7 +1268,7 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa avaliação.", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });

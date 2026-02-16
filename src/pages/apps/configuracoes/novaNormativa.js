@@ -1232,7 +1232,7 @@ const handleDenyReplication = () => {
       window.scrollTo(0, 0);
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
@@ -1439,7 +1439,7 @@ const handleDenyReplication = () => {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
@@ -1641,7 +1641,7 @@ const handleDenyReplication = () => {
       window.scrollTo(0, 0);
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
@@ -1843,7 +1843,7 @@ const handleDenyReplication = () => {
       window.scrollTo(0, 0);
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
