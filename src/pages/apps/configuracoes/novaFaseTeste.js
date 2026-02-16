@@ -543,7 +543,7 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa fase", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
@@ -727,7 +727,7 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa fase", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
@@ -895,7 +895,7 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar esse controle.", {
+      enqueueSnackbar("Não foi possível cadastrar essa fase", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });

@@ -107,7 +107,14 @@ export const fuzzyFilter = (row, columnId, value) => {
 
 // ==============================|| REACT TABLE - LIST ||============================== //
 
-function ReactTable({ data, columns, processosTotal, isLoading, onEditPhase, canEdit }) {
+function ReactTable({
+  data,
+  columns,
+  processosTotal,
+  isLoading,
+  onEditPhase,
+  canEdit,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
@@ -171,7 +178,7 @@ function ReactTable({ data, columns, processosTotal, isLoading, onEditPhase, can
         posicaoProcessual: false,
         area: false,
       }),
-    []
+    [],
   );
 
   const verticalDividerStyle = {
@@ -192,7 +199,7 @@ function ReactTable({ data, columns, processosTotal, isLoading, onEditPhase, can
           ? columns.columnDef.header
           : "#",
       key: columns.columnDef.accessorKey,
-    })
+    }),
   );
 
   // Função para realizar a marcação de texto
@@ -246,37 +253,37 @@ function ReactTable({ data, columns, processosTotal, isLoading, onEditPhase, can
           />
         </Stack>
         {canEdit === true && (
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          alignItems="center"
-          sx={{ width: { xs: "100%", sm: "auto" } }}
-        >
-          <div style={verticalDividerStyle}></div>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            alignItems="center"
+            sx={{ width: { xs: "100%", sm: "auto" } }}
+          >
+            <div style={verticalDividerStyle}></div>
 
-          <Stack direction="row" spacing={2} alignItems="center">
-            {/* Botão para abrir o Drawer principal */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                flexShrink: 0,
-                ml: 0.75,
-              }}
-            >
-              <DrawerAtributo
-                buttonSx={{
-                  marginLeft: 1.5,
-                  height: "20px",
-                  minWidth: "20px",
+            <Stack direction="row" spacing={2} alignItems="center">
+              {/* Botão para abrir o Drawer principal */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  flexShrink: 0,
+                  ml: 0.75,
                 }}
-              />
-            </Box>
+              >
+                <DrawerAtributo
+                  buttonSx={{
+                    marginLeft: 1.5,
+                    height: "20px",
+                    minWidth: "20px",
+                  }}
+                />
+              </Box>
+            </Stack>
           </Stack>
-        </Stack>
         )}
       </Stack>
-              
+
       <MainCard content={false}>
         <ScrollX>
           <div ref={tableRef}>
@@ -332,7 +339,7 @@ function ReactTable({ data, columns, processosTotal, isLoading, onEditPhase, can
                                   <Box>
                                     {flexRender(
                                       header.column.columnDef.header,
-                                      header.getContext()
+                                      header.getContext(),
                                     )}
                                   </Box>
                                   {header.column.getCanSort() && (
@@ -391,7 +398,7 @@ function ReactTable({ data, columns, processosTotal, isLoading, onEditPhase, can
                                 >
                                   {flexRender(
                                     cell.column.columnDef.cell,
-                                    cell.getContext()
+                                    cell.getContext(),
                                   )}
                                 </TableCell>
                               ))}
@@ -636,7 +643,7 @@ function ActionCell({ row, refreshData, onEdit }) {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (response.status === 204) {
@@ -669,7 +676,7 @@ function ActionCell({ row, refreshData, onEdit }) {
         `${API_COMMAND}/api/Orgao/${row.original.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (response.ok) {
@@ -685,7 +692,7 @@ function ActionCell({ row, refreshData, onEdit }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o empresa: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o empresa: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -707,7 +714,6 @@ function ActionCell({ row, refreshData, onEdit }) {
   const id = open ? "simple-popover" : undefined;
 
   return (
-    
     <Stack
       direction="row"
       alignItems="center"
@@ -1126,10 +1132,10 @@ ReactTable.propTypes = {
 
 // ==============================|| LISTAGEM ||============================== //
 
-const ListagemAtributo = ( {canEdit, atributo }) => {
+const ListagemAtributo = ({ canEdit, atributo }) => {
   const theme = useTheme();
   const location = useLocation();
-  console.log(atributo)
+  console.log(atributo);
   const [formData, setFormData] = useState({ refreshCount: 0 });
   const {
     acoesJudiciais: lists,
@@ -1165,12 +1171,11 @@ const ListagemAtributo = ( {canEdit, atributo }) => {
   }, []);
 
   const refreshOrgaos = () => {
-    setFormData(current => ({
+    setFormData((current) => ({
       ...current,
-      refreshCount: current.refreshCount + 1
+      refreshCount: current.refreshCount + 1,
     }));
   };
-  
 
   const handleEditAcionista = (teste) => {
     setSelectedAcionista(teste);
@@ -1186,7 +1191,6 @@ const ListagemAtributo = ( {canEdit, atributo }) => {
       emitter.off("refreshCustomers", refreshHandler);
     };
   }, []);
-  
 
   const marcoTrueLists = useMemo(() => {
     if (lists && lists.length) {
@@ -1205,32 +1209,88 @@ const ListagemAtributo = ( {canEdit, atributo }) => {
 
   // Definição das colunas da tabela, incluindo a coluna expansora
   const columns = useMemo(() => {
-    // Coluna fixa de nome
     const cols = [
+      {
+        header: "Código",
+        accessorKey: "code",
+        // Ajuste 1: Torna o Código clicável
+        cell: ({ row, getValue }) => (
+          <Box
+            component="span"
+            onClick={() => canEdit && handleEditAcionista(row.original)}
+            sx={{
+              cursor: canEdit ? "pointer" : "inherit",
+              color: canEdit ? theme.palette.primary.main : "inherit",
+              "&:hover": canEdit ? { textDecoration: "underline" } : {},
+            }}
+          >
+            {getValue()}
+          </Box>
+        ),
+      },
       {
         header: "Nome",
         accessorKey: "name",
+        // Ajuste 1: Torna o Nome clicável
+        cell: ({ row, getValue }) => (
+          <Box
+            component="span"
+            onClick={() => canEdit && handleEditAcionista(row.original)}
+            sx={{
+              cursor: canEdit ? "pointer" : "inherit",
+              color: canEdit ? theme.palette.primary.main : "inherit",
+              "&:hover": canEdit ? { textDecoration: "underline" } : {},
+            }}
+          >
+            {getValue()}
+          </Box>
+        ),
+      },
+      {
+        header: "Descrição",
+        accessorKey: "description",
+        // Ajuste 2: Trunca o texto com "..." e adiciona Tooltip
+        cell: ({ getValue }) => {
+          const text = getValue();
+
+          if (!text) return "-";
+
+          return (
+            <Tooltip title={text} arrow placement="top-start">
+              <Box
+                sx={{
+                  maxWidth: "250px", // Ajuste esse valor conforme a largura desejada na sua tela
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "block",
+                }}
+              >
+                {text}
+              </Box>
+            </Tooltip>
+          );
+        },
       },
     ];
 
-    // Se estiver editável, adiciona ActionCell
-    // if (canEdit) {
-    //   cols.push({
-    //     header: " ",
-    //     disableSortBy: true,
-    //     cell: ({ row }) => (
-    //       <ActionCell
-    //         row={row}
-    //         refreshData={refreshOrgaos}
-    //         onEdit={handleEditAcionista}
-    //       />
-    //     ),
-    //   });
-    // }
+    if (canEdit) {
+      cols.push({
+        header: " ",
+        id: "actions", // Adicionado um ID obrigatório quando não há accessorKey
+        disableSortBy: true,
+        cell: ({ row }) => (
+          <ActionCell
+            row={row}
+            refreshData={refreshOrgaos}
+            onEdit={handleEditAcionista}
+          />
+        ),
+      });
+    }
 
     return cols;
   }, [theme, canEdit, refreshOrgaos, handleEditAcionista]);
-
   useEffect(() => {
     if (isInitialLoad && !isLoading) {
       setIsInitialLoad(false);
@@ -1269,7 +1329,7 @@ const ListagemAtributo = ( {canEdit, atributo }) => {
                 onFormDataChange: handleFormDataChange,
                 isLoading,
                 refreshData: refreshOrgaos,
-                canEdit: canEdit
+                canEdit: canEdit,
               }}
             />
           )}

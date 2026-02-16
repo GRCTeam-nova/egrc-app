@@ -1,112 +1,74 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Autocomplete,
-  Button,
-  TextField,
-  Grid,
-  Stack,
-  InputLabel,
-  Drawer,
   Box,
+  Button,
+  Drawer,
+  Grid,
+  InputLabel,
+  Stack,
+  TextField,
   Tooltip,
 } from "@mui/material";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { enqueueSnackbar } from "notistack";
-import ptBR from "date-fns/locale/pt-BR";
-import LoadingOverlay from "./LoadingOverlay";
-import { useToken } from "../../../api/TokenContext";
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
-import { useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
-import axios from "axios";
+import { enqueueSnackbar } from "notistack";
+import { useLocation } from "react-router-dom";
+
+import LoadingOverlay from "./LoadingOverlay";
+import { useToken } from "../../../api/TokenContext";
 import emitter from "./eventEmitter";
 
-function DrawerAtributo({ teste, hideButton = false }) {
-  // Estado interno para controlar se o drawer está aberto
-  const [open, setOpen] = useState(false);
+function DrawerAtributo({
+  teste,
+  hideButton = false,
+  open: openProp,
+  onClose,
+}) {
+  const isControlled = typeof openProp === "boolean";
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = isControlled ? openProp : openInternal;
+
   const { token } = useToken();
   const location = useLocation();
   const { dadosApi } = location.state || {};
+
   const [nome, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [descricaoConclusao, setDescricaoConclusao] = useState("");
   const [loading, setLoading] = useState(false);
-  const [expectedCompletionDate, setExpectedCompletionDate] = useState(null);
-  const [completionDate, setCompletionDate] = useState(null);
 
-  const [formData, setFormData] = useState({
-    status: "",
-    controle: "",
-  });
+  const isEditMode = useMemo(() => Boolean(teste?.idAttribute), [teste]);
 
-  // Quando o prop "teste" mudar (modo edição), abre o drawer e preenche os campos
-  useEffect(() => {
-    if (teste) {
-      const fetchTestData = async () => {
-        try {
-          setLoading(true);
-          const response = await axios.get(
-            `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes/${teste.idAttribute}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          // Supondo que os dados retornados possuam as propriedades utilizadas abaixo
-          const data = response.data;
-          setDescricao(data.description || "");
-          setDescricaoConclusao(data.descriptionTestCompletion || "");
-          setExpectedCompletionDate(
-            data.expectedCompletionDate
-              ? new Date(data.expectedCompletionDate)
-              : null
-          );
-          setCompletionDate(
-            data.completionDate ? new Date(data.completionDate) : null
-          );
-          setFormData((prev) => ({
-            ...prev,
-            controle: data.idControl || null,
-            status: data.testConclusion || "",
-          }));
-          setOpen(true);
-        } catch (error) {
-          console.error("Erro ao buscar dados do teste:", error);
-          enqueueSnackbar("Erro ao buscar dados do teste.", {
-            variant: "error",
-          });
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchTestData();
+  const setOpenSafe = (value) => {
+    if (isControlled) {
+      if (!value && typeof onClose === "function") onClose();
+      return;
     }
-  }, [teste, token]);
+    setOpenInternal(value);
+  };
 
-  // Se o drawer for aberto sem edição (novo cadastro), limpa os campos
   useEffect(() => {
-    if (open && !teste) {
-      setNome("");
-      setCodigo("");
-      setDescricao("");
-      setDescricaoConclusao("");
-      setExpectedCompletionDate(null);
-      setCompletionDate(null);
+    if (!open) return;
+
+    if (isEditMode) {
+      setCodigo(teste?.code ?? "");
+      setNome(teste?.name ?? "");
+      setDescricao(teste?.description ?? "");
+      return;
     }
-  }, [open, teste]);
+
+    setNome("");
+    setCodigo("");
+    setDescricao("");
+  }, [open, isEditMode, teste]);
 
   const tratarSubmit = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
+    const codeTrim = String(codigo ?? "").trim();
+    const nameTrim = String(nome ?? "").trim();
+    const descTrim = String(descricao ?? "").trim();
 
-    if (!descricao.trim()) {
+    if (!codeTrim || !nameTrim || !descTrim) {
       enqueueSnackbar("Preencha os campos obrigatórios!", { variant: "error" });
       return;
     }
@@ -114,29 +76,17 @@ function DrawerAtributo({ teste, hideButton = false }) {
     try {
       setLoading(true);
 
-      if (teste) {
-        // Modo edição: Atualiza o teste incluindo os novos campos de data
-        url =
-          `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
-        method = "PUT";
-        payload = {
-          idControl:
-            formData.controle === null || formData.controle === ""
-              ? null
-              : formData.controle,
-          description: descricao,
-          descriptionTestCompletion: descricaoConclusao,
-          idTest: teste.idTest,
-          expectedCompletionDate: expectedCompletionDate
-            ? expectedCompletionDate.toISOString()
-            : null,
-          completionDate: completionDate ? completionDate.toISOString() : null,
-          testConclusion: formData.status,
-          active: true,
+      if (isEditMode) {
+        const url = `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
+        const payload = {
+          idAttribute: teste.idAttribute,
+          code: codeTrim,
+          name: nameTrim,
+          description: descTrim,
         };
 
         const response = await fetch(url, {
-          method,
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -145,22 +95,23 @@ function DrawerAtributo({ teste, hideButton = false }) {
         });
 
         if (!response.ok) {
-          throw new Error("Erro ao enviar os dados do teste.");
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage =
+            errorData?.notifications?.[0]?.message ||
+            "Erro ao atualizar o atributo.";
+          throw new Error(errorMessage);
         }
       } else {
-        // Modo cadastro: Inclui os campos de data no payload do POST
-        url =
-          `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
-        method = "POST";
-        payload = {
-          code: codigo,
-          name: nome,
-          description: descricao,
-          idTestPhase: dadosApi.idTestPhase,
+        const url = `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
+        const payload = {
+          code: codeTrim,
+          name: nameTrim,
+          description: descTrim,
+          idTestPhase: dadosApi?.idTestPhase ?? null,
         };
 
         const postResponse = await fetch(url, {
-          method,
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -169,72 +120,36 @@ function DrawerAtributo({ teste, hideButton = false }) {
         });
 
         if (!postResponse.ok) {
-          throw new Error("Erro ao enviar os dados do teste.");
-        }
-
-        // Se o usuário informou uma descrição de conclusão, atualize o teste chamando o endpoint de PUT.
-        if (descricaoConclusao.trim() !== "") {
-          const createdData = await postResponse.json();
-          const idTest = createdData.data.idTest;
-
-          const editUrl =
-            `${process.env.REACT_APP_API_URL}projects/tests/phases/attributes`;
-          const editPayload = {
-            idTest,
-            description: descricao,
-            descriptionTestCompletion: descricaoConclusao,
-            expectedCompletionDate: expectedCompletionDate
-              ? expectedCompletionDate.toISOString()
-              : null,
-            completionDate: completionDate
-              ? completionDate.toISOString()
-              : null,
-            testConclusion: formData.status,
-            active: true,
-          };
-
-          const editResponse = await fetch(editUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(editPayload),
-          });
-
-          if (!editResponse.ok) {
-            throw new Error("Erro ao atualizar o atributo.");
-          }
+          const errorData = await postResponse.json().catch(() => ({}));
+          const errorMessage =
+            errorData?.notifications?.[0]?.message ||
+            "Erro ao cadastrar o atributo.";
+          throw new Error(errorMessage);
         }
       }
 
       enqueueSnackbar(
-        teste
+        isEditMode
           ? "Atributo atualizado com sucesso!"
           : "Atributo cadastrado com sucesso!",
-        { variant: "success" }
+        { variant: "success" },
       );
 
       if (window.refreshOrgaos) {
         window.refreshOrgaos();
       }
       emitter.emit("refreshCustomers");
-      setOpen(false);
+
+      setOpenSafe(false);
     } catch (error) {
       enqueueSnackbar(error.message, { variant: "error" });
-      setOpen(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
+  const handleOpen = () => setOpenSafe(true);
+  const handleClose = () => setOpenSafe(false);
 
   return (
     <>
@@ -268,7 +183,7 @@ function DrawerAtributo({ teste, hideButton = false }) {
               component="h2"
               sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
             >
-              {teste ? "Editar atributo" : "Cadastrar atributo"}
+              {isEditMode ? "Editar atributo" : "Cadastrar atributo"}
             </Box>
             <IconButton onClick={handleClose}>
               <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
@@ -277,51 +192,48 @@ function DrawerAtributo({ teste, hideButton = false }) {
 
           <LoadingOverlay isActive={loading} />
 
-          <LocalizationProvider
-            dateAdapter={AdapterDateFns}
-            adapterLocale={ptBR}
-          >
-            <Grid container spacing={2} marginTop={2}>
-              <Grid item xs={12} mb={1.5}>
-                <Stack spacing={1}>
-                  <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                    Código *
-                  </InputLabel>
-                  <TextField
-                    onChange={(event) => setCodigo(event.target.value)}
-                    fullWidth
-                    value={codigo}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} mb={1.5}>
-                <Stack spacing={1}>
-                  <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                    Nome *
-                  </InputLabel>
-                  <TextField
-                    onChange={(event) => setNome(event.target.value)}
-                    fullWidth
-                    value={nome}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} mb={1.5}>
-                <Stack spacing={1}>
-                  <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                    Descrição *
-                  </InputLabel>
-                  <TextField
-                    multiline
-                    rows={2}
-                    onChange={(event) => setDescricao(event.target.value)}
-                    fullWidth
-                    value={descricao}
-                  />
-                </Stack>
-              </Grid>
+          <Grid container spacing={2} marginTop={2}>
+            <Grid item xs={12} mb={1.5}>
+              <Stack spacing={1}>
+                <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                  Código *
+                </InputLabel>
+                <TextField
+                  onChange={(event) => setCodigo(event.target.value)}
+                  fullWidth
+                  value={codigo}
+                />
+              </Stack>
             </Grid>
-          </LocalizationProvider>
+
+            <Grid item xs={12} mb={1.5}>
+              <Stack spacing={1}>
+                <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                  Nome *
+                </InputLabel>
+                <TextField
+                  onChange={(event) => setNome(event.target.value)}
+                  fullWidth
+                  value={nome}
+                />
+              </Stack>
+            </Grid>
+
+            <Grid item xs={12} mb={1.5}>
+              <Stack spacing={1}>
+                <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                  Descrição *
+                </InputLabel>
+                <TextField
+                  multiline
+                  rows={2}
+                  onChange={(event) => setDescricao(event.target.value)}
+                  fullWidth
+                  value={descricao}
+                />
+              </Stack>
+            </Grid>
+          </Grid>
 
           <Stack direction="row" spacing={2} mt={5} justifyContent="flex-end">
             <Button onClick={handleClose} variant="outlined">
