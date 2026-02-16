@@ -104,7 +104,6 @@ function ColumnsLayouts() {
           item.idProcess ||
           item.id_responsible ||
           item.idCategory ||
-          item.idDeficiency ||
           item.idFramework ||
           item.idTreatment ||
           item.idDeficiencyClassification ||
@@ -177,7 +176,8 @@ function ColumnsLayouts() {
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/deficiencies/${dadosApi.idDeficiency}`,
+            // Corrigido para garantir que pega do ID corretamente
+            `https://api.egrc.homologacao.com.br/api/v1/deficiencies/${dadosApi.id || dadosApi.idDeficiency}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -186,7 +186,7 @@ function ColumnsLayouts() {
           );
 
           if (!response.ok) {
-            throw new Error("Erro ao buscar os dados de empresas");
+            throw new Error("Erro ao buscar os dados da deficiência");
           }
 
           const data = await response.json();
@@ -225,7 +225,8 @@ function ColumnsLayouts() {
         }
       };
 
-      if (dadosApi.idDeficiency) {
+      // CORREÇÃO: Agora verifica por `id` ou `idDeficiency`
+      if (dadosApi.id || dadosApi.idDeficiency) {
         fetchEmpresaDados();
       }
     }
@@ -241,10 +242,8 @@ function ColumnsLayouts() {
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "tipoDeficiencia") {
-      // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
-      // Para outros campos
       setFormData({ ...formData, [field]: value });
     }
   };
@@ -252,10 +251,8 @@ function ColumnsLayouts() {
   const handleSelectAllControles = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.controle.length === controles.length) {
-        // Deselect all
         setFormData({ ...formData, controle: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           controle: controles.map((controle) => controle.id),
@@ -272,10 +269,8 @@ function ColumnsLayouts() {
   const handleSelectAllPlanoAcao = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.planoAcao.length === planosAcoes.length) {
-        // Deselect all
         setFormData({ ...formData, planoAcao: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           planoAcao: planosAcoes.map((planoAcao) => planoAcao.id),
@@ -292,10 +287,8 @@ function ColumnsLayouts() {
   const handleSelectAll2 = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.processo.length === processos.length) {
-        // Deselect all
         setFormData({ ...formData, processo: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           processo: processos.map((processo) => processo.id),
@@ -312,7 +305,6 @@ function ColumnsLayouts() {
   const voltarParaCadastroMenu = () => {
     navigate(-1);
     window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
   const continuarEdicao = () => {
@@ -320,7 +312,6 @@ function ColumnsLayouts() {
     setSuccessDialogOpen(false);
   };
 
-  // Função para voltar para a listagem
   const voltarParaListagem = () => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
@@ -335,7 +326,6 @@ function ColumnsLayouts() {
     formData.processo.length === processos.length && processos.length > 0;
   const allSelectedPlanoAcao =
     formData.planoAcao.length === planosAcoes.length && planosAcoes.length > 0;
-
   const allSelectedControles =
     formData.controle.length === controles.length && controles.length > 0;
 
@@ -364,10 +354,9 @@ function ColumnsLayouts() {
       enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
         variant: "error",
       });
-      return; // Para a execução se a validação falhar
+      return; 
     }
 
-    // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
       url = "https://api.egrc.homologacao.com.br/api/v1/deficiencies";
       method = "POST";
@@ -379,7 +368,8 @@ function ColumnsLayouts() {
       url = `https://api.egrc.homologacao.com.br/api/v1/deficiencies`;
       method = "PUT";
       payload = {
-        idDeficiency: deficienciaDados?.idDeficiency,
+        // CORREÇÃO no payload: Garantir que puxamos a string correta do id
+        idDeficiency: deficienciaDados?.idDeficiency || deficienciaDados?.id,
         code: codigo,
         name: nome,
         description: descricao,
@@ -401,7 +391,6 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
 
-      // Primeira requisição (POST ou PUT inicial)
       const response = await fetch(url, {
         method,
         headers: {
@@ -425,8 +414,7 @@ function ColumnsLayouts() {
         });
       }
 
-      if (requisicao === "Criar" && data.data.idDeficiency) {
-        // Atualiza o estado para modo de edição
+      if (requisicao === "Criar" && data.data && (data.data.idDeficiency || data.data.id)) {
         setDeficienciaDados(data.data);
         setSuccessDialogOpen(true);
       } else {
@@ -434,7 +422,7 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar essa deficiência.", {
+      enqueueSnackbar("Não foi possível cadastrar/editar essa deficiência.", {
         variant: "error",
       });
     } finally {
@@ -482,26 +470,6 @@ function ColumnsLayouts() {
                     multiline
                     rows={4}
                     value={descricao}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Data</InputLabel>
-                  <DatePicker
-                    value={formData.data || null}
-                    onChange={(newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        data: newValue,
-                      }));
-                    }}
-                    slotProps={{
-                      textField: {
-                        placeholder: "00/00/0000",
-                      },
-                    }}
                   />
                 </Stack>
               </Grid>
