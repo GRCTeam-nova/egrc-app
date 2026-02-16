@@ -54,6 +54,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Drawer from "@mui/material/Drawer";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
+import InputAdornment from "@mui/material/InputAdornment";
 import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
@@ -126,9 +127,54 @@ const formatCurrencyBR = (val) => {
   if (val === null || val === undefined || val === "") return "—";
   const n = typeof val === "string" ? Number(val) : val;
   if (Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(n);
 };
 
+// Aceita entradas como "1234", "1.234", "1.234,56" ou "1234,56"
+// e também números vindos da API (ex: 345.78)
+const parseCurrencyBR = (raw) => {
+  if (raw === null || raw === undefined || raw === "") return null;
+
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  let s = String(raw)
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/^R\$\s*/i, "")
+    .replace(/[^0-9,.\-]/g, "");
+
+  if (!s) return null;
+
+  // Se tiver vírgula, assume padrão BR (vírgula decimal, ponto milhar)
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(/,/g, ".");
+  } else {
+    // Sem vírgula: assume ponto decimal (ex: "453.00" vindo da API)
+    const parts = s.split(".");
+    if (parts.length > 2) {
+      s = parts.slice(0, -1).join("") + "." + parts[parts.length - 1];
+    }
+  }
+
+  const n = Number(s);
+  return Number.isNaN(n) ? null : n;
+};
+
+// Máscara simples para input de moeda: digita apenas números e sempre mantém 2 casas decimais (pt-BR)
+const maskCurrencyBRInput = (raw) => {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  const n = Number(digits) / 100;
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
 
 const defaultVisibility = {
   name: true,
@@ -162,7 +208,6 @@ const formatDateChipBR = (yyyyMmDd) => {
   if (!y || !m || !d) return yyyyMmDd; // fallback
   return `${d}-${m}-${y}`;
 };
-
 
 function ReactTable({
   data,
@@ -220,6 +265,9 @@ function ReactTable({
 
     startDate: null,
     endDate: null,
+
+    minValue: "",
+    maxValue: "",
   });
 
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
@@ -227,7 +275,7 @@ function ReactTable({
   useEffect(() => {
     const getUniqueValues = (key, isArray = false) => {
       if (!data) return [];
-      const values = data.flatMap(item => {
+      const values = data.flatMap((item) => {
         const val = item[key];
         if (isArray && Array.isArray(val)) return val;
         return val ? [val] : [];
@@ -253,7 +301,10 @@ function ReactTable({
       newFilters.push({ type: "Status", values: arr(draftFilters.status) });
 
     if (arr(draftFilters.category).length > 0)
-      newFilters.push({ type: "Categoria", values: arr(draftFilters.category) });
+      newFilters.push({
+        type: "Categoria",
+        values: arr(draftFilters.category),
+      });
 
     if (arr(draftFilters.incidentType).length > 0)
       newFilters.push({ type: "Tipo", values: arr(draftFilters.incidentType) });
@@ -265,26 +316,52 @@ function ReactTable({
       newFilters.push({ type: "Causa", values: arr(draftFilters.cause) });
 
     if (arr(draftFilters.departments).length > 0)
-      newFilters.push({ type: "Departamentos", values: arr(draftFilters.departments) });
+      newFilters.push({
+        type: "Departamentos",
+        values: arr(draftFilters.departments),
+      });
 
     if (arr(draftFilters.risks).length > 0)
       newFilters.push({ type: "Riscos", values: arr(draftFilters.risks) });
 
     if (arr(draftFilters.processes).length > 0)
-      newFilters.push({ type: "Processos", values: arr(draftFilters.processes) });
+      newFilters.push({
+        type: "Processos",
+        values: arr(draftFilters.processes),
+      });
 
     if (draftFilters.startDate)
-      newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
+      newFilters.push({
+        type: "Data Inicial",
+        values: [draftFilters.startDate],
+      });
 
     if (draftFilters.endDate)
       newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
 
+    if (draftFilters.minValue !== "" && draftFilters.minValue !== null)
+      newFilters.push({
+        type: "Valor Inicial",
+        values: [draftFilters.minValue],
+      });
+
+    if (draftFilters.maxValue !== "" && draftFilters.maxValue !== null)
+      newFilters.push({
+        type: "Valor Final",
+        values: [draftFilters.maxValue],
+      });
+
     setSelectedFilters(newFilters);
-    if (onApplyFilters) onApplyFilters(draftFilters);
+    if (onApplyFilters) {
+      const payload = {
+        ...draftFilters,
+        minValue: parseCurrencyBR(draftFilters.minValue),
+        maxValue: parseCurrencyBR(draftFilters.maxValue),
+      };
+      onApplyFilters(payload);
+    }
     toggleDrawer();
   };
-
-
 
   const removeFilter = (index) => {
     setSelectedFilters((prev) => {
@@ -300,13 +377,23 @@ function ReactTable({
           Departamentos: "departments",
           Riscos: "risks",
           Processos: "processes",
+          "Valor Inicial": "minValue",
+          "Valor Final": "maxValue",
         };
 
         const key = mapTypeToKey[filterToRemove.type];
         if (key) {
-          updatedDraft[key] = updatedDraft[key].filter(v => !filterToRemove.values.includes(v));
-        } else if (filterToRemove.type === "Data Inicial") updatedDraft.startDate = null;
-        else if (filterToRemove.type === "Data Final") updatedDraft.endDate = null;
+          if (Array.isArray(updatedDraft[key])) {
+            updatedDraft[key] = updatedDraft[key].filter(
+              (v) => !filterToRemove.values.includes(v),
+            );
+          } else {
+            updatedDraft[key] = "";
+          }
+        } else if (filterToRemove.type === "Data Inicial")
+          updatedDraft.startDate = null;
+        else if (filterToRemove.type === "Data Final")
+          updatedDraft.endDate = null;
 
         return updatedDraft;
       });
@@ -331,10 +418,12 @@ function ReactTable({
 
       startDate: null,
       endDate: null,
+
+      minValue: "",
+      maxValue: "",
     });
     if (onApplyFilters) onApplyFilters({});
   };
-
 
   const filteredData = useMemo(() => {
     if (!data) return [];
@@ -383,13 +472,46 @@ function ReactTable({
             return itemDate <= endDate;
           }
 
+          case "Valor Inicial": {
+            const min = parseCurrencyBR(values?.[0]);
+            if (min === null || min === undefined) return true;
+
+            if (
+              item.value === null ||
+              item.value === undefined ||
+              item.value === ""
+            )
+              return false;
+
+            const v = parseCurrencyBR(item.value);
+            if (v === null || v === undefined) return false;
+
+            return v >= min;
+          }
+
+          case "Valor Final": {
+            const max = parseCurrencyBR(values?.[0]);
+            if (max === null || max === undefined) return true;
+
+            if (
+              item.value === null ||
+              item.value === undefined ||
+              item.value === ""
+            )
+              return false;
+
+            const v = parseCurrencyBR(item.value);
+            if (v === null || v === undefined) return false;
+
+            return v <= max;
+          }
+
           default:
             return true;
         }
       });
     });
   }, [data, selectedFilters]);
-
 
   const table = useReactTable({
     data: filteredData,
@@ -565,10 +687,15 @@ function ReactTable({
                   {filter.type}:
                 </Typography>
                 <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
-                  {filter.type === "Data Inicial" || filter.type === "Data Final"
+                  {filter.type === "Data Inicial" ||
+                  filter.type === "Data Final"
                     ? filter.values.map(formatDateChipBR).join(", ")
-                    : filter.values.join(", ")}
-
+                    : filter.type === "Valor Inicial" ||
+                        filter.type === "Valor Final"
+                      ? filter.values
+                          .map((v) => formatCurrencyBR(parseCurrencyBR(v)))
+                          .join(", ")
+                      : filter.values.join(", ")}
                 </Typography>
               </Box>
             }
@@ -623,30 +750,40 @@ function ReactTable({
           <Grid container spacing={2}>
             {/* STATUS */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Status</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={["Ativo", "Inativo"]}
                   value={draftFilters.status}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, status: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, status: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
 
-
             {/* TIPO (INCLUÍDO) */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Tipo</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Tipo
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={typeOptions}
                   value={draftFilters.incidentType}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, incidentType: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      incidentType: value,
+                    }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
@@ -654,14 +791,18 @@ function ReactTable({
 
             {/* DEPARTAMENTOS */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Departamentos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Departamentos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={deptOptions}
                   value={draftFilters.departments}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, departments: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, departments: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
@@ -669,7 +810,9 @@ function ReactTable({
 
             {/* RISCOS */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Riscos Relacionados</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Riscos Relacionados
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
@@ -677,9 +820,11 @@ function ReactTable({
                   options={riskOptions}
                   value={draftFilters.risks}
                   onChange={(event, value) =>
-                    setDraftFilters((prev) => ({ ...prev, risks: Array.isArray(value) ? value : [] }))
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      risks: Array.isArray(value) ? value : [],
+                    }))
                   }
-
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
@@ -687,37 +832,104 @@ function ReactTable({
 
             {/* PROCESSOS */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Processos</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Processos
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
                   options={processOptions}
                   value={draftFilters.processes}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, processes: value }))}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, processes: value }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
             </Grid>
+
+            {/* VALOR (RANGE) */}
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Valor Inicial
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  value={draftFilters.minValue}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      minValue: maskCurrencyBRInput(e.target.value),
+                    }))
+                  }
+                  placeholder="0,00"
+                  inputProps={{ inputMode: "decimal" }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">R$</InputAdornment>
+                    ),
+                  }}
+                />
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Valor Final
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  value={draftFilters.maxValue}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      maxValue: maskCurrencyBRInput(e.target.value),
+                    }))
+                  }
+                  placeholder="0,00"
+                  inputProps={{ inputMode: "decimal" }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">R$</InputAdornment>
+                    ),
+                  }}
+                />
+              </FormControl>
+            </Grid>
+
             {/* DATAS */}
             <Grid item xs={6}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Data Inicial</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Inicial
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <TextField
                   type="date"
                   value={draftFilters.startDate || ""}
-                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
                   InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
             </Grid>
             <Grid item xs={6}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Data Final</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data Final
+              </InputLabel>
               <FormControl fullWidth margin="normal">
                 <TextField
                   type="date"
                   value={draftFilters.endDate || ""}
-                  onChange={(e) => setDraftFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
                   InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
@@ -725,8 +937,12 @@ function ReactTable({
           </Grid>
 
           <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
-            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
           </Stack>
         </Box>
       </Drawer>
@@ -774,8 +990,8 @@ function ReactTable({
                               onClick={header.column.getToggleSortingHandler()}
                               {...(header.column.getCanSort() &&
                                 header.column.columnDef.meta === undefined && {
-                                className: "cursor-pointer prevent-select",
-                              })}
+                                  className: "cursor-pointer prevent-select",
+                                })}
                             >
                               {header.isPlaceholder ? null : (
                                 <Stack
@@ -963,7 +1179,9 @@ function ActionCell({ row, refreshData }) {
       );
 
       setStatus(newStatus);
-      const message = `Incidente ${row.original.name} ${newStatus.toLowerCase()}.`;
+      const message = `Incidente ${
+        row.original.name
+      } ${newStatus.toLowerCase()}.`;
 
       enqueueSnackbar(message, {
         variant: "success",
@@ -1509,130 +1727,151 @@ const ListagemIncidente = () => {
     }));
   };
 
-  const columns = useMemo(() => [
-    {
-      header: "Incidente",
-      accessorKey: "name",
-      cell: ({ row }) => (
-        <Typography
-          sx={{
-            fontSize: "13px",
-            cursor: "pointer",
-            fontWeight: 600,
-            color: theme.palette.primary.main,
-          }}
-          onClick={() => {
-            const dadosApi = row.original;
-            navigation(`/incidentes/criar`, {
-              state: { indoPara: "NovoIncidente", dadosApi },
-            });
-          }}
-        >
-          {row.original.name}
-        </Typography>
-      ),
-    },
-    { header: "Código", accessorKey: "code" },
-    { header: "Tipo", accessorKey: "incidentType" },
-    {
-      header: "Processos",
-      accessorKey: "processes",
-      cell: ({ row }) => (
-        <Typography sx={{ fontSize: "13px" }}>
-          {(row.original.processes || []).join(", ")}
-        </Typography>
-      ),
-    },
-    {
-      header: "Departamentos afetados",
-      accessorKey: "departments",
-      cell: ({ row }) => (row.original.departments || []).join(", ") || "—"
-    },
-    {
-      header: "Riscos Relacionados",
-      accessorKey: "risks",
-      cell: ({ row }) => (row.original.risks || []).join(", ") || "—"
-    },
-    {
-      header: "Valor",
-      accessorKey: "value",
-      cell: ({ row }) => row.original.value ? `R$ ${row.original.value.toLocaleString()}` : "—"
-    },
-    {
-      header: "Recuperado",
-      accessorKey: "recoveredValue",
-      cell: ({ row }) => formatCurrencyBR(row.original.recoveredValue),
-    },
-    { header: "Data de criação", accessorKey: "date", cell: ({ row }) => formatDateBR(row.original.date) },
+  const columns = useMemo(
+    () => [
+      {
+        header: "Incidente",
+        accessorKey: "name",
+        cell: ({ row }) => (
+          <Typography
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/incidentes/criar`, {
+                state: { indoPara: "NovoIncidente", dadosApi },
+              });
+            }}
+          >
+            {row.original.name}
+          </Typography>
+        ),
+      },
+      { header: "Código", accessorKey: "code" },
+      { header: "Tipo", accessorKey: "incidentType" },
+      {
+        header: "Processos",
+        accessorKey: "processes",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {(row.original.processes || []).join(", ")}
+          </Typography>
+        ),
+      },
+      {
+        header: "Departamentos afetados",
+        accessorKey: "departments",
+        cell: ({ row }) => (row.original.departments || []).join(", ") || "—",
+      },
+      {
+        header: "Riscos Relacionados",
+        accessorKey: "risks",
+        cell: ({ row }) => (row.original.risks || []).join(", ") || "—",
+      },
+      {
+        header: "Valor",
+        accessorKey: "value",
+        cell: ({ row }) => formatCurrencyBR(row.original.value),
+      },
+      {
+        header: "Recuperado",
+        accessorKey: "recoveredValue",
+        cell: ({ row }) => formatCurrencyBR(row.original.recoveredValue),
+      },
+      {
+        header: "Data de criação",
+        accessorKey: "date",
+        cell: ({ row }) => formatDateBR(row.original.date),
+      },
 
-    { header: "Base de Origem", accessorKey: "origin", cell: ({ row }) => row.original.origin || "—" },
+      {
+        header: "Base de Origem",
+        accessorKey: "origin",
+        cell: ({ row }) => row.original.origin || "—",
+      },
 
-    { header: "Causa", accessorKey: "cause", cell: ({ row }) => row.original.cause || "—" },
+      {
+        header: "Causa",
+        accessorKey: "cause",
+        cell: ({ row }) => row.original.cause || "—",
+      },
 
-    {
-      header: "Descrição",
-      accessorKey: "description",
-      cell: ({ row }) => (
-        <Typography sx={{ fontSize: "13px" }} title={row.original.description || ""} noWrap>
-          {row.original.description || "—"}
-        </Typography>
-      ),
-    },
+      {
+        header: "Descrição",
+        accessorKey: "description",
+        cell: ({ row }) => (
+          <Typography
+            sx={{ fontSize: "13px" }}
+            title={row.original.description || ""}
+            noWrap
+          >
+            {row.original.description || "—"}
+          </Typography>
+        ),
+      },
 
-    {
-      header: "Outras Informações",
-      accessorKey: "information",
-      cell: ({ row }) => (
-        <Typography sx={{ fontSize: "13px" }} title={row.original.information || ""} noWrap>
-          {row.original.information || "—"}
-        </Typography>
-      ),
-    },
+      {
+        header: "Outras Informações",
+        accessorKey: "information",
+        cell: ({ row }) => (
+          <Typography
+            sx={{ fontSize: "13px" }}
+            title={row.original.information || ""}
+            noWrap
+          >
+            {row.original.information || "—"}
+          </Typography>
+        ),
+      },
 
-
-
-    {
-      header: "Status",
-      accessorKey: "active",
-      cell: ({ row }) => (
-        <Chip
-          label={row.original.active === true ? "Ativo" : "Inativo"}
-          color={row.original.active === true ? "success" : "error"}
-          sx={{
-            backgroundColor: "transparent",
-            color: "#00000099",
-            fontWeight: 600,
-            fontSize: "12px",
-            height: "28px",
-            "& .MuiChip-icon": {
-              color:
-                row.original.active === true ? "success.main" : "error.main",
-              marginLeft: "4px",
-            },
-          }}
-          icon={
-            <span
-              style={{
-                backgroundColor:
-                  row.original.active === true ? "green" : "red",
-                borderRadius: "50%",
-                display: "inline-block",
-                width: "8px",
-                height: "8px",
-                marginRight: "-6px",
-                marginLeft: "2px",
-              }}
-            />
-          }
-        />
-      ),
-    },
-    {
-      id: "actions",
-      header: " ",
-      cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />
-    }
-  ], [theme]);
+      {
+        header: "Status",
+        accessorKey: "active",
+        cell: ({ row }) => (
+          <Chip
+            label={row.original.active === true ? "Ativo" : "Inativo"}
+            color={row.original.active === true ? "success" : "error"}
+            sx={{
+              backgroundColor: "transparent",
+              color: "#00000099",
+              fontWeight: 600,
+              fontSize: "12px",
+              height: "28px",
+              "& .MuiChip-icon": {
+                color:
+                  row.original.active === true ? "success.main" : "error.main",
+                marginLeft: "4px",
+              },
+            }}
+            icon={
+              <span
+                style={{
+                  backgroundColor:
+                    row.original.active === true ? "green" : "red",
+                  borderRadius: "50%",
+                  display: "inline-block",
+                  width: "8px",
+                  height: "8px",
+                  marginRight: "-6px",
+                  marginLeft: "2px",
+                }}
+              />
+            }
+          />
+        ),
+      },
+      {
+        id: "actions",
+        header: " ",
+        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
+      },
+    ],
+    [theme],
+  );
 
   useEffect(() => {
     if (isInitialLoad && !isLoading) {
