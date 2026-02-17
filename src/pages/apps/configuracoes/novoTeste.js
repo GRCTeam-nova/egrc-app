@@ -230,6 +230,7 @@ function ColumnsLayouts() {
         setControleDados(data);
         setMensagemFeedback("editado");
         setNome(data.name || "");
+        window.dispatchEvent(new CustomEvent('updateBreadcrumbName', { detail: data.name }));
         setDescricaoTeste(data.description || "");
         setRiscoAssociados(data.controlRisks || "");
         setAssertions(data.controlAssertions || "");
