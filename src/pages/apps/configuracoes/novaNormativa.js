@@ -56,9 +56,9 @@ function ColumnsLayouts() {
   const [departamentos, setDepartamentos] = useState([]);
   const [processos, setProcessos] = useState([]);
   // ... seus outros estados
-const [descricao, setDescricao] = useState(""); // Mantém o histórico vindo do banco
-const [novoComentario, setNovoComentario] = useState(""); // Novo estado para o input atual
-// ...
+  const [descricao, setDescricao] = useState(""); // Mantém o histórico vindo do banco
+  const [novoComentario, setNovoComentario] = useState(""); // Novo estado para o input atual
+  // ...
   const [conclusaoRevisao, setConclusaoRevisao] = useState("");
   const idUser = localStorage.getItem("id_user");
   const userName = localStorage.getItem("username");
@@ -112,7 +112,7 @@ const [novoComentario, setNovoComentario] = useState(""); // Novo estado para o 
   window.setHasChanges = setHasChanges;
 
   const [confirmRevisorOpen, setConfirmRevisorOpen] = useState(false);
-const [tempResponsavelId, setTempResponsavelId] = useState(null);
+  const [tempResponsavelId, setTempResponsavelId] = useState(null);
 
   const [formData, setFormData] = useState({
     statusNorma: "",
@@ -195,43 +195,43 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
   useEffect(() => {
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/departments`,
-      setDepartamentos
+      setDepartamentos,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/normatives/types`,
-      setTipoNormas
+      setTipoNormas,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/normatives/regulatories`,
-      setReguladores
+      setReguladores,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/normatives`,
-      setNormaOrigem
+      setNormaOrigem,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/normatives`,
-      setNormaDestino
+      setNormaDestino,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/companies`,
-      setEmpresa
+      setEmpresa,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/processes`,
-      setProcessos
+      setProcessos,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
-      setPlanoAcao
+      setPlanoAcao,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
-      setResponsavel
+      setResponsavel,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
-      setAprovador
+      setAprovador,
     );
     window.scrollTo(0, 0);
   }, []);
@@ -248,7 +248,7 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -330,8 +330,8 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
     }
   }, [dadosApi, token, reload]);
 
-// Função para gerar a string final do comentário
-   const getDescricaoAtualizada = () => {
+  // Função para gerar a string final do comentário
+  const getDescricaoAtualizada = () => {
     // Se não escreveu nada novo, retorna a descrição original
     if (!novoComentario || !novoComentario.trim()) {
       return descricao;
@@ -357,8 +357,6 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
       setDiasDaRevisao("");
       return;
     }
-
-    
 
     // Mapeia periodicidade para dias
     const diasMap = { 1: 180, 2: 360, 3: 720 };
@@ -387,7 +385,9 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
     if (newDate) {
       setTempRevDate(newDate);
       // Verifica se a justificativa está vazia para decidir se mostra o campo
-      setShowJustificativaField(!motivoRevogacao || motivoRevogacao.trim() === "");
+      setShowJustificativaField(
+        !motivoRevogacao || motivoRevogacao.trim() === "",
+      );
       setConfirmRevogOpen(true);
     } else {
       // Se usuário limpar a data, só atualiza sem confirmação
@@ -396,28 +396,27 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
   };
 
   useEffect(() => {
-  // Só no modo Criar
-  if (requisicao !== "Criar") return;
+    // Só no modo Criar
+    if (requisicao !== "Criar") return;
 
-  // Precisa ter id do usuário
-  if (!idUser) return;
+    // Precisa ter id do usuário
+    if (!idUser) return;
 
-  // Não sobrescreve se já tiver algo selecionado
-  if (formData.revisor) return;
+    // Não sobrescreve se já tiver algo selecionado
+    if (formData.revisor) return;
 
-  // Espera carregar as opções
-  if (!Array.isArray(responsaveis) || responsaveis.length === 0) return;
+    // Espera carregar as opções
+    if (!Array.isArray(responsaveis) || responsaveis.length === 0) return;
 
-  // Só seta se o usuário existir na lista de responsáveis
-  const exists = responsaveis.some((r) => String(r.id) === String(idUser));
-  if (!exists) return;
+    // Só seta se o usuário existir na lista de responsáveis
+    const exists = responsaveis.some((r) => String(r.id) === String(idUser));
+    if (!exists) return;
 
-  setFormData((prev) => ({
-    ...prev,
-    revisor: idUser,
-  }));
-}, [requisicao, idUser, responsaveis, formData.revisor]);
-
+    setFormData((prev) => ({
+      ...prev,
+      revisor: idUser,
+    }));
+  }, [requisicao, idUser, responsaveis, formData.revisor]);
 
   // Função para salvar APENAS o comentário, ignorando outras alterações na tela
   const handleSalvarComentarioRapido = async () => {
@@ -464,13 +463,17 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
         idCompanies: normativaDados.idCompanies,
         idDepartments: normativaDados.idDepartments,
         idProcesses: normativaDados.idProcess, // Note: confirme se a API retorna idProcess ou idProcesses no GET
-        
+
         // Tratamento simples de arquivos para manter o que já existe sem upload novo
-        files: normativaDados.files ? normativaDados.files.map(f => typeof f === 'string' ? f : f.path) : [],
+        files: normativaDados.files
+          ? normativaDados.files.map((f) =>
+              typeof f === "string" ? f : f.path,
+            )
+          : [],
       };
 
       const url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-      
+
       const response = await fetch(url, {
         method: "PUT",
         headers: {
@@ -487,22 +490,22 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
       // 3. Atualiza os estados locais para refletir o salvamento
       setDescricao(novaDescricaoCompleta); // Atualiza o histórico visual
       setNovoComentario(""); // Limpa o campo de novo comentário
-      
+
       // Atualiza o objeto de referência para o novo estado do banco
       setNormativaDados((prev) => ({
         ...prev,
-        description: novaDescricaoCompleta
+        description: novaDescricaoCompleta,
       }));
 
       enqueueSnackbar("Comentário adicionado com sucesso!", {
         variant: "success",
       });
-
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Não foi possível salvar o comentário.", {
         variant: "error",
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -561,7 +564,7 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
 
       const newFiles = formData.files.filter((file) => file instanceof File);
       const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
+        (file) => !(file instanceof File),
       );
 
       let uploadFilesResult = { files: [] };
@@ -570,7 +573,7 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
         formDataUpload.append("ContainerFolder", 4);
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : ""
+          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -584,7 +587,7 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         uploadFilesResult = uploadResponse.data;
       }
@@ -700,7 +703,11 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
       }
 
       // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, dataRevogacao: tempRevDate, normativeStatus: 6 }));
+      setFormData((prev) => ({
+        ...prev,
+        dataRevogacao: tempRevDate,
+        normativeStatus: 6,
+      }));
       setNormativaDados((prev) => ({ ...prev, normativeStatus: 6 }));
       handleCancelRevog();
       setHasStartedByTester(true);
@@ -716,6 +723,7 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -763,38 +771,38 @@ const [tempResponsavelId, setTempResponsavelId] = useState(null);
   };
 
   // Função chamada quando o usuário seleciona um Responsável no Autocomplete
-const handleResponsavelChange = (event, newValue) => {
-  const newId = newValue ? newValue.id : "";
-  
-  // Atualiza o Responsável imediatamente
-  setFormData((prev) => ({
-    ...prev,
-    responsavel: newId,
-  }));
+  const handleResponsavelChange = (event, newValue) => {
+    const newId = newValue ? newValue.id : "";
 
-  // Se houve uma seleção válida, pergunta se quer replicar para o Revisor
-  if (newId) {
-    setTempResponsavelId(newId);
-    setConfirmRevisorOpen(true);
-  }
-};
+    // Atualiza o Responsável imediatamente
+    setFormData((prev) => ({
+      ...prev,
+      responsavel: newId,
+    }));
 
-// Usuário clicou em "Sim"
-const handleConfirmReplication = () => {
-  setFormData((prev) => ({
-    ...prev,
-    revisor: tempResponsavelId, // Copia o ID para o campo revisor
-  }));
-  setConfirmRevisorOpen(false);
-  setTempResponsavelId(null);
-};
+    // Se houve uma seleção válida, pergunta se quer replicar para o Revisor
+    if (newId) {
+      setTempResponsavelId(newId);
+      setConfirmRevisorOpen(true);
+    }
+  };
 
-// Usuário clicou em "Não"
-const handleDenyReplication = () => {
-  setConfirmRevisorOpen(false);
-  setTempResponsavelId(null);
-  // Não faz nada com o campo revisor, ele permanece como estava
-};
+  // Usuário clicou em "Sim"
+  const handleConfirmReplication = () => {
+    setFormData((prev) => ({
+      ...prev,
+      revisor: tempResponsavelId, // Copia o ID para o campo revisor
+    }));
+    setConfirmRevisorOpen(false);
+    setTempResponsavelId(null);
+  };
+
+  // Usuário clicou em "Não"
+  const handleDenyReplication = () => {
+    setConfirmRevisorOpen(false);
+    setTempResponsavelId(null);
+    // Não faz nada com o campo revisor, ele permanece como estava
+  };
 
   const handleDepartmentCreated = (newDepartamento) => {
     setDepartamentos((prevDepartamentos) => [
@@ -840,7 +848,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "normaOrigem",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -868,7 +876,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "departamento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -888,7 +896,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "planoAcao",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -908,7 +916,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "aprovador",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -928,7 +936,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "normaDestino",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -948,7 +956,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "empresa",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -968,7 +976,7 @@ const handleDenyReplication = () => {
     } else {
       tratarMudancaInputGeral(
         "processo",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -993,7 +1001,7 @@ const handleDenyReplication = () => {
   const [formValidation, setFormValidation] = useState({
     codigo: true,
     nome: true,
-    revisor: true
+    revisor: true,
   });
 
   const allSelected =
@@ -1075,7 +1083,7 @@ const handleDenyReplication = () => {
 
       const newFiles = formData.files.filter((file) => file instanceof File);
       const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
+        (file) => !(file instanceof File),
       );
 
       let uploadFilesResult = { files: [] };
@@ -1084,7 +1092,7 @@ const handleDenyReplication = () => {
         formDataUpload.append("ContainerFolder", 4);
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : ""
+          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -1098,7 +1106,7 @@ const handleDenyReplication = () => {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         uploadFilesResult = uploadResponse.data;
       }
@@ -1239,6 +1247,7 @@ const handleDenyReplication = () => {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -1287,7 +1296,7 @@ const handleDenyReplication = () => {
 
       const newFiles = formData.files.filter((file) => file instanceof File);
       const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
+        (file) => !(file instanceof File),
       );
 
       let uploadFilesResult = { files: [] };
@@ -1296,7 +1305,7 @@ const handleDenyReplication = () => {
         formDataUpload.append("ContainerFolder", 4);
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : ""
+          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -1310,7 +1319,7 @@ const handleDenyReplication = () => {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         uploadFilesResult = uploadResponse.data;
       }
@@ -1446,6 +1455,7 @@ const handleDenyReplication = () => {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -1494,7 +1504,7 @@ const handleDenyReplication = () => {
 
       const newFiles = formData.files.filter((file) => file instanceof File);
       const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
+        (file) => !(file instanceof File),
       );
 
       let uploadFilesResult = { files: [] };
@@ -1503,7 +1513,7 @@ const handleDenyReplication = () => {
         formDataUpload.append("ContainerFolder", 4);
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : ""
+          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -1517,7 +1527,7 @@ const handleDenyReplication = () => {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         uploadFilesResult = uploadResponse.data;
       }
@@ -1648,6 +1658,7 @@ const handleDenyReplication = () => {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -1696,7 +1707,7 @@ const handleDenyReplication = () => {
 
       const newFiles = formData.files.filter((file) => file instanceof File);
       const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
+        (file) => !(file instanceof File),
       );
 
       let uploadFilesResult = { files: [] };
@@ -1705,7 +1716,7 @@ const handleDenyReplication = () => {
         formDataUpload.append("ContainerFolder", 4);
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : ""
+          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -1719,7 +1730,7 @@ const handleDenyReplication = () => {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         uploadFilesResult = uploadResponse.data;
       }
@@ -1850,6 +1861,7 @@ const handleDenyReplication = () => {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -1901,7 +1913,7 @@ const handleDenyReplication = () => {
 
     const newFiles = formData.files.filter((file) => file instanceof File);
     const existingFiles = formData.files.filter(
-      (file) => !(file instanceof File)
+      (file) => !(file instanceof File),
     );
 
     let uploadFilesResult = { files: [] };
@@ -1911,7 +1923,7 @@ const handleDenyReplication = () => {
 
       formDataUpload.append(
         "IdContainer",
-        requisicao === "Editar" ? dadosApi?.idNormative : ""
+        requisicao === "Editar" ? dadosApi?.idNormative : "",
       );
       newFiles.forEach((file) => {
         formDataUpload.append("Files", file, file.name);
@@ -1925,7 +1937,7 @@ const handleDenyReplication = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
       uploadFilesResult = uploadResponse.data;
     }
@@ -2064,7 +2076,7 @@ const handleDenyReplication = () => {
         setSuccessDialogOpen(true);
         navigate(location.pathname, {
           replace: true,
-          state: { dadosApi: companyId },
+          state: { dadosApi: { idNormative: companyId } },
         });
       } else {
         voltarParaCadastroMenu();
@@ -2074,6 +2086,7 @@ const handleDenyReplication = () => {
       enqueueSnackbar("Não foi possível cadastrar essa normativa.", {
         variant: "error",
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -2172,7 +2185,6 @@ const handleDenyReplication = () => {
   const isFormLocked = isRevogado;
   // ==================================================================
 
-
   return (
     <>
       <LoadingOverlay isActive={loading} />
@@ -2184,10 +2196,10 @@ const handleDenyReplication = () => {
               <TextField
                 onChange={(event) => setCodigo(event.target.value)}
                 fullWidth
-          value={codigo}
-          error={!codigo && formValidation.codigo === false}
-          disabled={isFormLocked}
-        />
+                value={codigo}
+                error={!codigo && formValidation.codigo === false}
+                disabled={isFormLocked}
+              />
             </Stack>
           </Grid>
           {requisicao === "Editar" && (
@@ -2248,42 +2260,40 @@ const handleDenyReplication = () => {
               <TextField
                 onChange={(event) => setNome(event.target.value)}
                 fullWidth
-          value={nome}
-          error={!nome && formValidation.nome === false}
-          disabled={isFormLocked}
-        />
+                value={nome}
+                error={!nome && formValidation.nome === false}
+                disabled={isFormLocked}
+              />
             </Stack>
           </Grid>
 
-           {/* Localize o Grid do Revisor (aprox. linha 1418) */}
-<Grid item xs={6} sx={{ paddingBottom: 5 }}>
-  <Stack spacing={1}>
-    <InputLabel>Revisor *</InputLabel>
-    <Autocomplete
-      options={responsaveis} // Assumindo que a lista de pessoas é a mesma
-      getOptionLabel={(option) => option.nome}
-      // AGORA vinculado ao formData.revisor
-      value={
-        responsaveis.find(
-          (r) => r.id === formData.revisor
-        ) || null
-      }
-      onChange={(event, newValue) => {
-        setFormData((prev) => ({
-          ...prev,
-          revisor: newValue ? newValue.id : "",
-        }));
-      }}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          // Adicione validação aqui se o campo Revisor for obrigatório
-        />
-      )}
-      disabled={isFormLocked}
-    />
-  </Stack>
-</Grid>
+          {/* Localize o Grid do Revisor (aprox. linha 1418) */}
+          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+            <Stack spacing={1}>
+              <InputLabel>Revisor *</InputLabel>
+              <Autocomplete
+                options={responsaveis} // Assumindo que a lista de pessoas é a mesma
+                getOptionLabel={(option) => option.nome}
+                // AGORA vinculado ao formData.revisor
+                value={
+                  responsaveis.find((r) => r.id === formData.revisor) || null
+                }
+                onChange={(event, newValue) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    revisor: newValue ? newValue.id : "",
+                  }));
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    // Adicione validação aqui se o campo Revisor for obrigatório
+                  />
+                )}
+                disabled={isFormLocked}
+              />
+            </Stack>
+          </Grid>
 
           <Grid item xs={6}>
             <Stack spacing={1}>
@@ -2293,7 +2303,7 @@ const handleDenyReplication = () => {
                 getOptionLabel={(option) => option.nome}
                 value={
                   statusNormas.find(
-                    (item) => item.id === formData.statusNorma
+                    (item) => item.id === formData.statusNorma,
                   ) || null
                 }
                 onChange={(event, newValue) => {
@@ -2312,95 +2322,96 @@ const handleDenyReplication = () => {
 
           {requisicao === "Editar" && (
             <>
-          {/* ... (dentro do return) ... */}
+              {/* ... (dentro do return) ... */}
 
-<Grid item xs={12} sx={{ paddingBottom: 5 }}>
-  <Stack spacing={2}>
-    
-    {/* 1. CAMPO DE HISTÓRICO (Visual Melhorado) */}
-    {descricao && (
-      <>
-        {/* 2. CAMPO DE NOVA ENTRADA COM BOTÃO AO LADO */}
-        <Stack 
-          direction="row" 
-          justifyContent="space-between" 
-          alignItems="center" 
-          spacing={2}
-          sx={{ mb: 1, mt: 2 }} // Margem para espaçamento
-        >
-          <InputLabel sx={{ m: 0 }}>
-            {descricao ? "Adicionar novo comentário" : "Comentário"}
-          </InputLabel>
-          
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleSalvarComentarioRapido}
-            disabled={isFormLocked || loading}
-            sx={{ 
-              fontWeight: 600,
-              textTransform: "none",
-              height: "30px"
-            }}
-          >
-            Salvar Comentário
-          </Button>
-        </Stack>
+              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={2}>
+                  {/* 1. CAMPO DE HISTÓRICO (Visual Melhorado) */}
+                  {descricao && (
+                    <>
+                      {/* 2. CAMPO DE NOVA ENTRADA COM BOTÃO AO LADO */}
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={2}
+                        sx={{ mb: 1, mt: 2 }} // Margem para espaçamento
+                      >
+                        <InputLabel sx={{ m: 0 }}>
+                          {descricao
+                            ? "Adicionar novo comentário"
+                            : "Comentário"}
+                        </InputLabel>
 
-        <TextField
-          onChange={(event) => setNovoComentario(event.target.value)}
-          fullWidth
-          multiline
-          rows={4}
-          value={novoComentario}
-          placeholder="Digite aqui seu comentário ou observação..."
-          disabled={isFormLocked}
-          sx={{
-            backgroundColor: "#fff",
-            marginBottom: 2 // Espaço antes do histórico
-          }}
-        />
-    
-        <InputLabel sx={{ fontWeight: "bold", color: "#333" }}>
-          Histórico de Comentários
-        </InputLabel>
-        <TextField
-          fullWidth
-          multiline
-          minRows={3}
-          maxRows={8} // Permite crescer um pouco mais se tiver muito texto
-          value={descricao}
-          // Usamos readOnly ao invés de disabled para controlar melhor as cores
-          InputProps={{
-            readOnly: true,
-          }}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              backgroundColor: "#f0f7ff", // Um azul bem clarinho (mais agradável que cinza)
-              "& fieldset": {
-                borderColor: "#b3d9ff", // Borda suave
-              },
-              "&:hover fieldset": {
-                borderColor: "#b3d9ff", // Mantém a borda ao passar o mouse
-              },
-              "&.Mui-focused fieldset": {
-                borderColor: "#b3d9ff", // Mantém a borda ao focar (clicar)
-              },
-            },
-            "& .MuiInputBase-input": {
-              color: "#0d0d0d !important", // Força a cor PRETA (quase preta)
-              WebkitTextFillColor: "#0d0d0d !important", // Garante contraste no Chrome/Safari
-              fontSize: "0.95rem",
-              fontWeight: 500, // Um pouco mais de peso na fonte
-            },
-          }}
-        />
-      </>
-    )}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={handleSalvarComentarioRapido}
+                          disabled={isFormLocked || loading}
+                          sx={{
+                            fontWeight: 600,
+                            textTransform: "none",
+                            height: "30px",
+                          }}
+                        >
+                          Salvar Comentário
+                        </Button>
+                      </Stack>
 
+                      <TextField
+                        onChange={(event) =>
+                          setNovoComentario(event.target.value)
+                        }
+                        fullWidth
+                        multiline
+                        rows={4}
+                        value={novoComentario}
+                        placeholder="Digite aqui seu comentário ou observação..."
+                        disabled={isFormLocked}
+                        sx={{
+                          backgroundColor: "#fff",
+                          marginBottom: 2, // Espaço antes do histórico
+                        }}
+                      />
 
-  </Stack>
-</Grid>
+                      <InputLabel sx={{ fontWeight: "bold", color: "#333" }}>
+                        Histórico de Comentários
+                      </InputLabel>
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        maxRows={8} // Permite crescer um pouco mais se tiver muito texto
+                        value={descricao}
+                        // Usamos readOnly ao invés de disabled para controlar melhor as cores
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            backgroundColor: "#f0f7ff", // Um azul bem clarinho (mais agradável que cinza)
+                            "& fieldset": {
+                              borderColor: "#b3d9ff", // Borda suave
+                            },
+                            "&:hover fieldset": {
+                              borderColor: "#b3d9ff", // Mantém a borda ao passar o mouse
+                            },
+                            "&.Mui-focused fieldset": {
+                              borderColor: "#b3d9ff", // Mantém a borda ao focar (clicar)
+                            },
+                          },
+                          "& .MuiInputBase-input": {
+                            color: "#0d0d0d !important", // Força a cor PRETA (quase preta)
+                            WebkitTextFillColor: "#0d0d0d !important", // Garante contraste no Chrome/Safari
+                            fontSize: "0.95rem",
+                            fontWeight: 500, // Um pouco mais de peso na fonte
+                          },
+                        }}
+                      />
+                    </>
+                  )}
+                </Stack>
+              </Grid>
               <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Data de cadastro</InputLabel>
@@ -2504,7 +2515,7 @@ const handleDenyReplication = () => {
                     getOptionLabel={(option) => option.nome}
                     value={
                       reguladores.find(
-                        (regulador) => regulador.id === formData.regulador
+                        (regulador) => regulador.id === formData.regulador,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -2535,7 +2546,7 @@ const handleDenyReplication = () => {
                     getOptionLabel={(option) => option.nome}
                     value={
                       tipoNormas.find(
-                        (item) => item.id === formData.tipoNorma
+                        (item) => item.id === formData.tipoNorma,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -2561,15 +2572,15 @@ const handleDenyReplication = () => {
                     options={[
                       { id: "all", nome: "Selecionar todos" },
                       ...normaOrigens.filter(
-                        (norma) => norma.id !== idNormativoAtual
+                        (norma) => norma.id !== idNormativoAtual,
                       ),
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.normaOrigem.map(
                       (id) =>
                         normaOrigens.find(
-                          (normaOrigem) => normaOrigem.id === id
-                        ) || id
+                          (normaOrigem) => normaOrigem.id === id,
+                        ) || id,
                     )}
                     onChange={(event, newValue) => {
                       const selectedIds = newValue.map((item) => item.id);
@@ -2625,15 +2636,15 @@ const handleDenyReplication = () => {
                     options={[
                       { id: "all", nome: "Selecionar todos" },
                       ...normaDestinos.filter(
-                        (norma) => norma.id !== idNormativoAtual
+                        (norma) => norma.id !== idNormativoAtual,
                       ),
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.normaDestino.map(
                       (id) =>
                         normaDestinos.find(
-                          (normaDestino) => normaDestino.id === id
-                        ) || id
+                          (normaDestino) => normaDestino.id === id,
+                        ) || id,
                     )}
                     onChange={(event, newValue) => {
                       const selectedIds = newValue.map((item) => item.id);
@@ -2705,7 +2716,7 @@ const handleDenyReplication = () => {
                     getOptionLabel={(option) => option.nome}
                     value={formData.empresa.map(
                       (id) =>
-                        empresas.find((empresa) => empresa.id === id) || id
+                        empresas.find((empresa) => empresa.id === id) || id,
                     )}
                     onChange={handleSelectAllEmpresas}
                     isOptionEqualToValue={(option, value) =>
@@ -2756,7 +2767,8 @@ const handleDenyReplication = () => {
                       }}
                       onDepartmentCreated={handleDepartmentCreated}
                     />
-                  </InputLabel>                  <Autocomplete
+                  </InputLabel>{" "}
+                  <Autocomplete
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -2767,8 +2779,8 @@ const handleDenyReplication = () => {
                     value={formData.departamento.map(
                       (id) =>
                         departamentos.find(
-                          (departamento) => departamento.id === id
-                        ) || id
+                          (departamento) => departamento.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAllDepartamentos}
                     isOptionEqualToValue={(option, value) =>
@@ -2819,7 +2831,8 @@ const handleDenyReplication = () => {
                       }}
                       onProcessCreated={handleProcessCreated}
                     />
-                  </InputLabel>                  <Autocomplete
+                  </InputLabel>{" "}
+                  <Autocomplete
                     multiple
                     disableCloseOnSelect
                     options={[
@@ -2829,7 +2842,7 @@ const handleDenyReplication = () => {
                     getOptionLabel={(option) => option.nome}
                     value={formData.processo.map(
                       (id) =>
-                        processos.find((processo) => processo.id === id) || id
+                        processos.find((processo) => processo.id === id) || id,
                     )}
                     onChange={handleSelectAll2}
                     isOptionEqualToValue={(option, value) =>
@@ -2890,7 +2903,7 @@ const handleDenyReplication = () => {
                     value={formData.planoAcao.map(
                       (id) =>
                         planosAcoes.find((planoAcao) => planoAcao.id === id) ||
-                        id
+                        id,
                     )}
                     onChange={handleSelectAllPlanoAcao}
                     isOptionEqualToValue={(option, value) =>
@@ -2998,7 +3011,7 @@ const handleDenyReplication = () => {
                             getOptionLabel={(option) => option.nome}
                             value={
                               riscoNormas.find(
-                                (item) => item.id === formData.riscoNorma
+                                (item) => item.id === formData.riscoNorma,
                               ) || null
                             }
                             onChange={(_, newValue) => {
@@ -3035,7 +3048,7 @@ const handleDenyReplication = () => {
                             getOptionLabel={(option) => option.nome}
                             value={
                               statusRevisao.find(
-                                (item) => item.id === formData.statuRevisao
+                                (item) => item.id === formData.statuRevisao,
                               ) || null
                             }
                             onChange={(event, newValue) => {
@@ -3061,7 +3074,7 @@ const handleDenyReplication = () => {
                             value={
                               periodicidadeRevisoes.find(
                                 (item) =>
-                                  item.id === formData.periodicidadeRevisao
+                                  item.id === formData.periodicidadeRevisao,
                               ) || null
                             }
                             onChange={(event, newValue) => {
@@ -3160,30 +3173,32 @@ const handleDenyReplication = () => {
                 </Stack>
               </Grid>
 
-<Grid item xs={6} sx={{ paddingBottom: 5 }}>
-  <Stack spacing={1}>
-    <InputLabel>Responsável</InputLabel>
-    <Autocomplete
-      options={responsaveis}
-      getOptionLabel={(option) => option.nome}
-      // Valor vinculado ao formData.responsavel
-      value={
-        responsaveis.find(
-          (r) => r.id === formData.responsavel
-        ) || null
-      }
-      // Chama a função customizada
-      onChange={handleResponsavelChange}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          error={!formData.responsavel && formValidation.responsavel === false}
-        />
-      )}
-      disabled={isFormLocked}
-    />
-  </Stack>
-</Grid>
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Responsável</InputLabel>
+                  <Autocomplete
+                    options={responsaveis}
+                    getOptionLabel={(option) => option.nome}
+                    // Valor vinculado ao formData.responsavel
+                    value={
+                      responsaveis.find((r) => r.id === formData.responsavel) ||
+                      null
+                    }
+                    // Chama a função customizada
+                    onChange={handleResponsavelChange}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        error={
+                          !formData.responsavel &&
+                          formValidation.responsavel === false
+                        }
+                      />
+                    )}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -3199,7 +3214,7 @@ const handleDenyReplication = () => {
                     value={formData.aprovador.map(
                       (id) =>
                         aprovadores.find((aprovador) => aprovador.id === id) ||
-                        id
+                        id,
                     )}
                     onChange={handleSelectAllAprovadores}
                     isOptionEqualToValue={(option, value) =>
@@ -3237,8 +3252,6 @@ const handleDenyReplication = () => {
                   />
                 </Stack>
               </Grid>
-
-             
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -3381,26 +3394,31 @@ const handleDenyReplication = () => {
             </DialogActions>
           </Dialog>
           <Dialog
-  open={confirmRevisorOpen}
-  onClose={handleDenyReplication}
-  aria-labelledby="alert-dialog-title"
-  aria-describedby="alert-dialog-description"
->
-  <DialogTitle id="alert-dialog-title">
-    {"Definir Revisor?"}
-  </DialogTitle>
-  <DialogContent>
-    <DialogContentText id="alert-dialog-description">
-      Deseja que o responsável selecionado também seja atribuído como revisor desta normativa?
-    </DialogContentText>
-  </DialogContent>
-  <DialogActions>
-    <Button onClick={handleDenyReplication}>Não</Button>
-    <Button onClick={handleConfirmReplication} autoFocus variant="contained">
-      Sim
-    </Button>
-  </DialogActions>
-</Dialog>
+            open={confirmRevisorOpen}
+            onClose={handleDenyReplication}
+            aria-labelledby="alert-dialog-title"
+            aria-describedby="alert-dialog-description"
+          >
+            <DialogTitle id="alert-dialog-title">
+              {"Definir Revisor?"}
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText id="alert-dialog-description">
+                Deseja que o responsável selecionado também seja atribuído como
+                revisor desta normativa?
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleDenyReplication}>Não</Button>
+              <Button
+                onClick={handleConfirmReplication}
+                autoFocus
+                variant="contained"
+              >
+                Sim
+              </Button>
+            </DialogActions>
+          </Dialog>
           <Dialog
             open={confirmRevogOpen}
             onClose={handleCancelRevog}

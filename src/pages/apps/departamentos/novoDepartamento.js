@@ -702,6 +702,7 @@ function ColumnsLayouts() {
         voltarParaCadastroMenu();
       }
     } catch (error) {
+      setLoading(false);
       console.error(error.message);
       enqueueSnackbar("Não foi possível cadastrar esse departamento.", {
         variant: "error",
