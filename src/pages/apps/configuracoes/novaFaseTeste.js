@@ -225,6 +225,7 @@ function ColumnsLayouts() {
           // Preenchendo os campos com os dados recebidos
           setFaseTesteDados(data);
           setNomeFase(data.name);
+          window.dispatchEvent(new CustomEvent('updateBreadcrumbName', { detail: data.name }));
           setDescricao(data.description || "");
           setPopulacao(data.population ? data.population.toString() : "");
           setAmostra(data.sample ? data.sample.toString() : "");
