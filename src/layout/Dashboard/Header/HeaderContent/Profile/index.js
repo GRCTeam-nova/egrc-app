@@ -21,6 +21,7 @@ import {
 // project import
 import MainCard from '../../../../../components/MainCard';
 import Transitions from '../../../../../components/@extended/Transitions';
+import useAuth from '../../../../../hooks/useAuth';
 import ProfileTab from './ProfileTab';
 
 // assets
@@ -29,6 +30,7 @@ import { LogoutOutlined } from '@ant-design/icons';
 // ==============================|| HEADER CONTENT - PROFILE ||============================== //
 
 const Profile = () => {
+  const { logout } = useAuth();
   const theme = useTheme();
   const navigate = useNavigate();
   const anchorRef = useRef(null);
@@ -45,7 +47,8 @@ const Profile = () => {
     setOpen(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     // Remova os dados do usuário e o token do localStorage
     localStorage.clear();
     navigate('/login', { replace: true });
