@@ -1,5 +1,5 @@
 export const routeMapping = {
-  "/dashboard/resumo": { title: "Resumo", parent: null },
+  "/dashboard/resumo": { title: "Dashboard", parent: null },
   "/dashboard/analytics": { title: "Analytics", parent: null },
 
   "/empresas/lista": { title: "Empresas", parent: null },
