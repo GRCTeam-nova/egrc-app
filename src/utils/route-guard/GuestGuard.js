@@ -11,14 +11,14 @@ import useAuth from '../../hooks/useAuth';
 const GuestGuard = ({ children }) => {
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  // location não está sendo usado, pode até remover se quiser
 
   useEffect(() => {
-    // Ensure that the effect only runs when the login status changes, not on every render
     if (isLoggedIn) {
-      navigate('/login');
+      // ✅ Agora sim: se já está logado, vai pro sistema, não pro login!
+      navigate(APP_DEFAULT_PATH, { replace: true }); 
     }
-  }, [isLoggedIn]); // Only listen to isLoggedIn
+  }, [isLoggedIn, navigate]); 
 
   return children;
 };

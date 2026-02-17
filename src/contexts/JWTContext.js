@@ -42,46 +42,58 @@ const JWTContext = createContext(null);
 export const JWTProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const serviceToken = window.localStorage.getItem('access_token');
-        if (serviceToken && verifyToken(serviceToken)) {
-          setSession(serviceToken);
-          const idUser = localStorage.getItem('id_user');
-          
-          let user = null;
-          
-          if(idUser) {
-             const response = await axios.get(`/collaborators/${idUser}`); 
-             user = response.data;
-          } else {
-             const response = await axios.get('/api/account/me');
-             user = response.data.user;
-          }
+  // Dentro de JWTContext.js, no seu useEffect inicial:
 
-          dispatch({
-            type: LOGIN,
-            payload: {
-              isLoggedIn: true,
-              user
-            }
-          });
+useEffect(() => {
+  const init = async () => {
+    try {
+      // 1. Identificamos se a rota atual é de recuperação/segurança
+      const currentPath = window.location.pathname;
+      const isAuthRecoveryRoute = 
+        currentPath.includes('/reset-password') || 
+        currentPath.includes('/forgot-password') || 
+        currentPath.includes('/check-mail') ||
+        currentPath.includes('/primeiro-acesso');
+
+      const serviceToken = window.localStorage.getItem('access_token');
+
+      // 2. Só tentamos buscar os dados do usuário se houver token E não for rota de recuperação
+      if (serviceToken && verifyToken(serviceToken) && !isAuthRecoveryRoute) {
+        setSession(serviceToken);
+        const idUser = localStorage.getItem('id_user');
+        
+        let user = null;
+        
+        if(idUser) {
+           const response = await axios.get(`/collaborators/${idUser}`); 
+           user = response.data;
         } else {
-          dispatch({
-            type: LOGOUT
-          });
+           const response = await axios.get('/api/account/me');
+           user = response.data.user;
         }
-      } catch (err) {
-        console.error(err);
-        dispatch({
-          type: LOGOUT
-        });
-      }
-    };
 
-    init();
-  }, []);
+        dispatch({
+          type: LOGIN,
+          payload: {
+            isLoggedIn: true,
+            user
+          }
+        });
+      } else {
+        // 3. Se for rota de recuperação, garantimos que não haja "sujeira" da sessão anterior
+        if (isAuthRecoveryRoute) {
+           setSession(null); 
+        }
+        dispatch({ type: LOGOUT });
+      }
+    } catch (err) {
+      console.error(err);
+      dispatch({ type: LOGOUT });
+    }
+  };
+
+  init();
+}, []);
 
   const directLogin = (token, userData) => {
     setSession(token);
