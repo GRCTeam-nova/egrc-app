@@ -336,6 +336,12 @@ function ColumnsLayouts() {
     const probNum = Number(quantidadeNiveisProbabiliade);
     const impactNum = Number(quantidadeNiveisImpacto);
 
+    const ranges = heatmapOptions.plotOptions.heatmap.colorScale.ranges;
+    const hasEmptyRangeName = ranges.some((r) => !r.name || r.name.trim() === "");
+    if (hasEmptyRangeName) {
+      missingFields.push("Nome de todas as faixas do quadrante");
+    }
+
     if (!nome.trim()) {
       setFormValidation((prev) => ({ ...prev, nome: false }));
       missingFields.push("Nome");
@@ -360,7 +366,7 @@ function ColumnsLayouts() {
     if (missingFields.length > 0) {
       enqueueSnackbar(
         `Por favor, preencha os campos: ${missingFields.join(", ")}`,
-        { variant: "warning" }
+        { variant: "error" }
       );
       return;
     }
@@ -662,20 +668,37 @@ function ColumnsLayouts() {
     },
   });
 
-  function enforceSequentialRanges(ranges) {
-  return ranges.map((r, idx) => {
-    const prevTo = idx > 0 ? ranges[idx - 1].to : null;
-    const from = idx > 0
-      // a partir da 2ª linha: prev.to + 1
-      ? prevTo + 1
-      // 1ª linha mantém o valor digitado
-      : r.from;
-    // garante to >= from
-    const to = r.to < from ? from : r.to;
-    return { ...r, from, to };
-  });
-}
+function enforceSequentialRanges(ranges) {
+    return ranges.map((r, idx, arr) => {
+      const prevTo = idx > 0 ? ranges[idx - 1].to : null;
+      
+      // Força o 0 no primeiro índice
+      const from = idx === 0 ? 0 : prevTo + 1; 
+      
+      // Garante que o "Até" nunca seja menor que o "De", mas sem forçar infinito no último
+      const to = r.to < from ? from : r.to;
 
+      return { ...r, from, to };
+    });
+  }
+
+  const addColorRange = () => {
+    setHeatmapOptions((prev) => {
+      const prevRanges = [...prev.plotOptions.heatmap.colorScale.ranges];
+      const lastIndex = prevRanges.length - 1;
+
+      const newRanges = [
+        ...prevRanges,
+        { 
+          from: prevRanges[lastIndex].to + 1, 
+          to: prevRanges[lastIndex].to + 10, // Inicia a próxima faixa somando 10 como padrão
+          color: "#aaaaaa", 
+          name: "" 
+        }
+      ];
+      return updateRanges(prev, enforceSequentialRanges(newRanges));
+    });
+  };
 
   // Labels de probabilidade e impacto
   const [probLabels, setProbLabels] = useState([]);
@@ -811,18 +834,6 @@ const handleColorRangeChange = (index, field, rawValue) => {
   });
 };
 
-
-const addColorRange = () => {
-  setHeatmapOptions(prev => {
-    const prevRanges = prev.plotOptions.heatmap.colorScale.ranges;
-    const last = prevRanges[prevRanges.length - 1];
-    const newRanges = [
-      ...prevRanges,
-      { from: last.to + 1, to: last.to + 25, color: "#aaaaaa", name: "" }
-    ];
-    return updateRanges(prev, enforceSequentialRanges(newRanges));
-  });
-};
 
 const removeColorRange = (index) => {
   setHeatmapOptions(prev => {
@@ -1140,7 +1151,7 @@ function updateRanges(prev, ranges) {
 
           {quantitativo && (
             <>
-              <Grid item xs={6.01} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Índices</InputLabel>
                   <Autocomplete
@@ -1168,7 +1179,7 @@ function updateRanges(prev, ranges) {
                 </Stack>
               </Grid>
 
-              <Grid item xs={6.01} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Métrica de Probabilidade</InputLabel>
                   <Autocomplete
@@ -1200,7 +1211,7 @@ function updateRanges(prev, ranges) {
                 </Stack>
               </Grid>
 
-              <Grid item xs={6.01} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Métrica de Impacto</InputLabel>
                   <Autocomplete
@@ -1424,87 +1435,84 @@ function updateRanges(prev, ranges) {
                     </Box>
 
                     {heatmapOptions.plotOptions.heatmap.colorScale.ranges.map(
-                      (range, idx) => (
-                        <Box
-                          key={idx}
-                          sx={{ display: "flex", alignItems: "center", mb: 2 }}
-                        >
-                          {/* Input "from" */}
-                          <Box sx={{ mr: 1 }}>
-                            <TextField
-                              label="De"
-                              type="number"
-                              size="small"
-                              value={range.from}
-                              onChange={(e) =>
-                                handleColorRangeChange(
-                                  idx,
-                                  "from",
-                                  e.target.value
-                                )
-                              }
-                              sx={{ width: "70px" }}
-                            />
-                          </Box>
+  (range, idx, arr) => {
+    // Identifica se é a última faixa do array
+    const isLast = idx === arr.length - 1;
 
-                          {/* Input "to" */}
-                          <Box sx={{ mr: 1 }}>
-                            <TextField
-                              label="Até"
-                              type="number"
-                              size="small"
-                              value={range.to}
-                              onChange={(e) =>
-                                handleColorRangeChange(
-                                  idx,
-                                  "to",
-                                  e.target.value
-                                )
-                              }
-                              sx={{ width: "70px" }}
-                            />
-                          </Box>
+    return (
+      <Box
+        key={idx}
+        sx={{ display: "flex", alignItems: "center", mb: 2 }}
+      >
+        {/* Input "from" (AJUSTADO: Travado em 0 no primeiro item) */}
+        <Box sx={{ mr: 1 }}>
+          <TextField
+            label="De"
+            type="number"
+            size="small"
+            value={idx === 0 ? 0 : range.from} // Força a exibição do 0 na primeira linha
+            disabled={idx === 0} // Bloqueia a edição apenas na primeira linha
+            onChange={(e) =>
+              handleColorRangeChange(idx, "from", e.target.value)
+            }
+            sx={{ width: "70px" }}
+          />
+        </Box>
 
-                          {/* Quadradinho de cor (abre Popover) */}
-                          <Box
-                            sx={{
-                              width: 30,
-                              height: 30,
-                              backgroundColor: range.color,
-                              cursor: "pointer",
-                              border: "1px solid #ccc",
-                              borderRadius: 1,
-                              mr: 2,
-                            }}
-                            onClick={(e) => handleOpenColorPicker(e, idx)}
-                          />
+        <Box sx={{ mr: 1 }}>
+          <TextField
+            label="Até"
+            type="number"
+            size="small"
+            value={range.to} // Exibe o valor real (ex: 50)
+            onChange={(e) =>
+              handleColorRangeChange(idx, "to", e.target.value)
+            }
+            sx={{ width: "70px" }}
+          />
+        </Box>
 
-                          {/* Campo para nome da faixa */}
-                          <TextField
-                            label="Nome do quadrante"
-                            size="small"
-                            value={range.name ?? ""}
-                            onChange={(e) =>
-                              handleFaixaNomeChange(idx, e.target.value)
-                            }
-                            sx={{ width: "150px", mr: 2 }}
-                            InputLabelProps={{ shrink: true }}
-                          />
+        {/* Quadradinho de cor (mantido igual) */}
+        <Box
+          sx={{
+            width: 30,
+            height: 30,
+            backgroundColor: range.color,
+            cursor: "pointer",
+            border: "1px solid #ccc",
+            borderRadius: 1,
+            mr: 2,
+          }}
+          onClick={(e) => handleOpenColorPicker(e, idx)}
+        />
 
-                          {/* Ícone de remover faixa */}
-                          <IconButton
-                            size="small"
-                            onClick={() => removeColorRange(idx)}
-                            disabled={
-                              heatmapOptions.plotOptions.heatmap.colorScale
-                                .ranges.length <= 1
-                            }
-                          >
-                            <DeleteForeverOutlined color="error" />
-                          </IconButton>
-                        </Box>
-                      )
-                    )}
+        {/* Campo para nome da faixa (AJUSTADO: Removida a cor vermelha de erro) */}
+        <TextField
+          label="Nome do quadrante"
+          size="small"
+          required
+          value={range.name ?? ""}
+          onChange={(e) =>
+            handleFaixaNomeChange(idx, e.target.value)
+          }
+          sx={{ width: "150px", mr: 2 }}
+          InputLabelProps={{ shrink: true }}
+        />
+
+        {/* Ícone de remover faixa */}
+        <IconButton
+          size="small"
+          onClick={() => removeColorRange(idx)}
+          disabled={
+            heatmapOptions.plotOptions.heatmap.colorScale.ranges.length <= 1
+          }
+        >
+          <DeleteForeverOutlined color="error" />
+        </IconButton>
+      </Box>
+    );
+  }
+)}
                   </Box>
 
                   {/* Rótulos de Probabilidade e Impacto */}
