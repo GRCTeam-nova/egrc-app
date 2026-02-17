@@ -173,6 +173,7 @@ function ColumnsLayouts() {
   // Em caso de edição
   useEffect(() => {
     if (dadosApi) {
+      setLoading(true);
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
@@ -220,8 +221,10 @@ function ColumnsLayouts() {
           setDeficienciaDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
+          setLoading(false);
         } finally {
           console.log("Requisição finalizada");
+          setLoading(false);
         }
       };
 

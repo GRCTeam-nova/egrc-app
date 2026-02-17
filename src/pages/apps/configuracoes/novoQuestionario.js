@@ -187,6 +187,7 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     if (dadosApi && dadosApi.idAssessment) {
+      setLoading(true);
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
@@ -326,8 +327,10 @@ function ColumnsLayouts() {
           setNormativaDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
+          setLoading(false);
         } finally {
           console.log("Requisição finalizada");
+          setLoading(false);
         }
       };
 

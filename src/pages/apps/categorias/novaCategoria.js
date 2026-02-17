@@ -95,6 +95,7 @@ function ColumnsLayouts() {
   // Em caso de edição
   useEffect(() => {
     if (dadosApi) {
+      setLoading(true);
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
@@ -121,8 +122,10 @@ function ColumnsLayouts() {
           }));
           setCategoriasDados(data);
         } catch (err) {
+          setLoading(false);
           console.error("Erro ao buscar os dados:", err.message);
         } finally {
+          setLoading(false);
           console.log("Requisição finalizada");
         }
       };

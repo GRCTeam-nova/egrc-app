@@ -136,6 +136,7 @@ function ColumnsLayouts() {
 
   useEffect(() => {
     if (dadosApi) {
+      setLoading(true);
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
@@ -204,8 +205,10 @@ function ColumnsLayouts() {
 
           setIncidenteDados(data);
         } catch (err) {
+          setLoading(false);
           console.error("Erro ao buscar os dados:", err.message);
         } finally {
+          setLoading(false);
           console.log("Requisição finalizada");
         }
       };

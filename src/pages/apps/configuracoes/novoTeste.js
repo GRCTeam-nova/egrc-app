@@ -217,6 +217,7 @@ function ColumnsLayouts() {
   useEffect(() => {
     if (!dadosApi?.idTest) return;
 
+    setLoading(true);
     const fetchAll = async () => {
       try {
         // 1) Busca dados do teste existente
@@ -265,8 +266,10 @@ function ColumnsLayouts() {
         );
         const mainStatus = computeMainStatus(resPhases.data);
         setFormData((prev) => ({ ...prev, status: mainStatus }));
+        setLoading(false);
       } catch (err) {
         console.error("Erro ao inicializar edição:", err);
+        setLoading(false);
       }
     };
 

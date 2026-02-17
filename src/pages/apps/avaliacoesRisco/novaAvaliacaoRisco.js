@@ -281,6 +281,7 @@ function ColumnsLayouts() {
   // Em caso de edição
   useEffect(() => {
     if (dadosApi && dadosApi.idAssessment) {
+      setLoading(true)
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
@@ -504,8 +505,9 @@ function ColumnsLayouts() {
           setNormativaDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
+          setLoading(false)
         } finally {
-          console.log("Requisição finalizada");
+          setLoading(false)
         }
       };
 
@@ -945,7 +947,6 @@ function ColumnsLayouts() {
     let payload = {};
 
     try {
-      setLoadingText("Gerando os questionários...");
       setLoading(true);
 
       if (requisicao === "Editar") {
@@ -1041,7 +1042,6 @@ function ColumnsLayouts() {
       });
     } finally {
       setLoading(false);
-      setLoadingText("");
     }
   };
 
@@ -1518,23 +1518,6 @@ function ColumnsLayouts() {
   return (
     <>
       <LoadingOverlay isActive={loading} />
-
-      {loading && !!loadingText && (
-        <Box
-          sx={{
-            position: "fixed",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: (theme) => theme.zIndex.modal + 2,
-            pointerEvents: "none",
-          }}
-        >
-          <Typography variant="h6">{loadingText}</Typography>
-        </Box>
-      )}
-
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={1} marginTop={2}>
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
