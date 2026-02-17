@@ -81,8 +81,9 @@ function ColumnsLayouts() {
   const [hasChanges, setHasChanges] = useState(false);
   const [statusNormas] = useState([
     { id: 1, nome: "Elaboração" },
+    { id: 2, nome: "Em aprovação" },
     { id: 3, nome: "Versão Final" },
-    { id: 4, nome: "Em Revisão" },
+    { id: 4, nome: "Em aprovação" },
     { id: 6, nome: "Revogado" },
   ]);
   const [deletedFiles, setDeletedFiles] = useState([]);
@@ -706,7 +707,7 @@ function ColumnsLayouts() {
       setFormData((prev) => ({
         ...prev,
         dataRevogacao: tempRevDate,
-        normativeStatus: 6,
+        statusNorma: 6,
       }));
       setNormativaDados((prev) => ({ ...prev, normativeStatus: 6 }));
       handleCancelRevog();
@@ -1025,20 +1026,32 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  const { buttonTitle } = useMemo(() => {
+const actionButtons = useMemo(() => {
+    if (requisicao !== "Editar") return [];
+
     const currentStatus = formData.statusNorma;
-    const tester = idUser === formData.responsavel;
-    let title = "";
-    if (currentStatus === 1 && tester) title = "ELABORADA";
-    else if (currentStatus === 2 && tester) title = "TESTE REALIZADO";
-    else if (currentStatus === 4 && formData.aprovador.includes(idUser))
-      title = "APROVADA / RETORNAR";
-    else if (currentStatus === 5 && formData.aprovador.includes(idUser))
-      title = "RETORNAR";
-    else if (currentStatus === 3 && formData.aprovador.includes(idUser))
-      title = "REVISADA";
-    return { buttonTitle: title, isTester: tester };
-  }, [idUser, formData, normativaDados]);
+    const tester = String(formData.responsavel) === String(idUser) || String(formData.revisor) === String(idUser);
+    const approver = Array.isArray(formData.aprovador) && formData.aprovador.some(id => String(id) === String(idUser));
+    const externo = formData.ambiente === 2;
+
+    let buttons = [];
+
+    // Se for externo, anula o workflow e exibe apenas REVOGAR
+    if (externo) {
+      if (currentStatus !== 6) buttons.push("REVOGAR");
+      return buttons;
+    }
+
+    if (currentStatus === 1 && tester) {
+      buttons.push("ELABORADA"); // Servirá para ALTERADA também
+    } else if (currentStatus === 4 && approver) {
+      buttons.push("APROVADA", "RETORNAR");
+    } else if (currentStatus === 3 && tester) {
+      buttons.push("ALTERAR", "REVOGAR"); 
+    }
+
+    return buttons;
+  }, [idUser, formData.statusNorma, formData.responsavel, formData.aprovador, formData.ambiente, requisicao]);
 
   const handleStart = async () => {
     let url = "";
@@ -1232,7 +1245,7 @@ function ColumnsLayouts() {
       }
 
       // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, normativeStatus: statusToSend }));
+      setFormData((prev) => ({ ...prev, statusNorma: statusToSend }));
       setNormativaDados((prev) => ({ ...prev, normativeStatus: statusToSend }));
       setHasStartedByTester(true);
       enqueueSnackbar("Status alterado com sucesso!", {
@@ -1248,6 +1261,65 @@ function ColumnsLayouts() {
         anchorOrigin: { vertical: "top", horizontal: "right" },
       });
       setLoading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAlterar = async () => {
+    try {
+      setLoading(true);
+      const url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
+      const payload = {
+        idNormative: normativaDados.idNormative,
+        code: codigo,
+        name: nome,
+        description: getDescricaoAtualizada(),
+        idReviewer: formData.revisor || null,
+        registerDate: formData.dataCadastro,
+        publishDate: formData.dataPublicacao,
+        initialVigency: formData.vigenciaInicial,
+        lastRevision: formData.ultimaRevisao,
+        conclusion: conclusaoRevisao,
+        frequencyRevision: formData.periodicidadeRevisao || null,
+        limitDateRevision: formData.dataLimiteRevisao,
+        daysRevision: diasDaRevisao ? String(diasDaRevisao).trim() : null,
+        revocationDate: formData.dataRevogacao,
+        revocationReason: motivoRevogacao ? `[${userName}]: ${motivoRevogacao}` : null,
+        normativeStatus: 1, // Volta para Em Alteração / Elaboração
+        normativeRisk: formData.riscoNorma || null,
+        active: ativo,
+        idNormativeType: formData.tipoNorma || null,
+        idRegulatory: formData.regulador || null,
+        idResponsible: formData.responsavel || null,
+        idOrigins: formData.normaOrigem,
+        idDestinies: formData.normaDestino,
+        idActionPlans: formData.planoAcao,
+        idApprovers: formData.aprovador,
+        idCompanies: formData.empresa,
+        idDepartments: formData.departamento,
+        idProcesses: formData.processo,
+        files: formData.files.map((file) => typeof file === "string" ? file : (file.path || file)),
+      };
+
+      const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error("Erro ao alterar norma.");
+
+      setFormData((prev) => ({ ...prev, statusNorma: 1 }));
+      setNormativaDados((prev) => ({ ...prev, normativeStatus: 1 }));
+      enqueueSnackbar("Normativa colocada em alteração!", { variant: "success", anchorOrigin: { vertical: "top", horizontal: "right" } });
+      window.scrollTo(0, 0);
+    } catch (error) {
+      console.error(error.message);
+      enqueueSnackbar("Não foi possível alterar a normativa", { variant: "error", anchorOrigin: { vertical: "top", horizontal: "right" } });
     } finally {
       setLoading(false);
     }
@@ -1643,7 +1715,7 @@ function ColumnsLayouts() {
       }
 
       // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, normativeStatus: 3 }));
+      setFormData((prev) => ({ ...prev, statusNorma: 3 }));
       setNormativaDados((prev) => ({ ...prev, normativeStatus: 3 }));
       setHasStartedByTester(true);
       enqueueSnackbar("Normativa aprovada com sucesso!", {
@@ -1846,7 +1918,7 @@ function ColumnsLayouts() {
       }
 
       // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, normativeStatus: 1 }));
+      setFormData((prev) => ({ ...prev, statusNorma: 1 }));
       setNormativaDados((prev) => ({ ...prev, normativeStatus: 1 }));
       setHasStartedByTester(true);
       enqueueSnackbar("Normativa retornada com sucesso!", {
@@ -2175,22 +2247,80 @@ function ColumnsLayouts() {
 
   const canEditAttributes = !(isTester && status === 1);
 
+// ==================================================================
+  //           NOVO BLOCO DE REGRAS DE PERMISSIONAMENTO
   // ==================================================================
-  //           BLOCO DE CÓDIGO ADICIONADO PARA AJUSTES
-  // ==================================================================
-  const isRevogado = normativaDados?.normativeStatus === 6;
-  const isResponsavel = formData.responsavel === idUser;
-  const isAprovador = formData.aprovador.includes(idUser);
-  const canRevogar = (isResponsavel || isReviewer) && !isRevogado;
-  const isFormLocked = isRevogado;
+  const isResponsavel = String(formData.responsavel) === String(idUser) || String(formData.revisor) === String(idUser);
+  const isAprovador = Array.isArray(formData.aprovador) && formData.aprovador.some(id => String(id) === String(idUser));
+  
+  const isExterno = formData.ambiente === 2;
+  const isRevogado = formData.statusNorma === 6;
+  const isVersaoFinal = formData.statusNorma === 3;
+  const isEmAprovacao = formData.statusNorma === 4;
+  const isElaboracao = formData.statusNorma === 1;
+
+  // Trava para os campos gerais da tela:
+  const isFormLocked = requisicao === "Editar" && (
+    isRevogado || 
+    isExterno || 
+    isVersaoFinal || 
+    isEmAprovacao || 
+    (isElaboracao && !isResponsavel)
+  );
+
+  // Trava ESPECÍFICA para a área de comentários (Aprovador pode comentar em Aprovação):
+  const isCommentLocked = requisicao === "Editar" && (
+    isRevogado || 
+    isExterno || 
+    isVersaoFinal || 
+    (isEmAprovacao && !isAprovador) || 
+    (isElaboracao && !isResponsavel)
+  );
+
+  // Regra de Revogação: Liberado se for Responsável ou se for Ambiente Externo.
+  const canRevogar = requisicao === "Editar" && !isRevogado && (isResponsavel || isExterno);
   // ==================================================================
 
   return (
     <>
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
-        <Grid container spacing={1} marginTop={2}>
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+        <Grid container spacing={3} sx={{ padding: 3 }}>
+          
+          {/* ================= SEÇÃO DE BOTÕES (TOPO) ================= */}
+          {requisicao === "Editar" && (
+            <Grid item xs={12} display="flex" justifyContent="space-between" alignItems="center" sx={{ borderBottom: "2px solid #e0e0e0", pb: 2, mb: 2 }}>
+              <Typography variant="h5" fontWeight="bold" color="primary">
+                Edição de Normativa
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                {actionButtons.includes("ELABORADA") && (
+                  <Button variant="contained" color="primary" onClick={handleStart}>ELABORADA</Button>
+                )}
+                {actionButtons.includes("APROVADA") && (
+                  <Button variant="contained" color="success" onClick={handleConcluirTeste}>APROVADA</Button>
+                )}
+                {actionButtons.includes("RETORNAR") && (
+                  <Button variant="outlined" color="warning" onClick={handleRetornar}>RETORNAR</Button>
+                )}
+                {actionButtons.includes("ALTERAR") && (
+                  <Button variant="contained" color="secondary" onClick={handleAlterar}>ALTERAR</Button>
+                )}
+                {actionButtons.includes("REVOGAR") && (
+                  <Button variant="outlined" color="error" onClick={() => handleOpenConfirmRevog(new Date())}>REVOGAR</Button>
+                )}
+              </Stack>
+            </Grid>
+          )}
+
+          {/* ================= 1. IDENTIFICAÇÃO PRINCIPAL ================= */}
+          <Grid item xs={12}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+              1. Identificação Principal
+            </Typography>
+          </Grid>
+          
+          <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
               <InputLabel>Código *</InputLabel>
               <TextField
@@ -2202,59 +2332,7 @@ function ColumnsLayouts() {
               />
             </Stack>
           </Grid>
-          {requisicao === "Editar" && (
-            <Grid item xs={3} mt={4} ml={5}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                {buttonTitle === "ELABORADA" ? (
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={handleStart}
-                  >
-                    ELABORADA
-                  </Button>
-                ) : buttonTitle === "TESTE REALIZADO" ? (
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={handleTesteRealizado}
-                  >
-                    TESTE REALIZADO
-                  </Button>
-                ) : buttonTitle === "APROVADA / RETORNAR" ? (
-                  <>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={handleConcluirTeste}
-                    >
-                      APROVADA
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleRetornar}
-                    >
-                      RETORNAR
-                    </Button>
-                  </>
-                ) : (
-                  buttonTitle && (
-                    <Button
-                      sx={{ display: "none" }}
-                      variant="contained"
-                      size="small"
-                      onClick={tratarSubmit}
-                    >
-                      {buttonTitle}
-                    </Button>
-                  )
-                )}
-              </Stack>
-            </Grid>
-          )}
-
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+          <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
               <InputLabel>Nome *</InputLabel>
               <TextField
@@ -2266,1029 +2344,437 @@ function ColumnsLayouts() {
               />
             </Stack>
           </Grid>
-
-          {/* Localize o Grid do Revisor (aprox. linha 1418) */}
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+          <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
               <InputLabel>Revisor *</InputLabel>
               <Autocomplete
-                options={responsaveis} // Assumindo que a lista de pessoas é a mesma
+                options={responsaveis}
                 getOptionLabel={(option) => option.nome}
-                // AGORA vinculado ao formData.revisor
-                value={
-                  responsaveis.find((r) => r.id === formData.revisor) || null
-                }
-                onChange={(event, newValue) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    revisor: newValue ? newValue.id : "",
-                  }));
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    // Adicione validação aqui se o campo Revisor for obrigatório
-                  />
-                )}
+                value={responsaveis.find((r) => r.id === formData.revisor) || null}
+                onChange={(event, newValue) => setFormData((prev) => ({ ...prev, revisor: newValue ? newValue.id : "" }))}
+                renderInput={(params) => <TextField {...params} />}
                 disabled={isFormLocked}
               />
             </Stack>
           </Grid>
-
-          <Grid item xs={6}>
+          <Grid item xs={12} sm={6}>
             <Stack spacing={1}>
               <InputLabel>Status da norma</InputLabel>
               <Autocomplete
                 options={statusNormas}
                 getOptionLabel={(option) => option.nome}
-                value={
-                  statusNormas.find(
-                    (item) => item.id === formData.statusNorma,
-                  ) || null
-                }
-                onChange={(event, newValue) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    statusNorma: newValue ? newValue.id : "",
-                  }));
-                  // Exemplo de uso da mask:
-                  // console.log("Máscara de Probabilidade:", newValue?.mask);
-                }}
+                value={statusNormas.find((item) => item.id === formData.statusNorma) || null}
+                onChange={(event, newValue) => setFormData((prev) => ({ ...prev, statusNorma: newValue ? newValue.id : "" }))}
                 renderInput={(params) => <TextField {...params} />}
                 disabled={isFormLocked}
               />
             </Stack>
           </Grid>
 
+          <Grid item xs={12} sm={3} display="flex" alignItems="center">
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 3 }}>
+                  <Switch checked={ativo} onChange={(event) => setAtivo(event.target.checked)} disabled={isFormLocked} />
+                  <Typography>{ativo ? "Ativo" : "Inativo"}</Typography>
+                </Stack>
+              </Grid>
+          
+
+          {/* SÓ MOSTRA O RESTANTE SE FOR MODO DE EDIÇÃO */}
           {requisicao === "Editar" && (
             <>
-              {/* ... (dentro do return) ... */}
-
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={2}>
-                  {/* 1. CAMPO DE HISTÓRICO (Visual Melhorado) */}
+              {/* ================= 2. ÁREA DE COMENTÁRIOS E APROVAÇÃO ================= */}
+              <Grid item xs={12} mt={2}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+                  2. Aprovação e Comentários do Workflow
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Stack spacing={2} sx={{ backgroundColor: "#f9f9f9", padding: 3, borderRadius: 2, border: "1px solid #eee" }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <InputLabel sx={{ m: 0, fontWeight: "bold" }}>
+                      {descricao ? "Adicionar novo comentário" : "Comentário da Revisão"}
+                    </InputLabel>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleSalvarComentarioRapido}
+                      disabled={isCommentLocked || loading}
+                      sx={{ fontWeight: 600, textTransform: "none" }}
+                    >
+                      Salvar Comentário
+                    </Button>
+                  </Stack>
+                  <TextField
+                    onChange={(event) => setNovoComentario(event.target.value)}
+                    fullWidth
+                    multiline
+                    rows={3}
+                    value={novoComentario}
+                    placeholder="Digite aqui seu comentário, justificativa ou observação..."
+                    disabled={isCommentLocked}
+                    sx={{ backgroundColor: "#fff" }}
+                  />
                   {descricao && (
                     <>
-                      {/* 2. CAMPO DE NOVA ENTRADA COM BOTÃO AO LADO */}
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        spacing={2}
-                        sx={{ mb: 1, mt: 2 }} // Margem para espaçamento
-                      >
-                        <InputLabel sx={{ m: 0 }}>
-                          {descricao
-                            ? "Adicionar novo comentário"
-                            : "Comentário"}
-                        </InputLabel>
-
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={handleSalvarComentarioRapido}
-                          disabled={isFormLocked || loading}
-                          sx={{
-                            fontWeight: 600,
-                            textTransform: "none",
-                            height: "30px",
-                          }}
-                        >
-                          Salvar Comentário
-                        </Button>
-                      </Stack>
-
-                      <TextField
-                        onChange={(event) =>
-                          setNovoComentario(event.target.value)
-                        }
-                        fullWidth
-                        multiline
-                        rows={4}
-                        value={novoComentario}
-                        placeholder="Digite aqui seu comentário ou observação..."
-                        disabled={isFormLocked}
-                        sx={{
-                          backgroundColor: "#fff",
-                          marginBottom: 2, // Espaço antes do histórico
-                        }}
-                      />
-
-                      <InputLabel sx={{ fontWeight: "bold", color: "#333" }}>
-                        Histórico de Comentários
-                      </InputLabel>
+                      <InputLabel sx={{ fontWeight: "bold", mt: 2 }}>Histórico de Comentários</InputLabel>
                       <TextField
                         fullWidth
                         multiline
                         minRows={3}
-                        maxRows={8} // Permite crescer um pouco mais se tiver muito texto
+                        maxRows={8}
                         value={descricao}
-                        // Usamos readOnly ao invés de disabled para controlar melhor as cores
-                        InputProps={{
-                          readOnly: true,
-                        }}
+                        InputProps={{ readOnly: true }}
                         sx={{
-                          "& .MuiOutlinedInput-root": {
-                            backgroundColor: "#f0f7ff", // Um azul bem clarinho (mais agradável que cinza)
-                            "& fieldset": {
-                              borderColor: "#b3d9ff", // Borda suave
-                            },
-                            "&:hover fieldset": {
-                              borderColor: "#b3d9ff", // Mantém a borda ao passar o mouse
-                            },
-                            "&.Mui-focused fieldset": {
-                              borderColor: "#b3d9ff", // Mantém a borda ao focar (clicar)
-                            },
-                          },
-                          "& .MuiInputBase-input": {
-                            color: "#0d0d0d !important", // Força a cor PRETA (quase preta)
-                            WebkitTextFillColor: "#0d0d0d !important", // Garante contraste no Chrome/Safari
-                            fontSize: "0.95rem",
-                            fontWeight: 500, // Um pouco mais de peso na fonte
-                          },
+                          "& .MuiOutlinedInput-root": { backgroundColor: "#f0f7ff" },
+                          "& .MuiInputBase-input": { color: "#0d0d0d !important", WebkitTextFillColor: "#0d0d0d !important" },
                         }}
                       />
                     </>
                   )}
                 </Stack>
               </Grid>
-              <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Data de cadastro</InputLabel>
-                  <DatePicker
-                    disabled
-                    value={formData.dataCadastro || null}
-                    onChange={(newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        dataCadastro: newValue,
-                      }));
-                    }}
-                    slotProps={{
-                      textField: {
-                        placeholder: "00/00/0000",
-                      },
-                    }}
-                  />
-                </Stack>
+
+              {/* ================= 3. EQUIPE E RESPONSABILIDADES ================= */}
+              <Grid item xs={12} mt={2}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+                  3. Equipe Responsável
+                </Typography>
               </Grid>
-
-              <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
-                  <InputLabel>Data de publicação</InputLabel>
-                  <DatePicker
-                    value={formData.dataPublicacao || null}
-                    onChange={(newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        dataPublicacao: newValue,
-                      }));
-                    }}
-                    slotProps={{
-                      textField: {
-                        placeholder: "00/00/0000",
-                      },
-                    }}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Vigência inicial</InputLabel>
-                  <DatePicker
-                    value={formData.vigenciaInicial || null}
-                    onChange={(newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        vigenciaInicial: newValue,
-                      }));
-                    }}
-                    slotProps={{
-                      textField: {
-                        placeholder: "00/00/0000",
-                      },
-                    }}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Ambiente</InputLabel>
-                  <Autocomplete
-                    options={ambientes}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      ambientes.find((a) => a.id === formData.ambiente) || null
-                    }
-                    onChange={(event, newValue) => {
-                      const ambienteId = newValue ? newValue.id : "";
-                      setFormData((prev) => ({
-                        ...prev,
-                        ambiente: ambienteId,
-                        // se for Externo (2) → Versão Final (3); se for Interno (1) → Elaboração (1)
-                        statusNorma:
-                          ambienteId === 2
-                            ? 3
-                            : ambienteId === 1
-                              ? 1
-                              : prev.statusNorma,
-                        // quando Externo, grava a data de hoje em ultimaRevisao
-                        ultimaRevisao:
-                          ambienteId === 2 ? new Date() : prev.ultimaRevisao,
-                      }));
-                    }}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={2.4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Regulador</InputLabel>
-                  <Autocomplete
-                    options={reguladores}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      reguladores.find(
-                        (regulador) => regulador.id === formData.regulador,
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        regulador: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.regulador &&
-                          formValidation.regulador === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Tipo da norma</InputLabel>
-                  <Autocomplete
-                    options={tipoNormas}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      tipoNormas.find(
-                        (item) => item.id === formData.tipoNorma,
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        tipoNorma: newValue ? newValue.id : "",
-                      }));
-                      // Exemplo de uso da mask:
-                      // console.log("Máscara de Probabilidade:", newValue?.mask);
-                    }}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={4} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>Norma de origem</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...normaOrigens.filter(
-                        (norma) => norma.id !== idNormativoAtual,
-                      ),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.normaOrigem.map(
-                      (id) =>
-                        normaOrigens.find(
-                          (normaOrigem) => normaOrigem.id === id,
-                        ) || id,
-                    )}
-                    onChange={(event, newValue) => {
-                      const selectedIds = newValue.map((item) => item.id);
-                      setFormData((prev) => ({
-                        ...prev,
-                        normaOrigem: selectedIds,
-                      }));
-                    }}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    getOptionDisabled={(option) =>
-                      option.id !== "all" &&
-                      formData.normaDestino.includes(option.id)
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelected : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.normaOrigem.length === 0 ||
-                            formData.normaOrigem.every((val) => val === 0)) &&
-                          formValidation.normaOrigem === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={4} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>Norma de destino</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...normaDestinos.filter(
-                        (norma) => norma.id !== idNormativoAtual,
-                      ),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.normaDestino.map(
-                      (id) =>
-                        normaDestinos.find(
-                          (normaDestino) => normaDestino.id === id,
-                        ) || id,
-                    )}
-                    onChange={(event, newValue) => {
-                      const selectedIds = newValue.map((item) => item.id);
-                      setFormData((prev) => ({
-                        ...prev,
-                        normaDestino: selectedIds,
-                      }));
-                    }}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    getOptionDisabled={(option) =>
-                      option.id !== "all" &&
-                      formData.normaOrigem.includes(option.id)
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedDiretrizes
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.normaDestino.length === 0 ||
-                            formData.normaDestino.every((val) => val === 0)) &&
-                          formValidation.normaDestino === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Empresas{" "}
-                    <DrawerEmpresa
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onCompanyCreated={handleCompanyCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...empresas,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.empresa.map(
-                      (id) =>
-                        empresas.find((empresa) => empresa.id === id) || id,
-                    )}
-                    onChange={handleSelectAllEmpresas}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedEmpresas
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.empresa.length === 0 ||
-                            formData.empresa.every((val) => val === 0)) &&
-                          formValidation.empresa === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Departamentos{" "}
-                    <DrawerDepartamento
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onDepartmentCreated={handleDepartmentCreated}
-                    />
-                  </InputLabel>{" "}
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...departamentos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.departamento.map(
-                      (id) =>
-                        departamentos.find(
-                          (departamento) => departamento.id === id,
-                        ) || id,
-                    )}
-                    onChange={handleSelectAllDepartamentos}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedDepartamentos
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.departamento.length === 0 ||
-                            formData.departamento.every((val) => val === 0)) &&
-                          formValidation.departamento === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} mb={5}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Processos{" "}
-                    <DrawerProcesso
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onProcessCreated={handleProcessCreated}
-                    />
-                  </InputLabel>{" "}
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...processos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processo.map(
-                      (id) =>
-                        processos.find((processo) => processo.id === id) || id,
-                    )}
-                    onChange={handleSelectAll2}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelected2 : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.processo.length === 0 ||
-                            formData.processo.every((val) => val === 0)) &&
-                          formValidation.processo === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Plano de ação{" "}
-                    <DrawerPlanos
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
-                      onPlansCreated={handlePlanCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...planosAcoes,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.planoAcao.map(
-                      (id) =>
-                        planosAcoes.find((planoAcao) => planoAcao.id === id) ||
-                        id,
-                    )}
-                    onChange={handleSelectAllPlanoAcao}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedPlanoAcao
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.planoAcao.length === 0 ||
-                            formData.planoAcao.every((val) => val === 0)) &&
-                          formValidation.planoAcao === false
-                        }
-                      />
-                    )}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} mb={5}>
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1">
-                      Campos de revisão
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Grid container spacing={1}>
-                      <Grid
-                        item
-                        xs={6}
-                        sx={{ paddingBottom: 5, paddingTop: 5 }}
-                      >
-                        <Stack spacing={1}>
-                          <InputLabel>Última revisão</InputLabel>
-                          <DatePicker
-                            disabled
-                            value={formData.ultimaRevisao || null}
-                            onChange={(newValue) => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                ultimaRevisao: newValue,
-                              }));
-                            }}
-                            slotProps={{
-                              textField: {
-                                placeholder: "00/00/0000",
-                              },
-                            }}
-                          />
-                        </Stack>
-                      </Grid>
-                      {requisicao === "Editar" && (
-                        <Grid item xs={3} mt={4} ml={5}>
-                          <Stack
-                            direction="row"
-                            alignItems="center"
-                            spacing={1}
-                          >
-                            {buttonTitle === "REVISADA" ? (
-                              <Button
-                                variant="contained"
-                                size="small"
-                                onClick={handleStart}
-                              >
-                                REVISADA
-                              </Button>
-                            ) : (
-                              buttonTitle && (
-                                <Button
-                                  hidden
-                                  variant="contained"
-                                  size="small"
-                                  onClick={tratarSubmit}
-                                ></Button>
-                              )
-                            )}
-                          </Stack>
-                        </Grid>
-                      )}
-                      <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                        <Stack spacing={1}>
-                          <InputLabel>Risco da norma</InputLabel>
-                          <Autocomplete
-                            options={riscoNormas}
-                            getOptionLabel={(option) => option.nome}
-                            value={
-                              riscoNormas.find(
-                                (item) => item.id === formData.riscoNorma,
-                              ) || null
-                            }
-                            onChange={(_, newValue) => {
-                              const risco = newValue?.id ?? null; // pega o id numérico ou null
-                              let periodicidade = null; // default: limpar
-
-                              switch (risco) {
-                                case 1:
-                                case 2:
-                                case 3:
-                                  periodicidade = risco; // para 1,2,3 => mesmo valor
-                                  break;
-                                default:
-                                  periodicidade = null; // para 4 ou vazio, limpa
-                              }
-
-                              setFormData((prev) => ({
-                                ...prev,
-                                riscoNorma: risco,
-                                periodicidadeRevisao: periodicidade,
-                              }));
-                            }}
-                            renderInput={(params) => <TextField {...params} />}
-                            disabled={isFormLocked}
-                          />
-                        </Stack>
-                      </Grid>
-                      <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                        <Stack spacing={1}>
-                          <InputLabel>Status da revisão</InputLabel>
-                          <Autocomplete
-                            disabled={isFormLocked}
-                            options={statusRevisao}
-                            getOptionLabel={(option) => option.nome}
-                            value={
-                              statusRevisao.find(
-                                (item) => item.id === formData.statuRevisao,
-                              ) || null
-                            }
-                            onChange={(event, newValue) => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                statuRevisao: newValue ? newValue.id : "",
-                              }));
-                              // Exemplo de uso da mask:
-                              // console.log("Máscara de Probabilidade:", newValue?.mask);
-                            }}
-                            renderInput={(params) => <TextField {...params} />}
-                          />
-                        </Stack>
-                      </Grid>
-
-                      <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                        <Stack spacing={1}>
-                          <InputLabel>Periodicidade da revisão</InputLabel>
-                          <Autocomplete
-                            disabled={isFormLocked}
-                            options={periodicidadeRevisoes}
-                            getOptionLabel={(option) => option.nome}
-                            value={
-                              periodicidadeRevisoes.find(
-                                (item) =>
-                                  item.id === formData.periodicidadeRevisao,
-                              ) || null
-                            }
-                            onChange={(event, newValue) => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                periodicidadeRevisao: newValue
-                                  ? newValue.id
-                                  : "",
-                              }));
-                            }}
-                            renderInput={(params) => <TextField {...params} />}
-                          />
-                        </Stack>
-                      </Grid>
-
-                      <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                        <Stack spacing={1}>
-                          <InputLabel>Data limite da revisão</InputLabel>
-                          <DatePicker
-                            disabled={isFormLocked}
-                            value={formData.dataLimiteRevisao || null}
-                            onChange={(newValue) => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                dataLimiteRevisao: newValue,
-                              }));
-                            }}
-                            slotProps={{
-                              textField: {
-                                placeholder: "00/00/0000",
-                              },
-                            }}
-                          />
-                        </Stack>
-                      </Grid>
-
-                      <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                        <Stack spacing={1}>
-                          <InputLabel>Dias da revisão</InputLabel>
-                          <TextField
-                            disabled={isFormLocked}
-                            onChange={(event) =>
-                              setDiasDaRevisao(event.target.value)
-                            }
-                            fullWidth
-                            value={diasDaRevisao}
-                          />
-                        </Stack>
-                      </Grid>
-
-                      <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                        <Stack spacing={1}>
-                          <InputLabel>Conclusão da revisão</InputLabel>
-                          <TextField
-                            onChange={(event) =>
-                              setConclusaoRevisao(event.target.value)
-                            }
-                            fullWidth
-                            multiline
-                            rows={4}
-                            value={conclusaoRevisao}
-                            disabled={isFormLocked}
-                          />
-                        </Stack>
-                      </Grid>
-
-                      {/* Continue pasting publication dates, ambiente, regulador, normas origem/destino, empresas, departamentos, processos, planos, datas, periodicidade, riscos, conclusão, revisão, switch, file uploader, etc. */}
-                    </Grid>
-                  </AccordionDetails>
-                </Accordion>
-              </Grid>
-
-              <Grid item xs={3} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Data da revogação</InputLabel>
-                  <DatePicker
-                    value={formData.dataRevogacao || null}
-                    onChange={handleOpenConfirmRevog}
-                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
-                    disabled={!canRevogar || isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Motivo da revogação</InputLabel>
-                  <TextField
-                    onChange={(event) => setMotivoRevogacao(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={motivoRevogacao}
-                    disabled={!canRevogar || isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável</InputLabel>
+                  <InputLabel>Responsável (Dono da Norma)</InputLabel>
                   <Autocomplete
                     options={responsaveis}
                     getOptionLabel={(option) => option.nome}
-                    // Valor vinculado ao formData.responsavel
-                    value={
-                      responsaveis.find((r) => r.id === formData.responsavel) ||
-                      null
-                    }
-                    // Chama a função customizada
+                    value={responsaveis.find((r) => r.id === formData.responsavel) || null}
                     onChange={handleResponsavelChange}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
-                      />
-                    )}
+                    renderInput={(params) => <TextField {...params} />}
                     disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
                   <InputLabel>Aprovadores</InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...aprovadores,
-                    ]}
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...aprovadores]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.aprovador.map(
-                      (id) =>
-                        aprovadores.find((aprovador) => aprovador.id === id) ||
-                        id,
-                    )}
+                    value={formData.aprovador.map((id) => aprovadores.find((a) => a.id === id) || id)}
                     onChange={handleSelectAllAprovadores}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedAprovadores
-                                  : selected
-                              }
-                            />
-                          </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
+                        <Checkbox checked={option.id === "all" ? allSelectedAprovadores : selected} />
+                        {option.nome}
                       </li>
                     )}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          (formData.aprovador.length === 0 ||
-                            formData.aprovador.every((val) => val === 0)) &&
-                          formValidation.aprovador === false
-                        }
-                      />
-                    )}
+                    renderInput={(params) => <TextField {...params} />}
                     disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
 
-              <Grid item xs={4} sx={{ paddingBottom: 5 }}>
-                <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                    style={{ marginTop: 0.5 }}
-                  >
-                    <Switch
-                      checked={ativo}
-                      onChange={(event) => setAtivo(event.target.checked)}
-                    />
-                    <Typography>{ativo ? "Ativo" : "Inativo"}</Typography>
-                  </Stack>
-                </Stack>
+              {/* ================= 4. CLASSIFICAÇÃO E DATAS ================= */}
+              <Grid item xs={12} mt={2}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+                  4. Classificação e Prazos
+                </Typography>
               </Grid>
-
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={12} sm={4}>
                 <Stack spacing={1}>
-                  <InputLabel>Anexo</InputLabel>
-                  <FileUploader
-                    containerFolder={1}
-                    initialFiles={formData.files}
-                    onFilesChange={(files) =>
-                      setFormData((prev) => ({ ...prev, files }))
-                    }
-                    onFileDelete={(file) =>
-                      setDeletedFiles((prev) => [...prev, file])
-                    }
+                  <InputLabel>Ambiente</InputLabel>
+                  <Autocomplete
+                    options={ambientes}
+                    getOptionLabel={(option) => option.nome}
+                    value={ambientes.find((a) => a.id === formData.ambiente) || null}
+                    onChange={(event, newValue) => {
+                      const ambienteId = newValue ? newValue.id : "";
+                      setFormData((prev) => ({
+                        ...prev, ambiente: ambienteId,
+                        statusNorma: ambienteId === 2 ? 3 : ambienteId === 1 ? 1 : prev.statusNorma,
+                        ultimaRevisao: ambienteId === 2 ? new Date() : prev.ultimaRevisao,
+                      }));
+                    }}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
-              <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Accordion>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Tipo da norma</InputLabel>
+                  <Autocomplete
+                    options={tipoNormas}
+                    getOptionLabel={(option) => option.nome}
+                    value={tipoNormas.find((item) => item.id === formData.tipoNorma) || null}
+                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, tipoNorma: newValue ? newValue.id : "" }))}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Regulador</InputLabel>
+                  <Autocomplete
+                    options={reguladores}
+                    getOptionLabel={(option) => option.nome}
+                    value={reguladores.find((r) => r.id === formData.regulador) || null}
+                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, regulador: newValue ? newValue.id : "" }))}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              
+              
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de cadastro</InputLabel>
+                  <DatePicker
+                    disabled
+                    value={formData.dataCadastro || null}
+                    onChange={(newValue) => setFormData((prev) => ({ ...prev, dataCadastro: newValue }))}
+                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de publicação</InputLabel>
+                  <DatePicker
+                    value={formData.dataPublicacao || null}
+                    onChange={(newValue) => setFormData((prev) => ({ ...prev, dataPublicacao: newValue }))}
+                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Vigência inicial</InputLabel>
+                  <DatePicker
+                    value={formData.vigenciaInicial || null}
+                    onChange={(newValue) => setFormData((prev) => ({ ...prev, vigenciaInicial: newValue }))}
+                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              
+
+              {/* ================= 5. ASSOCIAÇÕES ================= */}
+              <Grid item xs={12} mt={2}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+                  5. Associações e Relacionamentos
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Norma de origem</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaOrigens.filter((n) => n.id !== idNormativoAtual)]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.normaOrigem.map((id) => normaOrigens.find((n) => n.id === id) || id)}
+                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, normaOrigem: newValue.map((item) => item.id) }))}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    getOptionDisabled={(option) => option.id !== "all" && formData.normaDestino.includes(option.id)}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox checked={option.id === "all" ? allSelected : selected} />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Norma de destino</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaDestinos.filter((n) => n.id !== idNormativoAtual)]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.normaDestino.map((id) => normaDestinos.find((n) => n.id === id) || id)}
+                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, normaDestino: newValue.map((item) => item.id) }))}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    getOptionDisabled={(option) => option.id !== "all" && formData.normaOrigem.includes(option.id)}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox checked={option.id === "all" ? allSelectedDiretrizes : selected} />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel display="flex" alignItems="center">Empresas <DrawerEmpresa buttonSx={{ ml: 1, width: 20, height: 20 }} onCompanyCreated={handleCompanyCreated} /></InputLabel>
+                  <Autocomplete
+                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...empresas]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.empresa.map((id) => empresas.find((e) => e.id === id) || id)}
+                    onChange={handleSelectAllEmpresas}
+                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelectedEmpresas : selected} />{option.nome}</li>)}
+                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Departamentos <DrawerDepartamento buttonSx={{ ml: 1, width: 20, height: 20 }} onDepartmentCreated={handleDepartmentCreated} /></InputLabel>
+                  <Autocomplete
+                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...departamentos]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.departamento.map((id) => departamentos.find((d) => d.id === id) || id)}
+                    onChange={handleSelectAllDepartamentos}
+                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelectedDepartamentos : selected} />{option.nome}</li>)}
+                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Processos <DrawerProcesso buttonSx={{ ml: 1, width: 20, height: 20 }} onProcessCreated={handleProcessCreated} /></InputLabel>
+                  <Autocomplete
+                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...processos]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.processo.map((id) => processos.find((p) => p.id === id) || id)}
+                    onChange={handleSelectAll2}
+                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelected2 : selected} />{option.nome}</li>)}
+                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Plano de ação <DrawerPlanos buttonSx={{ ml: 1, width: 20, height: 20 }} onPlansCreated={handlePlanCreated} /></InputLabel>
+                  <Autocomplete
+                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...planosAcoes]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.planoAcao.map((id) => planosAcoes.find((p) => p.id === id) || id)}
+                    onChange={handleSelectAllPlanoAcao}
+                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelectedPlanoAcao : selected} />{option.nome}</li>)}
+                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+
+              {/* ================= 6. REVISÃO E REVOGAÇÃO ================= */}
+              <Grid item xs={12} mt={2}>
+                <Accordion sx={{ backgroundColor: "#fdfdfd", border: "1px solid #e0e0e0", boxShadow: "none" }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="h6">Trecho</Typography>
+                    <Typography variant="subtitle1" fontWeight="bold">6. Regras de Revisão Periódica</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Stack spacing={1}>
+                          <InputLabel>Última revisão</InputLabel>
+                          <DatePicker disabled value={formData.ultimaRevisao || null} onChange={(newValue) => setFormData((prev) => ({ ...prev, ultimaRevisao: newValue }))} slotProps={{ textField: { placeholder: "00/00/0000" } }} />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Stack spacing={1}>
+                          <InputLabel>Risco da norma</InputLabel>
+                          <Autocomplete
+                            options={riscoNormas} getOptionLabel={(option) => option.nome}
+                            value={riscoNormas.find((item) => item.id === formData.riscoNorma) || null}
+                            onChange={(_, newValue) => {
+                              const risco = newValue?.id ?? null;
+                              setFormData((prev) => ({ ...prev, riscoNorma: risco, periodicidadeRevisao: [1, 2, 3].includes(risco) ? risco : null }));
+                            }}
+                            renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                          />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Stack spacing={1}>
+                          <InputLabel>Status da revisão</InputLabel>
+                          <Autocomplete disabled={isFormLocked} options={statusRevisao} getOptionLabel={(option) => option.nome} value={statusRevisao.find((item) => item.id === formData.statuRevisao) || null} onChange={(event, newValue) => setFormData((prev) => ({ ...prev, statuRevisao: newValue ? newValue.id : "" }))} renderInput={(params) => <TextField {...params} />} />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Stack spacing={1}>
+                          <InputLabel>Periodicidade</InputLabel>
+                          <Autocomplete disabled={isFormLocked} options={periodicidadeRevisoes} getOptionLabel={(option) => option.nome} value={periodicidadeRevisoes.find((item) => item.id === formData.periodicidadeRevisao) || null} onChange={(event, newValue) => setFormData((prev) => ({ ...prev, periodicidadeRevisao: newValue ? newValue.id : "" }))} renderInput={(params) => <TextField {...params} />} />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Stack spacing={1}>
+                          <InputLabel>Data limite</InputLabel>
+                          <DatePicker disabled={isFormLocked} value={formData.dataLimiteRevisao || null} onChange={(newValue) => setFormData((prev) => ({ ...prev, dataLimiteRevisao: newValue }))} slotProps={{ textField: { placeholder: "00/00/0000" } }} />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <Stack spacing={1}>
+                          <InputLabel>Dias da revisão</InputLabel>
+                          <TextField disabled={isFormLocked} onChange={(event) => setDiasDaRevisao(event.target.value)} fullWidth value={diasDaRevisao} />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <Stack spacing={1}>
+                          <InputLabel>Conclusão da revisão</InputLabel>
+                          <TextField onChange={(event) => setConclusaoRevisao(event.target.value)} fullWidth multiline rows={3} value={conclusaoRevisao} disabled={isFormLocked} />
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  </AccordionDetails>
+                </Accordion>
+              </Grid>
+
+              <Grid item xs={12} mt={2}>
+                <Accordion sx={{ backgroundColor: "#fff5f5", border: "1px solid #f5c6c6", boxShadow: "none" }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="subtitle1" fontWeight="bold" color="error">7. Revogação de Norma</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={3}>
+                        <Stack spacing={1}>
+                          <InputLabel>Data da revogação</InputLabel>
+                          <DatePicker value={formData.dataRevogacao || null} onChange={handleOpenConfirmRevog} slotProps={{ textField: { placeholder: "00/00/0000" } }} disabled={!canRevogar} />
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} sm={9}>
+                        <Stack spacing={1}>
+                          <InputLabel>Motivo da revogação</InputLabel>
+                          <TextField onChange={(event) => setMotivoRevogacao(event.target.value)} fullWidth multiline rows={2} value={motivoRevogacao} disabled={!canRevogar} />
+                        </Stack>
+                      </Grid>
+                    </Grid>
+                  </AccordionDetails>
+                </Accordion>
+              </Grid>
+
+              {/* ================= 8. ANEXOS E TRECHOS ================= */}
+              <Grid item xs={12} mt={2}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+                  8. Anexos e Integrações
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Stack spacing={1}>
+                  <InputLabel>Anexo</InputLabel>
+                  <FileUploader containerFolder={1} initialFiles={formData.files} onFilesChange={(files) => setFormData((prev) => ({ ...prev, files }))} onFileDelete={(file) => setDeletedFiles((prev) => [...prev, file])} />
+                </Stack>
+              </Grid>
+              <Grid item xs={12}>
+                <Accordion sx={{ border: "1px solid #e0e0e0", boxShadow: "none" }}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography variant="subtitle1" fontWeight="bold">Trechos</Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <ListagemTrecho />
@@ -3298,168 +2784,50 @@ function ColumnsLayouts() {
             </>
           )}
 
-          {/* Botões de ação */}
-          <Grid item xs={12} mt={-5}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-start",
-                gap: "8px",
-                marginRight: "20px",
-                marginTop: 5,
-              }}
-            >
-              <Button
-                variant="contained"
-                color="primary"
-                style={{
-                  width: "91px",
-                  height: "32px",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
-                onClick={tratarSubmit}
-              >
-                Atualizar
-              </Button>
-            </Box>
+          {/* BOTÃO DE SALVAR FORMULÁRIO GERAL */}
+          <Grid item xs={12} mt={2} mb={5} display="flex" justifyContent="flex-start">
+            <Button variant="contained" color="primary" sx={{ px: 4, py: 1, fontWeight: "bold" }} onClick={tratarSubmit}>
+              {requisicao === "Criar" ? "Cadastrar" : "Atualizar Formulário"}
+            </Button>
           </Grid>
-          <Dialog
-            open={successDialogOpen}
-            onClose={voltarParaListagem}
-            sx={{
-              "& .MuiDialog-paper": {
-                padding: "24px",
-                borderRadius: "12px",
-                width: "400px",
-                textAlign: "center",
-              },
-            }}
-          >
-            {/* Ícone de Sucesso */}
-            <Box display="flex" justifyContent="center" mt={2}>
-              <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
-            </Box>
-
-            {/* Título Centralizado */}
-            <DialogTitle
-              sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
-            >
-              Normativa Criada com Sucesso!
-            </DialogTitle>
-
-            {/* Mensagem */}
-            <DialogContent>
-              <DialogContentText
-                sx={{ fontSize: "16px", color: "#555", px: 2 }}
-              >
-                A normativa foi cadastrada com sucesso. Você pode voltar para a
-                listagem ou adicionar mais informações a essa normativa.
-              </DialogContentText>
-            </DialogContent>
-
-            {/* Botões */}
-            <DialogActions
-              sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
-            >
-              <Button
-                onClick={voltarParaListagem}
-                variant="outlined"
-                sx={{
-                  borderColor: "#007bff",
-                  color: "#007bff",
-                  fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "rgba(0, 123, 255, 0.1)",
-                  },
-                }}
-              >
-                Voltar para a listagem
-              </Button>
-              <Button
-                onClick={continuarEdicao}
-                variant="contained"
-                sx={{
-                  backgroundColor: "#007bff",
-                  fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "#0056b3",
-                  },
-                }}
-                autoFocus
-              >
-                Adicionar mais informações
-              </Button>
-            </DialogActions>
-          </Dialog>
-          <Dialog
-            open={confirmRevisorOpen}
-            onClose={handleDenyReplication}
-            aria-labelledby="alert-dialog-title"
-            aria-describedby="alert-dialog-description"
-          >
-            <DialogTitle id="alert-dialog-title">
-              {"Definir Revisor?"}
-            </DialogTitle>
-            <DialogContent>
-              <DialogContentText id="alert-dialog-description">
-                Deseja que o responsável selecionado também seja atribuído como
-                revisor desta normativa?
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleDenyReplication}>Não</Button>
-              <Button
-                onClick={handleConfirmReplication}
-                autoFocus
-                variant="contained"
-              >
-                Sim
-              </Button>
-            </DialogActions>
-          </Dialog>
-          <Dialog
-            open={confirmRevogOpen}
-            onClose={handleCancelRevog}
-            aria-labelledby="confirm-revog-dialog-title"
-          >
-            <DialogTitle id="confirm-revog-dialog-title">
-              Confirmar Revogação
-            </DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Tem certeza que deseja revogar esta norma em{" "}
-                {tempRevDate?.toLocaleDateString("pt-BR")}?<br />
-                Isso definirá o status como "Revogado" e essa norma não poderá
-                mais ser editada.
-              </DialogContentText>
-              {showJustificativaField && (
-                <TextField
-                  autoFocus
-                  margin="dense"
-                  id="justificativa-revogacao"
-                  label="Justificativa de Revogação"
-                  type="text"
-                  fullWidth
-                  variant="outlined"
-                  multiline
-                  rows={3}
-                  value={motivoRevogacao}
-                  onChange={(e) => setMotivoRevogacao(e.target.value)}
-                  placeholder="Informe a justificativa para a revogação desta norma..."
-                  sx={{ mt: 2 }}
-                />
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCancelRevog}>Cancelar</Button>
-              <Button onClick={handleConfirmRevog} autoFocus>
-                Confirmar
-              </Button>
-            </DialogActions>
-          </Dialog>
         </Grid>
+
+        {/* DIÁLOGOS DE CONFIRMAÇÃO (MANTIDOS INTACTOS) */}
+        <Dialog open={successDialogOpen} onClose={voltarParaListagem} sx={{ "& .MuiDialog-paper": { padding: "24px", borderRadius: "12px", width: "400px", textAlign: "center" } }}>
+          <Box display="flex" justifyContent="center" mt={2}><CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} /></Box>
+          <DialogTitle sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}>Normativa Criada com Sucesso!</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>A normativa foi cadastrada com sucesso. Você pode voltar para a listagem ou adicionar mais informações a essa normativa.</DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}>
+            <Button onClick={voltarParaListagem} variant="outlined" sx={{ borderColor: "#007bff", color: "#007bff", fontWeight: 600 }}>Voltar para a listagem</Button>
+            <Button onClick={continuarEdicao} variant="contained" sx={{ backgroundColor: "#007bff", fontWeight: 600 }}>Adicionar mais informações</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={confirmRevisorOpen} onClose={handleDenyReplication}>
+          <DialogTitle>{"Definir Revisor?"}</DialogTitle>
+          <DialogContent><DialogContentText>Deseja que o responsável selecionado também seja atribuído como revisor desta normativa?</DialogContentText></DialogContent>
+          <DialogActions>
+            <Button onClick={handleDenyReplication}>Não</Button>
+            <Button onClick={handleConfirmReplication} autoFocus variant="contained">Sim</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={confirmRevogOpen} onClose={handleCancelRevog}>
+          <DialogTitle>Confirmar Revogação</DialogTitle>
+          <DialogContent>
+            <DialogContentText>Tem certeza que deseja revogar esta norma em {tempRevDate?.toLocaleDateString("pt-BR")}? Isso definirá o status como "Revogado" e essa norma não poderá mais ser editada.</DialogContentText>
+            {showJustificativaField && (
+              <TextField autoFocus margin="dense" label="Justificativa de Revogação" fullWidth multiline rows={3} value={motivoRevogacao} onChange={(e) => setMotivoRevogacao(e.target.value)} sx={{ mt: 2 }} />
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancelRevog}>Cancelar</Button>
+            <Button onClick={handleConfirmRevog} autoFocus>Confirmar</Button>
+          </DialogActions>
+        </Dialog>
+
       </LocalizationProvider>
     </>
   );
