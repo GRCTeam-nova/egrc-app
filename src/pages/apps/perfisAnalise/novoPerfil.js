@@ -165,6 +165,7 @@ function ColumnsLayouts() {
   // ====================================== EDIÇÃO (caso dadosApi) ======================================
   useEffect(() => {
     if (dadosApi && dadosApi.idAnalysisProfile) {
+      setLoading(true);
       const fetchPerfilDados = async () => {
         try {
           const response = await fetch(
@@ -300,7 +301,9 @@ function ColumnsLayouts() {
             });
           }
           setHeatmapData(newHeatmapData);
+          setLoading(false);
         } catch (err) {
+          setLoading(false);
           console.error("Erro ao buscar dados do perfil:", err.message);
         }
       };

@@ -200,6 +200,7 @@ function ColumnsLayouts() {
   // Em caso de edição
   useEffect(() => {
     if (dadosApi) {
+      setLoading(true);
       const fetchEmpresaDados = async () => {
         try {
           const response = await fetch(
@@ -258,8 +259,10 @@ function ColumnsLayouts() {
           }));
 
           setDescricaoRevisor(data.descriptionConclusionReviewer || "");
+          setLoading(false);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
+          setLoading(false);
         }
       };
 
