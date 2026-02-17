@@ -342,6 +342,30 @@ function ColumnsLayouts() {
       missingFields.push("Nome de todas as faixas do quadrante");
     }
 
+    // --- NOVA VALIDAÇÃO: Bloqueia se o Heatmap tiver valores maiores que as faixas ---
+    const maxRangeTo = Math.max(...ranges.map(r => Number(r.to)));
+    let hasOutlyingValue = false;
+    let maxFoundValue = 0;
+
+    // Varre as linhas e colunas do Heatmap renderizado
+    heatmapData.forEach((series) => {
+      series.data.forEach((cell) => {
+        const cellValue = Number(cell.y);
+        if (cellValue > maxRangeTo) {
+          hasOutlyingValue = true;
+          if (cellValue > maxFoundValue) maxFoundValue = cellValue;
+        }
+      });
+    });
+
+    if (hasOutlyingValue) {
+      enqueueSnackbar(
+        `O Heatmap possui quadrantes com valores maiores (ex: ${maxFoundValue}) que o limite das faixas de cor (${maxRangeTo}). Ajuste o "Até" da última faixa ou os valores dos quadrantes.`,
+        { variant: "error" }
+      );
+      return; // <-- O RETURN AQUI IMPEDE QUE O CADASTRO SEJA ENVIADO!
+    }
+
     if (!nome.trim()) {
       setFormValidation((prev) => ({ ...prev, nome: false }));
       missingFields.push("Nome");
@@ -987,7 +1011,7 @@ function updateRanges(prev, ranges) {
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={2} marginTop={2}>
           {/* ======== CAMPOS PRINCIPAIS (NOME, QUANTIDADES, ETC.) ======== */}
-          <Grid item xs={6.01} sx={{ paddingBottom: 5 }}>
+          <Grid item xs={4} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>Nome *</InputLabel>
               <TextField
@@ -998,99 +1022,7 @@ function updateRanges(prev, ranges) {
               />
             </Stack>
           </Grid>
-          <Grid item xs={12 - 6.01}></Grid>
-
-          <Grid item xs={3} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Quantidade de níveis probabilidade *</InputLabel>
-              <TextField
-                type="number"
-                onChange={(event) => {
-                  let numericValue = event.target.value.replace(/\D/g, "");
-                  if (!numericValue) {
-                    numericValue = "";
-                  } else if (parseInt(numericValue, 10) > 9) {
-                    numericValue = "9";
-                  } else if (parseInt(numericValue, 10) < 2) {
-                    numericValue = "2";
-                  }
-                  setQuantidadeNiveisProbabiliade(numericValue);
-                }}
-                fullWidth
-                value={quantidadeNiveisProbabiliade}
-                error={
-                  (!quantidadeNiveisProbabiliade || Number(quantidadeNiveisProbabiliade) < 2) &&
-                  formValidation.quantidadeNiveisProbabiliade === false
-                }
-                inputProps={{
-                  min: 2,
-                  max: 9,
-                }}
-              />
-            </Stack>
-          </Grid>
-
-          <Grid item xs={3} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Quantidade de níveis impactos *</InputLabel>
-              <TextField
-                type="number"
-                onChange={(event) => {
-                  let numericValue = event.target.value.replace(/\D/g, "");
-                  if (!numericValue) {
-                    numericValue = "";
-                  } else if (parseInt(numericValue, 10) > 9) {
-                    numericValue = "9";
-                  } else if (parseInt(numericValue, 10) < 2) {
-                    numericValue = "2";
-                  }
-                  setQuantidadeNiveisImpacto(numericValue);
-                }}
-                fullWidth
-                value={quantidadeNiveisImpacto}
-                error={
-                  (!quantidadeNiveisImpacto || Number(quantidadeNiveisImpacto) < 2) &&
-                  formValidation.quantidadeNiveisImpacto === false
-                }
-                inputProps={{
-                  min: 2,
-                  max: 9,
-                }}
-              />
-            </Stack>
-          </Grid>
-
-          <Grid item xs={3} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Metodologia *</InputLabel>
-              <Autocomplete
-                options={metodologias}
-                getOptionLabel={(option) => option.nome}
-                value={
-                  metodologias.find(
-                    (metodologia) => metodologia.id === formData.metodologia
-                  ) || null
-                }
-                onChange={(event, newValue) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    metodologia: newValue ? newValue.id : "",
-                  }));
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    error={
-                      !formData.metodologia &&
-                      formValidation.metodologia === false
-                    }
-                  />
-                )}
-              />
-            </Stack>
-          </Grid>
-
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+          <Grid item xs={4} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>Níveis de avaliação *</InputLabel>
               <Autocomplete
@@ -1148,6 +1080,98 @@ function updateRanges(prev, ranges) {
               </Stack>
             </Stack>
           </Grid>
+
+          <Grid item xs={4} sx={{ paddingBottom: 5 }}>
+            <Stack spacing={1}>
+              <InputLabel>Quantidade de níveis probabilidade *</InputLabel>
+              <TextField
+                type="number"
+                onChange={(event) => {
+                  let numericValue = event.target.value.replace(/\D/g, "");
+                  if (!numericValue) {
+                    numericValue = "";
+                  } else if (parseInt(numericValue, 10) > 9) {
+                    numericValue = "9";
+                  } else if (parseInt(numericValue, 10) < 2) {
+                    numericValue = "2";
+                  }
+                  setQuantidadeNiveisProbabiliade(numericValue);
+                }}
+                fullWidth
+                value={quantidadeNiveisProbabiliade}
+                error={
+                  (!quantidadeNiveisProbabiliade || Number(quantidadeNiveisProbabiliade) < 2) &&
+                  formValidation.quantidadeNiveisProbabiliade === false
+                }
+                inputProps={{
+                  min: 2,
+                  max: 9,
+                }}
+              />
+            </Stack>
+          </Grid>
+
+          <Grid item xs={4} sx={{ paddingBottom: 5 }}>
+            <Stack spacing={1}>
+              <InputLabel>Quantidade de níveis impactos *</InputLabel>
+              <TextField
+                type="number"
+                onChange={(event) => {
+                  let numericValue = event.target.value.replace(/\D/g, "");
+                  if (!numericValue) {
+                    numericValue = "";
+                  } else if (parseInt(numericValue, 10) > 9) {
+                    numericValue = "9";
+                  } else if (parseInt(numericValue, 10) < 2) {
+                    numericValue = "2";
+                  }
+                  setQuantidadeNiveisImpacto(numericValue);
+                }}
+                fullWidth
+                value={quantidadeNiveisImpacto}
+                error={
+                  (!quantidadeNiveisImpacto || Number(quantidadeNiveisImpacto) < 2) &&
+                  formValidation.quantidadeNiveisImpacto === false
+                }
+                inputProps={{
+                  min: 2,
+                  max: 9,
+                }}
+              />
+            </Stack>
+          </Grid>
+
+          <Grid item xs={4} sx={{ paddingBottom: 5 }}>
+            <Stack spacing={1}>
+              <InputLabel>Metodologia *</InputLabel>
+              <Autocomplete
+                options={metodologias}
+                getOptionLabel={(option) => option.nome}
+                value={
+                  metodologias.find(
+                    (metodologia) => metodologia.id === formData.metodologia
+                  ) || null
+                }
+                onChange={(event, newValue) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    metodologia: newValue ? newValue.id : "",
+                  }));
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    error={
+                      !formData.metodologia &&
+                      formValidation.metodologia === false
+                    }
+                  />
+                )}
+              />
+            </Stack>
+          </Grid>
+
+          
 
           {quantitativo && (
             <>
@@ -1641,8 +1665,7 @@ function updateRanges(prev, ranges) {
         </Grid>
       </LocalizationProvider>
 
-      {/* DIALOG ABERTO AO CLICAR NO QUADRANTE (dataPointSelection) */}
-      <Dialog open={cellEditInfo.open} onClose={handleDialogClose}>
+      <Dialog open={cellEditInfo.open} onClose={handleDialogClose} disableRestoreFocus>
         <DialogTitle>Editar Quadrante</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 1 }}>
