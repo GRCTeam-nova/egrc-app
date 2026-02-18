@@ -1026,12 +1026,16 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-const actionButtons = useMemo(() => {
+  const actionButtons = useMemo(() => {
     if (requisicao !== "Editar") return [];
 
     const currentStatus = formData.statusNorma;
-    const tester = String(formData.responsavel) === String(idUser) || String(formData.revisor) === String(idUser);
-    const approver = Array.isArray(formData.aprovador) && formData.aprovador.some(id => String(id) === String(idUser));
+    const tester =
+      String(formData.responsavel) === String(idUser) ||
+      String(formData.revisor) === String(idUser);
+    const approver =
+      Array.isArray(formData.aprovador) &&
+      formData.aprovador.some((id) => String(id) === String(idUser));
     const externo = formData.ambiente === 2;
 
     let buttons = [];
@@ -1047,11 +1051,18 @@ const actionButtons = useMemo(() => {
     } else if (currentStatus === 4 && approver) {
       buttons.push("APROVADA", "RETORNAR");
     } else if (currentStatus === 3 && tester) {
-      buttons.push("ALTERAR", "REVOGAR"); 
+      buttons.push("ALTERAR", "REVOGAR");
     }
 
     return buttons;
-  }, [idUser, formData.statusNorma, formData.responsavel, formData.aprovador, formData.ambiente, requisicao]);
+  }, [
+    idUser,
+    formData.statusNorma,
+    formData.responsavel,
+    formData.aprovador,
+    formData.ambiente,
+    requisicao,
+  ]);
 
   const handleStart = async () => {
     let url = "";
@@ -1285,7 +1296,9 @@ const actionButtons = useMemo(() => {
         limitDateRevision: formData.dataLimiteRevisao,
         daysRevision: diasDaRevisao ? String(diasDaRevisao).trim() : null,
         revocationDate: formData.dataRevogacao,
-        revocationReason: motivoRevogacao ? `[${userName}]: ${motivoRevogacao}` : null,
+        revocationReason: motivoRevogacao
+          ? `[${userName}]: ${motivoRevogacao}`
+          : null,
         normativeStatus: 1, // Volta para Em Alteração / Elaboração
         normativeRisk: formData.riscoNorma || null,
         active: ativo,
@@ -1299,7 +1312,9 @@ const actionButtons = useMemo(() => {
         idCompanies: formData.empresa,
         idDepartments: formData.departamento,
         idProcesses: formData.processo,
-        files: formData.files.map((file) => typeof file === "string" ? file : (file.path || file)),
+        files: formData.files.map((file) =>
+          typeof file === "string" ? file : file.path || file,
+        ),
       };
 
       const response = await fetch(url, {
@@ -1315,11 +1330,17 @@ const actionButtons = useMemo(() => {
 
       setFormData((prev) => ({ ...prev, statusNorma: 1 }));
       setNormativaDados((prev) => ({ ...prev, normativeStatus: 1 }));
-      enqueueSnackbar("Normativa colocada em alteração!", { variant: "success", anchorOrigin: { vertical: "top", horizontal: "right" } });
+      enqueueSnackbar("Normativa colocada em alteração!", {
+        variant: "success",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
       window.scrollTo(0, 0);
     } catch (error) {
       console.error(error.message);
-      enqueueSnackbar("Não foi possível alterar a normativa", { variant: "error", anchorOrigin: { vertical: "top", horizontal: "right" } });
+      enqueueSnackbar("Não foi possível alterar a normativa", {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
     } finally {
       setLoading(false);
     }
@@ -2247,12 +2268,16 @@ const actionButtons = useMemo(() => {
 
   const canEditAttributes = !(isTester && status === 1);
 
-// ==================================================================
+  // ==================================================================
   //           NOVO BLOCO DE REGRAS DE PERMISSIONAMENTO
   // ==================================================================
-  const isResponsavel = String(formData.responsavel) === String(idUser) || String(formData.revisor) === String(idUser);
-  const isAprovador = Array.isArray(formData.aprovador) && formData.aprovador.some(id => String(id) === String(idUser));
-  
+  const isResponsavel =
+    String(formData.responsavel) === String(idUser) ||
+    String(formData.revisor) === String(idUser);
+  const isAprovador =
+    Array.isArray(formData.aprovador) &&
+    formData.aprovador.some((id) => String(id) === String(idUser));
+
   const isExterno = formData.ambiente === 2;
   const isRevogado = formData.statusNorma === 6;
   const isVersaoFinal = formData.statusNorma === 3;
@@ -2260,25 +2285,26 @@ const actionButtons = useMemo(() => {
   const isElaboracao = formData.statusNorma === 1;
 
   // Trava para os campos gerais da tela:
-  const isFormLocked = requisicao === "Editar" && (
-    isRevogado || 
-    isExterno || 
-    isVersaoFinal || 
-    isEmAprovacao || 
-    (isElaboracao && !isResponsavel)
-  );
+  const isFormLocked =
+    requisicao === "Editar" &&
+    (isRevogado ||
+      isExterno ||
+      isVersaoFinal ||
+      isEmAprovacao ||
+      (isElaboracao && !isResponsavel));
 
   // Trava ESPECÍFICA para a área de comentários (Aprovador pode comentar em Aprovação):
-  const isCommentLocked = requisicao === "Editar" && (
-    isRevogado || 
-    isExterno || 
-    isVersaoFinal || 
-    (isEmAprovacao && !isAprovador) || 
-    (isElaboracao && !isResponsavel)
-  );
+  const isCommentLocked =
+    requisicao === "Editar" &&
+    (isRevogado ||
+      isExterno ||
+      isVersaoFinal ||
+      (isEmAprovacao && !isAprovador) ||
+      (isElaboracao && !isResponsavel));
 
   // Regra de Revogação: Liberado se for Responsável ou se for Ambiente Externo.
-  const canRevogar = requisicao === "Editar" && !isRevogado && (isResponsavel || isExterno);
+  const canRevogar =
+    requisicao === "Editar" && !isRevogado && (isResponsavel || isExterno);
   // ==================================================================
 
   return (
@@ -2286,28 +2312,64 @@ const actionButtons = useMemo(() => {
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={3} sx={{ padding: 3 }}>
-          
           {/* ================= SEÇÃO DE BOTÕES (TOPO) ================= */}
           {requisicao === "Editar" && (
-            <Grid item xs={12} display="flex" justifyContent="space-between" alignItems="center" sx={{ borderBottom: "2px solid #e0e0e0", pb: 2, mb: 2 }}>
+            <Grid
+              item
+              xs={12}
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ borderBottom: "2px solid #e0e0e0", pb: 2, mb: 2 }}
+            >
               <Typography variant="h5" fontWeight="bold" color="primary">
                 Edição de Normativa
               </Typography>
               <Stack direction="row" alignItems="center" spacing={2}>
                 {actionButtons.includes("ELABORADA") && (
-                  <Button variant="contained" color="primary" onClick={handleStart}>ELABORADA</Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleStart}
+                  >
+                    ELABORADA
+                  </Button>
                 )}
                 {actionButtons.includes("APROVADA") && (
-                  <Button variant="contained" color="success" onClick={handleConcluirTeste}>APROVADA</Button>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleConcluirTeste}
+                  >
+                    APROVADA
+                  </Button>
                 )}
                 {actionButtons.includes("RETORNAR") && (
-                  <Button variant="outlined" color="warning" onClick={handleRetornar}>RETORNAR</Button>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    onClick={handleRetornar}
+                  >
+                    RETORNAR
+                  </Button>
                 )}
                 {actionButtons.includes("ALTERAR") && (
-                  <Button variant="contained" color="secondary" onClick={handleAlterar}>ALTERAR</Button>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={handleAlterar}
+                  >
+                    ALTERAR
+                  </Button>
                 )}
                 {actionButtons.includes("REVOGAR") && (
-                  <Button variant="outlined" color="error" onClick={() => handleOpenConfirmRevog(new Date())}>REVOGAR</Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => handleOpenConfirmRevog(new Date())}
+                  >
+                    REVOGAR
+                  </Button>
                 )}
               </Stack>
             </Grid>
@@ -2315,11 +2377,15 @@ const actionButtons = useMemo(() => {
 
           {/* ================= 1. IDENTIFICAÇÃO PRINCIPAL ================= */}
           <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+            <Typography
+              variant="subtitle1"
+              fontWeight="bold"
+              sx={{ color: "#555" }}
+            >
               1. Identificação Principal
             </Typography>
           </Grid>
-          
+
           <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
               <InputLabel>Código *</InputLabel>
@@ -2346,12 +2412,28 @@ const actionButtons = useMemo(() => {
           </Grid>
           <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
-              <InputLabel>Revisor *</InputLabel>
+              <InputLabel>Ambiente *</InputLabel>
               <Autocomplete
-                options={responsaveis}
+                options={ambientes}
                 getOptionLabel={(option) => option.nome}
-                value={responsaveis.find((r) => r.id === formData.revisor) || null}
-                onChange={(event, newValue) => setFormData((prev) => ({ ...prev, revisor: newValue ? newValue.id : "" }))}
+                value={
+                  ambientes.find((a) => a.id === formData.ambiente) || null
+                }
+                onChange={(event, newValue) => {
+                  const ambienteId = newValue ? newValue.id : "";
+                  setFormData((prev) => ({
+                    ...prev,
+                    ambiente: ambienteId,
+                    statusNorma:
+                      ambienteId === 2
+                        ? 3
+                        : ambienteId === 1
+                          ? 1
+                          : prev.statusNorma,
+                    ultimaRevisao:
+                      ambienteId === 2 ? new Date() : prev.ultimaRevisao,
+                  }));
+                }}
                 renderInput={(params) => <TextField {...params} />}
                 disabled={isFormLocked}
               />
@@ -2359,12 +2441,58 @@ const actionButtons = useMemo(() => {
           </Grid>
           <Grid item xs={12} sm={6}>
             <Stack spacing={1}>
+              <InputLabel>Revisor *</InputLabel>
+              <Autocomplete
+                options={responsaveis}
+                getOptionLabel={(option) => option.nome}
+                value={
+                  responsaveis.find((r) => r.id === formData.revisor) || null
+                }
+                onChange={(event, newValue) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    revisor: newValue ? newValue.id : "",
+                  }))
+                }
+                renderInput={(params) => <TextField {...params} />}
+                disabled={isFormLocked}
+              />
+            </Stack>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Stack spacing={1}>
+              <InputLabel>Responsável (Dono da Norma) *</InputLabel>
+              <Autocomplete
+                options={responsaveis}
+                getOptionLabel={(option) => option.nome}
+                value={
+                  responsaveis.find((r) => r.id === formData.responsavel) ||
+                  null
+                }
+                onChange={handleResponsavelChange}
+                renderInput={(params) => <TextField {...params} />}
+                disabled={isFormLocked}
+              />
+            </Stack>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Stack spacing={1}>
               <InputLabel>Status da norma</InputLabel>
               <Autocomplete
                 options={statusNormas}
                 getOptionLabel={(option) => option.nome}
-                value={statusNormas.find((item) => item.id === formData.statusNorma) || null}
-                onChange={(event, newValue) => setFormData((prev) => ({ ...prev, statusNorma: newValue ? newValue.id : "" }))}
+                value={
+                  statusNormas.find(
+                    (item) => item.id === formData.statusNorma,
+                  ) || null
+                }
+                onChange={(event, newValue) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    statusNorma: newValue ? newValue.id : "",
+                  }))
+                }
                 renderInput={(params) => <TextField {...params} />}
                 disabled={isFormLocked}
               />
@@ -2372,27 +2500,191 @@ const actionButtons = useMemo(() => {
           </Grid>
 
           <Grid item xs={12} sm={3} display="flex" alignItems="center">
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 3 }}>
-                  <Switch checked={ativo} onChange={(event) => setAtivo(event.target.checked)} disabled={isFormLocked} />
-                  <Typography>{ativo ? "Ativo" : "Inativo"}</Typography>
-                </Stack>
-              </Grid>
-          
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              sx={{ mt: 3 }}
+            >
+              <Switch
+                checked={ativo}
+                onChange={(event) => setAtivo(event.target.checked)}
+                disabled={isFormLocked}
+              />
+              <Typography>{ativo ? "Ativo" : "Inativo"}</Typography>
+            </Stack>
+          </Grid>
 
           {/* SÓ MOSTRA O RESTANTE SE FOR MODO DE EDIÇÃO */}
           {requisicao === "Editar" && (
             <>
-              {/* ================= 2. ÁREA DE COMENTÁRIOS E APROVAÇÃO ================= */}
+              {/* ================= 4. CLASSIFICAÇÃO E DATAS ================= */}
               <Grid item xs={12} mt={2}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
-                  2. Aprovação e Comentários do Workflow
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ color: "#555" }}
+                >
+                  2. Classificação e Prazos
                 </Typography>
               </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Tipo da norma</InputLabel>
+                  <Autocomplete
+                    options={tipoNormas}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      tipoNormas.find(
+                        (item) => item.id === formData.tipoNorma,
+                      ) || null
+                    }
+                    onChange={(event, newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        tipoNorma: newValue ? newValue.id : "",
+                      }))
+                    }
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Regulador</InputLabel>
+                  <Autocomplete
+                    options={reguladores}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      reguladores.find((r) => r.id === formData.regulador) ||
+                      null
+                    }
+                    onChange={(event, newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        regulador: newValue ? newValue.id : "",
+                      }))
+                    }
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de cadastro</InputLabel>
+                  <DatePicker
+                    disabled
+                    value={formData.dataCadastro || null}
+                    onChange={(newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        dataCadastro: newValue,
+                      }))
+                    }
+                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Data de publicação</InputLabel>
+                  <DatePicker
+                    value={formData.dataPublicacao || null}
+                    onChange={(newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        dataPublicacao: newValue,
+                      }))
+                    }
+                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Stack spacing={1}>
+                  <InputLabel>Vigência inicial</InputLabel>
+                  <DatePicker
+                    value={formData.vigenciaInicial || null}
+                    onChange={(newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        vigenciaInicial: newValue,
+                      }))
+                    }
+                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
+              {/* ================= 2. ÁREA DE COMENTÁRIOS E APROVAÇÃO ================= */}
+              <Grid item xs={12} mt={2}>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ color: "#555" }}
+                >
+                  3. Aprovação e Comentários do Workflow
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Aprovadores</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...aprovadores,
+                    ]}
+                    getOptionLabel={(option) => option.nome}
+                    value={formData.aprovador.map(
+                      (id) => aprovadores.find((a) => a.id === id) || id,
+                    )}
+                    onChange={handleSelectAllAprovadores}
+                    isOptionEqualToValue={(option, value) =>
+                      option.id === value.id
+                    }
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? allSelectedAprovadores
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
+                  />
+                </Stack>
+              </Grid>
               <Grid item xs={12}>
-                <Stack spacing={2} sx={{ backgroundColor: "#f9f9f9", padding: 3, borderRadius: 2, border: "1px solid #eee" }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Stack
+                  spacing={2}
+                  sx={{
+                    backgroundColor: "#f9f9f9",
+                    padding: 3,
+                    borderRadius: 2,
+                    border: "1px solid #eee",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
                     <InputLabel sx={{ m: 0, fontWeight: "bold" }}>
-                      {descricao ? "Adicionar novo comentário" : "Comentário da Revisão"}
+                      {descricao
+                        ? "Adicionar novo comentário"
+                        : "Comentário da Elaboração"}
                     </InputLabel>
                     <Button
                       variant="outlined"
@@ -2416,7 +2708,9 @@ const actionButtons = useMemo(() => {
                   />
                   {descricao && (
                     <>
-                      <InputLabel sx={{ fontWeight: "bold", mt: 2 }}>Histórico de Comentários</InputLabel>
+                      <InputLabel sx={{ fontWeight: "bold", mt: 2 }}>
+                        Histórico de Comentários
+                      </InputLabel>
                       <TextField
                         fullWidth
                         multiline
@@ -2425,8 +2719,79 @@ const actionButtons = useMemo(() => {
                         value={descricao}
                         InputProps={{ readOnly: true }}
                         sx={{
-                          "& .MuiOutlinedInput-root": { backgroundColor: "#f0f7ff" },
-                          "& .MuiInputBase-input": { color: "#0d0d0d !important", WebkitTextFillColor: "#0d0d0d !important" },
+                          "& .MuiOutlinedInput-root": {
+                            backgroundColor: "#f0f7ff",
+                          },
+                          "& .MuiInputBase-input": {
+                            color: "#0d0d0d !important",
+                            WebkitTextFillColor: "#0d0d0d !important",
+                          },
+                        }}
+                      />
+                    </>
+                  )}
+                </Stack>
+              </Grid>
+              <Grid item xs={12}>
+                <Stack
+                  spacing={2}
+                  sx={{
+                    backgroundColor: "#f9f9f9",
+                    padding: 3,
+                    borderRadius: 2,
+                    border: "1px solid #eee",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <InputLabel sx={{ m: 0, fontWeight: "bold" }}>
+                      {descricao
+                        ? "Adicionar novo comentário"
+                        : "Comentário da Revisão"}
+                    </InputLabel>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={handleSalvarComentarioRapido}
+                      disabled={isCommentLocked || loading}
+                      sx={{ fontWeight: 600, textTransform: "none" }}
+                    >
+                      Salvar Comentário
+                    </Button>
+                  </Stack>
+                  <TextField
+                    onChange={(event) => setNovoComentario(event.target.value)}
+                    fullWidth
+                    multiline
+                    rows={3}
+                    value={novoComentario}
+                    placeholder="Digite aqui seu comentário, justificativa ou observação..."
+                    disabled={isCommentLocked}
+                    sx={{ backgroundColor: "#fff" }}
+                  />
+                  {descricao && (
+                    <>
+                      <InputLabel sx={{ fontWeight: "bold", mt: 2 }}>
+                        Histórico de Comentários
+                      </InputLabel>
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        maxRows={8}
+                        value={descricao}
+                        InputProps={{ readOnly: true }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            backgroundColor: "#f0f7ff",
+                          },
+                          "& .MuiInputBase-input": {
+                            color: "#0d0d0d !important",
+                            WebkitTextFillColor: "#0d0d0d !important",
+                          },
                         }}
                       />
                     </>
@@ -2434,141 +2799,14 @@ const actionButtons = useMemo(() => {
                 </Stack>
               </Grid>
 
-              {/* ================= 3. EQUIPE E RESPONSABILIDADES ================= */}
-              <Grid item xs={12} mt={2}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
-                  3. Equipe Responsável
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Responsável (Dono da Norma)</InputLabel>
-                  <Autocomplete
-                    options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
-                    value={responsaveis.find((r) => r.id === formData.responsavel) || null}
-                    onChange={handleResponsavelChange}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Aprovadores</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...aprovadores]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.aprovador.map((id) => aprovadores.find((a) => a.id === id) || id)}
-                    onChange={handleSelectAllAprovadores}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox checked={option.id === "all" ? allSelectedAprovadores : selected} />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              {/* ================= 4. CLASSIFICAÇÃO E DATAS ================= */}
-              <Grid item xs={12} mt={2}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
-                  4. Classificação e Prazos
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Ambiente</InputLabel>
-                  <Autocomplete
-                    options={ambientes}
-                    getOptionLabel={(option) => option.nome}
-                    value={ambientes.find((a) => a.id === formData.ambiente) || null}
-                    onChange={(event, newValue) => {
-                      const ambienteId = newValue ? newValue.id : "";
-                      setFormData((prev) => ({
-                        ...prev, ambiente: ambienteId,
-                        statusNorma: ambienteId === 2 ? 3 : ambienteId === 1 ? 1 : prev.statusNorma,
-                        ultimaRevisao: ambienteId === 2 ? new Date() : prev.ultimaRevisao,
-                      }));
-                    }}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Tipo da norma</InputLabel>
-                  <Autocomplete
-                    options={tipoNormas}
-                    getOptionLabel={(option) => option.nome}
-                    value={tipoNormas.find((item) => item.id === formData.tipoNorma) || null}
-                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, tipoNorma: newValue ? newValue.id : "" }))}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Regulador</InputLabel>
-                  <Autocomplete
-                    options={reguladores}
-                    getOptionLabel={(option) => option.nome}
-                    value={reguladores.find((r) => r.id === formData.regulador) || null}
-                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, regulador: newValue ? newValue.id : "" }))}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              
-              
-              <Grid item xs={12} sm={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Data de cadastro</InputLabel>
-                  <DatePicker
-                    disabled
-                    value={formData.dataCadastro || null}
-                    onChange={(newValue) => setFormData((prev) => ({ ...prev, dataCadastro: newValue }))}
-                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Data de publicação</InputLabel>
-                  <DatePicker
-                    value={formData.dataPublicacao || null}
-                    onChange={(newValue) => setFormData((prev) => ({ ...prev, dataPublicacao: newValue }))}
-                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Stack spacing={1}>
-                  <InputLabel>Vigência inicial</InputLabel>
-                  <DatePicker
-                    value={formData.vigenciaInicial || null}
-                    onChange={(newValue) => setFormData((prev) => ({ ...prev, vigenciaInicial: newValue }))}
-                    slotProps={{ textField: { placeholder: "00/00/0000" } }}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              
-
               {/* ================= 5. ASSOCIAÇÕES ================= */}
               <Grid item xs={12} mt={2}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
-                  5. Associações e Relacionamentos
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ color: "#555" }}
+                >
+                  4. Associações e Relacionamentos
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -2577,15 +2815,32 @@ const actionButtons = useMemo(() => {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaOrigens.filter((n) => n.id !== idNormativoAtual)]}
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...normaOrigens.filter((n) => n.id !== idNormativoAtual),
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.normaOrigem.map((id) => normaOrigens.find((n) => n.id === id) || id)}
-                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, normaOrigem: newValue.map((item) => item.id) }))}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    getOptionDisabled={(option) => option.id !== "all" && formData.normaDestino.includes(option.id)}
+                    value={formData.normaOrigem.map(
+                      (id) => normaOrigens.find((n) => n.id === id) || id,
+                    )}
+                    onChange={(event, newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        normaOrigem: newValue.map((item) => item.id),
+                      }))
+                    }
+                    isOptionEqualToValue={(option, value) =>
+                      option.id === value.id
+                    }
+                    getOptionDisabled={(option) =>
+                      option.id !== "all" &&
+                      formData.normaDestino.includes(option.id)
+                    }
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
-                        <Checkbox checked={option.id === "all" ? allSelected : selected} />
+                        <Checkbox
+                          checked={option.id === "all" ? allSelected : selected}
+                        />
                         {option.nome}
                       </li>
                     )}
@@ -2600,15 +2855,36 @@ const actionButtons = useMemo(() => {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaDestinos.filter((n) => n.id !== idNormativoAtual)]}
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...normaDestinos.filter((n) => n.id !== idNormativoAtual),
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.normaDestino.map((id) => normaDestinos.find((n) => n.id === id) || id)}
-                    onChange={(event, newValue) => setFormData((prev) => ({ ...prev, normaDestino: newValue.map((item) => item.id) }))}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    getOptionDisabled={(option) => option.id !== "all" && formData.normaOrigem.includes(option.id)}
+                    value={formData.normaDestino.map(
+                      (id) => normaDestinos.find((n) => n.id === id) || id,
+                    )}
+                    onChange={(event, newValue) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        normaDestino: newValue.map((item) => item.id),
+                      }))
+                    }
+                    isOptionEqualToValue={(option, value) =>
+                      option.id === value.id
+                    }
+                    getOptionDisabled={(option) =>
+                      option.id !== "all" &&
+                      formData.normaOrigem.includes(option.id)
+                    }
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
-                        <Checkbox checked={option.id === "all" ? allSelectedDiretrizes : selected} />
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? allSelectedDiretrizes
+                              : selected
+                          }
+                        />
                         {option.nome}
                       </li>
                     )}
@@ -2620,114 +2896,305 @@ const actionButtons = useMemo(() => {
 
               <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
-                  <InputLabel display="flex" alignItems="center">Empresas <DrawerEmpresa buttonSx={{ ml: 1, width: 20, height: 20 }} onCompanyCreated={handleCompanyCreated} /></InputLabel>
+                  <InputLabel display="flex" alignItems="center">
+                    Empresas{" "}
+                    <DrawerEmpresa
+                      buttonSx={{ ml: 1, width: 20, height: 20 }}
+                      onCompanyCreated={handleCompanyCreated}
+                    />
+                  </InputLabel>
                   <Autocomplete
-                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...empresas]}
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...empresas,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.empresa.map((id) => empresas.find((e) => e.id === id) || id)}
+                    value={formData.empresa.map(
+                      (id) => empresas.find((e) => e.id === id) || id,
+                    )}
                     onChange={handleSelectAllEmpresas}
-                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelectedEmpresas : selected} />{option.nome}</li>)}
-                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all" ? allSelectedEmpresas : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
-                  <InputLabel>Departamentos <DrawerDepartamento buttonSx={{ ml: 1, width: 20, height: 20 }} onDepartmentCreated={handleDepartmentCreated} /></InputLabel>
+                  <InputLabel>
+                    Departamentos{" "}
+                    <DrawerDepartamento
+                      buttonSx={{ ml: 1, width: 20, height: 20 }}
+                      onDepartmentCreated={handleDepartmentCreated}
+                    />
+                  </InputLabel>
                   <Autocomplete
-                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...departamentos]}
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...departamentos,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.departamento.map((id) => departamentos.find((d) => d.id === id) || id)}
+                    value={formData.departamento.map(
+                      (id) => departamentos.find((d) => d.id === id) || id,
+                    )}
                     onChange={handleSelectAllDepartamentos}
-                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelectedDepartamentos : selected} />{option.nome}</li>)}
-                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? allSelectedDepartamentos
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
 
               <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
-                  <InputLabel>Processos <DrawerProcesso buttonSx={{ ml: 1, width: 20, height: 20 }} onProcessCreated={handleProcessCreated} /></InputLabel>
+                  <InputLabel>
+                    Processos{" "}
+                    <DrawerProcesso
+                      buttonSx={{ ml: 1, width: 20, height: 20 }}
+                      onProcessCreated={handleProcessCreated}
+                    />
+                  </InputLabel>
                   <Autocomplete
-                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...processos]}
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...processos,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.processo.map((id) => processos.find((p) => p.id === id) || id)}
+                    value={formData.processo.map(
+                      (id) => processos.find((p) => p.id === id) || id,
+                    )}
                     onChange={handleSelectAll2}
-                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelected2 : selected} />{option.nome}</li>)}
-                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all" ? allSelected2 : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
-                  <InputLabel>Plano de ação <DrawerPlanos buttonSx={{ ml: 1, width: 20, height: 20 }} onPlansCreated={handlePlanCreated} /></InputLabel>
+                  <InputLabel>
+                    Plano de ação{" "}
+                    <DrawerPlanos
+                      buttonSx={{ ml: 1, width: 20, height: 20 }}
+                      onPlansCreated={handlePlanCreated}
+                    />
+                  </InputLabel>
                   <Autocomplete
-                    multiple disableCloseOnSelect options={[{ id: "all", nome: "Selecionar todos" }, ...planosAcoes]}
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...planosAcoes,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.planoAcao.map((id) => planosAcoes.find((p) => p.id === id) || id)}
+                    value={formData.planoAcao.map(
+                      (id) => planosAcoes.find((p) => p.id === id) || id,
+                    )}
                     onChange={handleSelectAllPlanoAcao}
-                    renderOption={(props, option, { selected }) => (<li {...props}><Checkbox checked={option.id === "all" ? allSelectedPlanoAcao : selected} />{option.nome}</li>)}
-                    renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? allSelectedPlanoAcao
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={isFormLocked}
                   />
                 </Stack>
               </Grid>
 
               {/* ================= 6. REVISÃO E REVOGAÇÃO ================= */}
               <Grid item xs={12} mt={2}>
-                <Accordion sx={{ backgroundColor: "#fdfdfd", border: "1px solid #e0e0e0", boxShadow: "none" }}>
+                <Accordion
+                  sx={{
+                    backgroundColor: "#fdfdfd",
+                    border: "1px solid #e0e0e0",
+                    boxShadow: "none",
+                  }}
+                >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1" fontWeight="bold">6. Revisão Periódica</Typography>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      5. Revisão Periódica
+                    </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
                         <Stack spacing={1}>
                           <InputLabel>Última revisão</InputLabel>
-                          <DatePicker disabled value={formData.ultimaRevisao || null} onChange={(newValue) => setFormData((prev) => ({ ...prev, ultimaRevisao: newValue }))} slotProps={{ textField: { placeholder: "00/00/0000" } }} />
+                          <DatePicker
+                            disabled
+                            value={formData.ultimaRevisao || null}
+                            onChange={(newValue) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                ultimaRevisao: newValue,
+                              }))
+                            }
+                            slotProps={{
+                              textField: { placeholder: "00/00/0000" },
+                            }}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Stack spacing={1}>
                           <InputLabel>Risco da norma</InputLabel>
                           <Autocomplete
-                            options={riscoNormas} getOptionLabel={(option) => option.nome}
-                            value={riscoNormas.find((item) => item.id === formData.riscoNorma) || null}
+                            options={riscoNormas}
+                            getOptionLabel={(option) => option.nome}
+                            value={
+                              riscoNormas.find(
+                                (item) => item.id === formData.riscoNorma,
+                              ) || null
+                            }
                             onChange={(_, newValue) => {
                               const risco = newValue?.id ?? null;
-                              setFormData((prev) => ({ ...prev, riscoNorma: risco, periodicidadeRevisao: [1, 2, 3].includes(risco) ? risco : null }));
+                              setFormData((prev) => ({
+                                ...prev,
+                                riscoNorma: risco,
+                                periodicidadeRevisao: [1, 2, 3].includes(risco)
+                                  ? risco
+                                  : null,
+                              }));
                             }}
-                            renderInput={(params) => <TextField {...params} />} disabled={isFormLocked}
+                            renderInput={(params) => <TextField {...params} />}
+                            disabled={isFormLocked}
                           />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Status da revisão</InputLabel>
-                          <Autocomplete disabled={isFormLocked} options={statusRevisao} getOptionLabel={(option) => option.nome} value={statusRevisao.find((item) => item.id === formData.statuRevisao) || null} onChange={(event, newValue) => setFormData((prev) => ({ ...prev, statuRevisao: newValue ? newValue.id : "" }))} renderInput={(params) => <TextField {...params} />} />
+                          <Autocomplete
+                            disabled={isFormLocked}
+                            options={statusRevisao}
+                            getOptionLabel={(option) => option.nome}
+                            value={
+                              statusRevisao.find(
+                                (item) => item.id === formData.statuRevisao,
+                              ) || null
+                            }
+                            onChange={(event, newValue) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                statuRevisao: newValue ? newValue.id : "",
+                              }))
+                            }
+                            renderInput={(params) => <TextField {...params} />}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Periodicidade</InputLabel>
-                          <Autocomplete disabled={isFormLocked} options={periodicidadeRevisoes} getOptionLabel={(option) => option.nome} value={periodicidadeRevisoes.find((item) => item.id === formData.periodicidadeRevisao) || null} onChange={(event, newValue) => setFormData((prev) => ({ ...prev, periodicidadeRevisao: newValue ? newValue.id : "" }))} renderInput={(params) => <TextField {...params} />} />
+                          <Autocomplete
+                            disabled={isFormLocked}
+                            options={periodicidadeRevisoes}
+                            getOptionLabel={(option) => option.nome}
+                            value={
+                              periodicidadeRevisoes.find(
+                                (item) =>
+                                  item.id === formData.periodicidadeRevisao,
+                              ) || null
+                            }
+                            onChange={(event, newValue) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                periodicidadeRevisao: newValue
+                                  ? newValue.id
+                                  : "",
+                              }))
+                            }
+                            renderInput={(params) => <TextField {...params} />}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Data limite</InputLabel>
-                          <DatePicker disabled={isFormLocked} value={formData.dataLimiteRevisao || null} onChange={(newValue) => setFormData((prev) => ({ ...prev, dataLimiteRevisao: newValue }))} slotProps={{ textField: { placeholder: "00/00/0000" } }} />
+                          <DatePicker
+                            disabled={isFormLocked}
+                            value={formData.dataLimiteRevisao || null}
+                            onChange={(newValue) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                dataLimiteRevisao: newValue,
+                              }))
+                            }
+                            slotProps={{
+                              textField: { placeholder: "00/00/0000" },
+                            }}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Dias da revisão</InputLabel>
-                          <TextField disabled={isFormLocked} onChange={(event) => setDiasDaRevisao(event.target.value)} fullWidth value={diasDaRevisao} />
+                          <TextField
+                            disabled={isFormLocked}
+                            onChange={(event) =>
+                              setDiasDaRevisao(event.target.value)
+                            }
+                            fullWidth
+                            value={diasDaRevisao}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12}>
                         <Stack spacing={1}>
                           <InputLabel>Comentário do revisor</InputLabel>
-                          <TextField onChange={(event) => setConclusaoRevisao(event.target.value)} fullWidth multiline rows={3} value={conclusaoRevisao} disabled={isFormLocked} />
+                          <TextField
+                            onChange={(event) =>
+                              setConclusaoRevisao(event.target.value)
+                            }
+                            fullWidth
+                            multiline
+                            rows={3}
+                            value={conclusaoRevisao}
+                            disabled={isFormLocked}
+                          />
                         </Stack>
                       </Grid>
                     </Grid>
@@ -2736,22 +3203,50 @@ const actionButtons = useMemo(() => {
               </Grid>
 
               <Grid item xs={12} mt={2}>
-                <Accordion sx={{ backgroundColor: "#fff5f5", border: "1px solid #f5c6c6", boxShadow: "none" }}>
+                <Accordion
+                  sx={{
+                    backgroundColor: "#fff5f5",
+                    border: "1px solid #f5c6c6",
+                    boxShadow: "none",
+                  }}
+                >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1" fontWeight="bold" color="error">7. Revogação de Norma</Typography>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      color="error"
+                    >
+                      6. Revogação de Norma
+                    </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Data da revogação</InputLabel>
-                          <DatePicker value={formData.dataRevogacao || null} onChange={handleOpenConfirmRevog} slotProps={{ textField: { placeholder: "00/00/0000" } }} disabled={!canRevogar} />
+                          <DatePicker
+                            value={formData.dataRevogacao || null}
+                            onChange={handleOpenConfirmRevog}
+                            slotProps={{
+                              textField: { placeholder: "00/00/0000" },
+                            }}
+                            disabled={!canRevogar}
+                          />
                         </Stack>
                       </Grid>
                       <Grid item xs={12} sm={9}>
                         <Stack spacing={1}>
                           <InputLabel>Motivo da revogação</InputLabel>
-                          <TextField onChange={(event) => setMotivoRevogacao(event.target.value)} fullWidth multiline rows={2} value={motivoRevogacao} disabled={!canRevogar} />
+                          <TextField
+                            onChange={(event) =>
+                              setMotivoRevogacao(event.target.value)
+                            }
+                            fullWidth
+                            multiline
+                            rows={2}
+                            value={motivoRevogacao}
+                            disabled={!canRevogar}
+                          />
                         </Stack>
                       </Grid>
                     </Grid>
@@ -2761,20 +3256,37 @@ const actionButtons = useMemo(() => {
 
               {/* ================= 8. ANEXOS E TRECHOS ================= */}
               <Grid item xs={12} mt={2}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ color: "#555" }}
+                >
                   Anexos
                 </Typography>
               </Grid>
               <Grid item xs={12}>
                 <Stack spacing={1}>
                   <InputLabel>Anexo</InputLabel>
-                  <FileUploader containerFolder={1} initialFiles={formData.files} onFilesChange={(files) => setFormData((prev) => ({ ...prev, files }))} onFileDelete={(file) => setDeletedFiles((prev) => [...prev, file])} />
+                  <FileUploader
+                    containerFolder={1}
+                    initialFiles={formData.files}
+                    onFilesChange={(files) =>
+                      setFormData((prev) => ({ ...prev, files }))
+                    }
+                    onFileDelete={(file) =>
+                      setDeletedFiles((prev) => [...prev, file])
+                    }
+                  />
                 </Stack>
               </Grid>
               <Grid item xs={12}>
-                <Accordion sx={{ border: "1px solid #e0e0e0", boxShadow: "none" }}>
+                <Accordion
+                  sx={{ border: "1px solid #e0e0e0", boxShadow: "none" }}
+                >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1" fontWeight="bold">Trechos</Typography>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Trechos
+                    </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <ListagemTrecho />
@@ -2785,49 +3297,121 @@ const actionButtons = useMemo(() => {
           )}
 
           {/* BOTÃO DE SALVAR FORMULÁRIO GERAL */}
-          <Grid item xs={12} mt={2} mb={5} display="flex" justifyContent="flex-start">
-            <Button variant="contained" color="primary" sx={{ px: 4, py: 1, fontWeight: "bold" }} onClick={tratarSubmit}>
+          <Grid
+            item
+            xs={12}
+            mt={2}
+            mb={5}
+            display="flex"
+            justifyContent="flex-start"
+          >
+            <Button
+              variant="contained"
+              color="primary"
+              sx={{ px: 4, py: 1, fontWeight: "bold" }}
+              onClick={tratarSubmit}
+            >
               {requisicao === "Criar" ? "Cadastrar" : "Atualizar Formulário"}
             </Button>
           </Grid>
         </Grid>
 
         {/* DIÁLOGOS DE CONFIRMAÇÃO (MANTIDOS INTACTOS) */}
-        <Dialog open={successDialogOpen} onClose={voltarParaListagem} sx={{ "& .MuiDialog-paper": { padding: "24px", borderRadius: "12px", width: "400px", textAlign: "center" } }}>
-          <Box display="flex" justifyContent="center" mt={2}><CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} /></Box>
-          <DialogTitle sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}>Normativa Criada com Sucesso!</DialogTitle>
+        <Dialog
+          open={successDialogOpen}
+          onClose={voltarParaListagem}
+          sx={{
+            "& .MuiDialog-paper": {
+              padding: "24px",
+              borderRadius: "12px",
+              width: "400px",
+              textAlign: "center",
+            },
+          }}
+        >
+          <Box display="flex" justifyContent="center" mt={2}>
+            <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
+          </Box>
+          <DialogTitle
+            sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
+          >
+            Normativa Criada com Sucesso!
+          </DialogTitle>
           <DialogContent>
-            <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>A normativa foi cadastrada com sucesso. Você pode voltar para a listagem ou adicionar mais informações a essa normativa.</DialogContentText>
+            <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>
+              A normativa foi cadastrada com sucesso. Você pode voltar para a
+              listagem ou adicionar mais informações a essa normativa.
+            </DialogContentText>
           </DialogContent>
-          <DialogActions sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}>
-            <Button onClick={voltarParaListagem} variant="outlined" sx={{ borderColor: "#007bff", color: "#007bff", fontWeight: 600 }}>Voltar para a listagem</Button>
-            <Button onClick={continuarEdicao} variant="contained" sx={{ backgroundColor: "#007bff", fontWeight: 600 }}>Adicionar mais informações</Button>
+          <DialogActions
+            sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
+          >
+            <Button
+              onClick={voltarParaListagem}
+              variant="outlined"
+              sx={{ borderColor: "#007bff", color: "#007bff", fontWeight: 600 }}
+            >
+              Voltar para a listagem
+            </Button>
+            <Button
+              onClick={continuarEdicao}
+              variant="contained"
+              sx={{ backgroundColor: "#007bff", fontWeight: 600 }}
+            >
+              Adicionar mais informações
+            </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={confirmRevisorOpen} onClose={handleDenyReplication}>
           <DialogTitle>{"Definir Revisor?"}</DialogTitle>
-          <DialogContent><DialogContentText>Deseja que o responsável selecionado também seja atribuído como revisor desta normativa?</DialogContentText></DialogContent>
+          <DialogContent>
+            <DialogContentText>
+              Deseja que o responsável selecionado também seja atribuído como
+              revisor desta normativa?
+            </DialogContentText>
+          </DialogContent>
           <DialogActions>
             <Button onClick={handleDenyReplication}>Não</Button>
-            <Button onClick={handleConfirmReplication} autoFocus variant="contained">Sim</Button>
+            <Button
+              onClick={handleConfirmReplication}
+              autoFocus
+              variant="contained"
+            >
+              Sim
+            </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={confirmRevogOpen} onClose={handleCancelRevog}>
           <DialogTitle>Confirmar Revogação</DialogTitle>
           <DialogContent>
-            <DialogContentText>Tem certeza que deseja revogar esta norma em {tempRevDate?.toLocaleDateString("pt-BR")}? Isso definirá o status como "Revogado" e essa norma não poderá mais ser editada.</DialogContentText>
+            <DialogContentText>
+              Tem certeza que deseja revogar esta norma em{" "}
+              {tempRevDate?.toLocaleDateString("pt-BR")}? Isso definirá o status
+              como "Revogado" e essa norma não poderá mais ser editada.
+            </DialogContentText>
             {showJustificativaField && (
-              <TextField autoFocus margin="dense" label="Justificativa de Revogação" fullWidth multiline rows={3} value={motivoRevogacao} onChange={(e) => setMotivoRevogacao(e.target.value)} sx={{ mt: 2 }} />
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Justificativa de Revogação"
+                fullWidth
+                multiline
+                rows={3}
+                value={motivoRevogacao}
+                onChange={(e) => setMotivoRevogacao(e.target.value)}
+                sx={{ mt: 2 }}
+              />
             )}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCancelRevog}>Cancelar</Button>
-            <Button onClick={handleConfirmRevog} autoFocus>Confirmar</Button>
+            <Button onClick={handleConfirmRevog} autoFocus>
+              Confirmar
+            </Button>
           </DialogActions>
         </Dialog>
-
       </LocalizationProvider>
     </>
   );
