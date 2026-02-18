@@ -41,9 +41,15 @@ const AuthLogin = ({ isDemo = false }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { setToken } = useToken();
+  const [loginMessage, setLoginMessage] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    if (location.state && location.state.from) {
+      setLoginMessage(
+        "Você precisa efetuar o login para visualizar este questionário.",
+      );
+    }
     if (params.get("sessionExpired") === "true") {
       setShowExpiredAlert(true);
     }
@@ -123,7 +129,11 @@ const AuthLogin = ({ isDemo = false }) => {
 
       login(finalToken, userData);
 
-      navigate("/dashboard/resumo");
+      if (location.state && location.state.from) {
+        navigate(location.state.from);
+      } else {
+        navigate("/dashboard/resumo");
+      }
     } catch (error) {
       console.error("Erro no processo de login:", error);
     }

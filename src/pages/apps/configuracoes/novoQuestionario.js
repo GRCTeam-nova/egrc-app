@@ -35,7 +35,24 @@ function ColumnsLayouts() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { dadosApi, readOnly: readOnlyFromState, mode } = location.state || {};
+  // --- NOVA LÓGICA DE DETECÇÃO DE DADOS ---
+  // Tenta pegar do state (navegação interna) OU da URL (link de email)
+  const queryParams = new URLSearchParams(location.search);
+  
+  // Monta um objeto dadosApi baseado na URL se não vier do state
+  const dadosApiUrl = queryParams.get("idAssessment") ? {
+    idAssessment: queryParams.get("idAssessment"),
+    idQuiz: queryParams.get("idQuiz"),
+    idRespondent: queryParams.get("idRespondent"),
+    statusQuiz: 2 // Assumindo status "Em andamento" ou tratar conforme lógica
+  } : null;
+
+  // Usa o que estiver disponível (Prioridade: State > URL)
+  const dadosApi = location.state?.dadosApi || dadosApiUrl;
+  
+  // Ajuste do ReadOnly e Mode
+  const readOnlyFromState = location.state?.readOnly;
+  const mode = location.state?.mode;
   const isReadOnly = Boolean(readOnlyFromState) || mode === "consultar";
   const [controles, setControle] = useState([]);
   const [diretrizes, setDiretriz] = useState([]);

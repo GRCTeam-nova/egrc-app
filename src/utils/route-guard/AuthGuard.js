@@ -12,15 +12,15 @@ const AuthGuard = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
+useEffect(() => {
     if (!isLoggedIn) {
       navigate('login', {
         state: {
-          from: location.pathname
+          // CORREÇÃO AQUI: Concatenar location.search para manter os parâmetros ?id=...
+          from: location.pathname + location.search 
         },
         replace: true
       });
-      navigate('login', { replace: true });
     }
   }, [isLoggedIn, navigate, location]);
 
