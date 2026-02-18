@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
@@ -12,10 +11,9 @@ import { useGetEmpresa } from "../../../api/questionarios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
 import emitter from "./eventEmitter";
-// project import
+
 import MainCard from "../../../components/MainCard";
 
-// material-ui
 import { useTheme } from "@mui/material/styles";
 
 import {
@@ -40,7 +38,6 @@ import {
   useMediaQuery,
 } from "@mui/material";
 
-// third-party
 import {
   flexRender,
   getCoreRowModel,
@@ -51,7 +48,6 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 
-// project-import
 import ScrollX from "../../../components/ScrollX";
 import IconButton from "../../../components/@extended/IconButton";
 import CustomizedSteppers from "../../extra-pages/stepper";
@@ -77,7 +73,6 @@ import { useToken } from "../../../api/TokenContext";
 export const fuzzyFilter = (row, columnId, value) => {
   let cellValue = row.getValue(columnId);
 
-  // Se a célula ou o filtro forem undefined ou null, retorna false
   if (
     cellValue === undefined ||
     cellValue === null ||
@@ -87,7 +82,6 @@ export const fuzzyFilter = (row, columnId, value) => {
     return false;
   }
 
-  // Função que normaliza o texto, tratando também null ou undefined
   const normalizeText = (text) => {
     if (text === null || text === undefined) return "";
     return text
@@ -102,8 +96,6 @@ export const fuzzyFilter = (row, columnId, value) => {
 
   return cellValue.includes(valueStr);
 };
-
-// ==============================|| REACT TABLE - LIST ||============================== //
 
 function ReactTable({ data, columns, processosTotal, isLoading }) {
   const theme = useTheme();
@@ -169,7 +161,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         posicaoProcessual: false,
         area: false,
       }),
-    []
+    [],
   );
 
   let headers = [];
@@ -180,10 +172,9 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           ? columns.columnDef.header
           : "#",
       key: columns.columnDef.accessorKey,
-    })
+    }),
   );
 
-  // Função para realizar a marcação de texto
   useEffect(() => {
     const markInstance = new Mark(tableRef.current);
 
@@ -289,7 +280,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                   <Box>
                                     {flexRender(
                                       header.column.columnDef.header,
-                                      header.getContext()
+                                      header.getContext(),
                                     )}
                                   </Box>
                                   {header.column.getCanSort() && (
@@ -348,7 +339,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                 >
                                   {flexRender(
                                     cell.column.columnDef.cell,
-                                    cell.getContext()
+                                    cell.getContext(),
                                   )}
                                 </TableCell>
                               ))}
@@ -484,23 +475,19 @@ function ActionCell({ row, refreshData, normativaDados, canEdit = true }) {
   };
 
   const toggleStatus = async () => {
-    // Define novo status: se estiver ativo, queremos inativar (active: false)
-    // Se estiver inativo, queremos ativar (active: true)
-    const newStatusBool = !status; // inverte o status atual
+    const newStatusBool = !status;
     const newStatusText = newStatusBool ? "Ativo" : "Inativo";
 
     try {
-      // Constrói o payload com os dados atuais do acionista, alterando somente o campo active
       const dadosAtualizados = {
         idSharedholder: row.original.idSharedholder,
         name: row.original.name,
         document: row.original.document,
-        percentage: row.original.percentage, // mantemos o mesmo valor (pode ser null ou numérico)
+        percentage: row.original.percentage,
         active: newStatusBool,
         idActionType: row.original.idActionType,
       };
 
-      // Envia a requisição PUT com o payload atualizado
       const response = await axios.put(
         `${process.env.REACT_APP_API_URL}companies/shared-holders`,
         dadosAtualizados,
@@ -509,11 +496,10 @@ function ActionCell({ row, refreshData, normativaDados, canEdit = true }) {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (response.status === 204) {
-        // Atualiza o estado para refletir o novo status
         setStatus(newStatusBool);
         const message = `Questionário ${
           row.original.name
@@ -543,7 +529,7 @@ function ActionCell({ row, refreshData, normativaDados, canEdit = true }) {
         `${API_COMMAND}/api/Orgao/${row.original.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (response.ok) {
@@ -559,7 +545,7 @@ function ActionCell({ row, refreshData, normativaDados, canEdit = true }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o empresa: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o empresa: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -1000,17 +986,14 @@ ActionCell.propTypes = {
   canEdit: PropTypes.bool,
 };
 
-// ==============================|| LISTAGEM ||============================== //
-
-// Componente principal da página de listagem de registros
 const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
   const theme = useTheme();
   const idUser = localStorage.getItem("id_user");
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-  } = useGetEmpresa(formData, normativaDados);
+  const { acoesJudiciais: lists, isLoading } = useGetEmpresa(
+    formData,
+    normativaDados,
+  );
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerDeleteId] = useState("");
@@ -1025,7 +1008,7 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
         (item) =>
           (item.coordinateInerent && item.coordinateInerent.trim() !== "") ||
           (item.coordinatePlanned && item.coordinatePlanned.trim() !== "") ||
-          (item.coordinateResidual && item.coordinateResidual.trim() !== "")
+          (item.coordinateResidual && item.coordinateResidual.trim() !== ""),
       );
       onFilledQuestionarios?.(filtered);
     }
@@ -1036,7 +1019,7 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
   };
 
   useEffect(() => {
-    window.refreshOrgaos = refreshOrgaos; 
+    window.refreshOrgaos = refreshOrgaos;
     const refreshHandler = () => {
       refreshOrgaos();
     };
@@ -1047,11 +1030,10 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
     return () => {
       emitter.off("refreshCustomers", refreshHandler);
       emitter.off("refreshQuestionarios", refreshHandler);
-      delete window.refreshOrgaos; 
+      delete window.refreshOrgaos;
     };
   }, []);
 
-  // Handler para atualizar 'formData' e disparar uma nova consulta
   const refreshOrgaos = () => {
     setFormData((currentData) => ({
       ...currentData,
@@ -1076,7 +1058,6 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
     };
   }, []);
 
-  // Filtra a lista para incluir somente os clientes com 'marco' como true
   const marcoTrueLists = useMemo(() => {
     if (lists && lists.length) {
       return lists.filter((item) => item.marco === true);
@@ -1084,22 +1065,18 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
     return [];
   }, [lists]);
 
-  // Função para fechar modais
   const handleClose = () => {
     setOpen(!open);
   };
 
-  // Função callback para atualizar formData
   const handleFormDataChange = (newFormData) => {
     setFormData(newFormData);
   };
 
-  // logo acima do useMemo de columns
   const assessmentStatus = Number(normativaDados?.assessmentStatus);
-  const isAssessmentComplete = assessmentStatus === 4;
-  const isAssessmentFinalizada = assessmentStatus === 5;
+  const isAssessmentComplete = assessmentStatus === 3;
+  const isAssessmentFinalizada = assessmentStatus === 4;
 
-  // responsável pela avaliação (fallbacks porque a API pode variar o nome do campo)
   const idResponsibleAssessment =
     normativaDados?.idResponsible ??
     normativaDados?.responsibleId ??
@@ -1110,8 +1087,7 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
     idResponsibleAssessment != null &&
     String(idResponsibleAssessment) === String(idUser);
 
-const columns = useMemo(() => {
-    // colunas fixas
+  const columns = useMemo(() => {
     const baseColumns = [
       {
         header: "Respondente",
@@ -1119,7 +1095,7 @@ const columns = useMemo(() => {
         cell: ({ row }) => (
           <Typography
             sx={{
-              fontSize: '13px',
+              fontSize: "13px",
             }}
           >
             {row.original.respondent}
@@ -1153,16 +1129,14 @@ const columns = useMemo(() => {
       },
     ];
 
-    // coluna de ações:
-// - se avaliação estiver COMPLETA (4): mantém sem ações (como já era)
-// - se avaliação estiver FINALIZADA (5) e usuário for o responsável: permite CONSULTAR todos
-// - caso contrário: só o dono do questionário vê ação
     if (!isAssessmentComplete) {
       baseColumns.push({
         header: " ",
         disableSortBy: true,
         cell: ({ row }) => {
-          const statusQuiz = Number(row.original.statusQuiz ?? row.original.status);
+          const statusQuiz = Number(
+            row.original.statusQuiz ?? row.original.status,
+          );
           const isOwner = String(row.original.idRespondent) === String(idUser);
 
           const canSee =
@@ -1170,9 +1144,6 @@ const columns = useMemo(() => {
 
           if (!canSee) return null;
 
-          // Regra do botão:
-          // - se já estiver concluído (>=3) OU não for dono => apenas consultar (readOnly)
-          // - se for dono e ainda não concluído => editar
           const canEdit = isOwner && statusQuiz < 3;
 
           return (
@@ -1188,11 +1159,14 @@ const columns = useMemo(() => {
       });
     }
 
-
-return baseColumns;
-    
-    // ADICIONADO idUser NAS DEPENDÊNCIAS
-  }, [theme, isAssessmentComplete, isAssessmentFinalizada, isResponsibleAssessment, idUser]);
+    return baseColumns;
+  }, [
+    theme,
+    isAssessmentComplete,
+    isAssessmentFinalizada,
+    isResponsibleAssessment,
+    idUser,
+  ]);
 
   useEffect(() => {
     if (isInitialLoad && !isLoading) {
@@ -1207,7 +1181,6 @@ return baseColumns;
       )}
 
       {isInitialLoad && isLoading ? (
-        // Exibir indicador de carregamento apenas no carregamento inicial
         <div
           style={{
             display: "flex",
