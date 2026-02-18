@@ -76,7 +76,7 @@ function ColumnsLayouts() {
   const [hasChanges, setHasChanges] = useState(false);
   const [statuss] = useState([
     { id: 1, nome: "Não iniciada" },
-    { id: 2, nome: "Iniciada" },
+    { id: 2, nome: "Em avaliação" },
     { id: 3, nome: "Em avaliação" },
     { id: 4, nome: "Completa" },
     { id: 5, nome: "Finalizada" },
@@ -160,11 +160,11 @@ function ColumnsLayouts() {
 
   // 2. Respondentes e Responsável: Editáveis na criação e na alteração se status for "Não iniciada" (1) ou "Iniciada" (2).
   const isPeopleEditable =
-    !statusAtual || statusAtual === 1 || statusAtual === 2;
+    !statusAtual || statusAtual === 1;
 
   // 3. Avaliação (Heatmap, Justificativa, Switch): Apenas Responsável nos status "Em avaliação" (3) e "Completa" (4).
   const isEvaluationEditable =
-    isResponsibleAv && (statusAtual === 3 || statusAtual === 4);
+    isResponsibleAv && (statusAtual === 2 || statusAtual === 3 || statusAtual === 4);
 
   const isComplete = statusAtual === 4;
   const isFinalizada = statusAtual === 5;
@@ -281,7 +281,7 @@ function ColumnsLayouts() {
   // Em caso de edição
   useEffect(() => {
     if (dadosApi && dadosApi.idAssessment) {
-      setLoading(true)
+      setLoading(true);
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
@@ -505,9 +505,9 @@ function ColumnsLayouts() {
           setNormativaDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
-          setLoading(false)
+          setLoading(false);
         } finally {
-          setLoading(false)
+          setLoading(false);
         }
       };
 
@@ -910,7 +910,7 @@ function ColumnsLayouts() {
     let title = "";
 
     if (currentStatus === 1 && isResp) title = "INICIAR AVALIAÇÃO";
-    else if ((currentStatus === 3 || currentStatus === 4) && isResp)
+    else if ((currentStatus === 2 || currentStatus === 3 || currentStatus === 4) && isResp)
       title = "FINALIZAR";
 
     return { buttonTitle: title, isTester: isResp };
@@ -969,6 +969,10 @@ function ColumnsLayouts() {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 2 || null,
           active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1074,6 +1078,10 @@ function ColumnsLayouts() {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 5 || null, // Status "Finalizada"
           active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1201,6 +1209,10 @@ function ColumnsLayouts() {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 4 || null,
           active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1298,9 +1310,12 @@ function ColumnsLayouts() {
       // Payload preenchido
       const payload = {
         idAssessment: normativaDados?.idAssessment,
-        // Ao retornar, o status volta para Iniciado/Em andamento?
-        // No seu código original você seta localmente o status para 2.
-        // Se a API aceitar, enviamos o status desejado.
+
+        idRisk: formData.risco,
+        idCycle: formData.ciclo,
+        idRespondents: formData.respondente,
+        idResponsible: formData.responsavelAv,
+
         assessmentStatus: 2,
         active: status,
         replaceUser: sobrepor
