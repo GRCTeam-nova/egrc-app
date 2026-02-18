@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+
 import React, { useState, useEffect } from "react";
 import {
   Button,
@@ -8,8 +8,9 @@ import {
   InputLabel,
   Drawer,
   Box,
-  InputAdornment,
   Tooltip,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -23,36 +24,43 @@ import { useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 
 function DrawerAcionista({ acionista, hideButton = false }) {
-  // Estado interno para controlar se o drawer está aberto
   const [open, setOpen] = useState(false);
   const { token } = useToken();
   const location = useLocation();
   const { dadosApi } = location.state || {};
-  const [nome, setNome] = useState("");
-  const [porcentagem, setPorcentagem] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [documento, setDocumento] = useState("");
 
-  // Quando o prop "acionista" mudar (modo edição), abre o drawer e preenche os campos
+  const [nome, setNome] = useState("");
+  
+  const [quantidade, setQuantidade] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [idActionType, setIdActionType] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+  
   useEffect(() => {
     if (acionista) {
       setNome(acionista.name || "");
       setDocumento(acionista.document || "");
-      setPorcentagem(
+      setIdActionType(acionista.idActionType || "");
+
+      
+      setQuantidade(
         acionista.percentage !== undefined && acionista.percentage !== null
           ? String(acionista.percentage)
-          : ""
+          : "",
       );
       setOpen(true);
     }
   }, [acionista]);
 
-  // Se o drawer for aberto sem edição (novo cadastro), limpa os campos
+  
   useEffect(() => {
     if (open && !acionista) {
       setNome("");
       setDocumento("");
-      setPorcentagem("");
+      setQuantidade("");
+      setIdActionType("");
     }
   }, [open, acionista]);
 
@@ -61,41 +69,42 @@ function DrawerAcionista({ acionista, hideButton = false }) {
     setDocumento(value);
   };
 
-  // Controla a entrada no campo porcentagem, limitando a 100%
-  const handlePorcentagemChange = (event) => {
-    let value = event.target.value.replace(/\D/g, "");
-    if (value !== "" && Number(value) > 100) {
-      value = "100";
+  
+  const handleQuantidadeChange = (event) => {
+    const value = event.target.value;
+    
+    if (/^\d*\.?\d*$/.test(value)) {
+      setQuantidade(value);
     }
-    setPorcentagem(value);
   };
 
   const tratarSubmit = async () => {
     let url = "";
     let method = "";
     let payload = {};
-  
+
     if (!nome.trim() || !documento.trim()) {
       enqueueSnackbar("Preencha os campos obrigatórios!", { variant: "error" });
       return;
     }
-  
+
     try {
       setLoading(true);
-  
+
       if (acionista) {
-        // Modo edição: Atualiza o acionista incluindo o campo porcentagem (caso informado)
+        
         url = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
         method = "PUT";
         payload = {
           idSharedholder: acionista.idSharedholder,
           name: nome,
           document: documento,
-          percentage: porcentagem.trim() !== "" ? Number(porcentagem) : null,
-          idActionType: null,
+          
+          percentage: quantidade.trim() !== "" ? Number(quantidade) : null,
+          idActionType: idActionType || null,
           active: true,
         };
-  
+
         const response = await fetch(url, {
           method,
           headers: {
@@ -104,20 +113,21 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           },
           body: JSON.stringify(payload),
         });
-  
+
         if (!response.ok) {
           throw new Error("Erro ao enviar os dados do acionista.");
         }
       } else {
-        // Modo cadastro: O payload do POST não inclui o campo porcentagem.
+        
         url = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
         method = "POST";
         payload = {
           name: nome,
           document: documento,
           idCompany: dadosApi.idCompany,
+          idActionType: idActionType || null,
         };
-  
+
         const postResponse = await fetch(url, {
           method,
           headers: {
@@ -126,26 +136,26 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           },
           body: JSON.stringify(payload),
         });
-  
+
         if (!postResponse.ok) {
           throw new Error("Erro ao enviar os dados do acionista.");
         }
-  
-        // Se o usuário informou uma porcentagem, atualize o acionista chamando o endpoint de PUT.
-        if (porcentagem.trim() !== "") {
+
+        
+        if (quantidade.trim() !== "") {
           const createdData = await postResponse.json();
           const idSharedholder = createdData.data.idSharedholder;
-  
+
           const editUrl = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
           const editPayload = {
             idSharedholder,
             name: nome,
             document: documento,
-            percentage: Number(porcentagem),
+            percentage: Number(quantidade), 
             active: true,
-            idActionType: null,
+            idActionType: null, 
           };
-  
+
           const editResponse = await fetch(editUrl, {
             method: "PUT",
             headers: {
@@ -154,20 +164,20 @@ function DrawerAcionista({ acionista, hideButton = false }) {
             },
             body: JSON.stringify(editPayload),
           });
-  
+
           if (!editResponse.ok) {
-            throw new Error("Erro ao atualizar a porcentagem do acionista.");
+            throw new Error("Erro ao atualizar a quantidade do acionista.");
           }
         }
       }
-  
+
       enqueueSnackbar(
         acionista
           ? "Acionista atualizado com sucesso!"
           : "Acionista cadastrado com sucesso!",
-        { variant: "success" }
+        { variant: "success" },
       );
-  
+
       if (window.refreshOrgaos) {
         window.refreshOrgaos();
       }
@@ -179,7 +189,6 @@ function DrawerAcionista({ acionista, hideButton = false }) {
       setLoading(false);
     }
   };
-  
 
   const handleOpen = () => {
     setOpen(true);
@@ -191,17 +200,17 @@ function DrawerAcionista({ acionista, hideButton = false }) {
 
   return (
     <>
-    {!hideButton && (
-      <Tooltip title="Cadastre um participante" arrow placement="top">
-        <Button
-          variant="contained"
-          onClick={handleOpen}
-          startIcon={<PlusOutlined />}
-          style={{ borderRadius: "20px", height: "32px" }}
-        >
-          Novo
-        </Button>
-      </Tooltip>
+      {!hideButton && (
+        <Tooltip title="Cadastre um participante" arrow placement="top">
+          <Button
+            variant="contained"
+            onClick={handleOpen}
+            startIcon={<PlusOutlined />}
+            style={{ borderRadius: "20px", height: "32px" }}
+          >
+            Novo
+          </Button>
+        </Tooltip>
       )}
 
       <Drawer
@@ -211,7 +220,12 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         PaperProps={{ sx: { width: 670 } }}
       >
         <Box sx={{ width: 650, p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
             <Box
               component="h2"
               sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
@@ -225,7 +239,10 @@ function DrawerAcionista({ acionista, hideButton = false }) {
 
           <LoadingOverlay isActive={loading} />
 
-          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
+          <LocalizationProvider
+            dateAdapter={AdapterDateFns}
+            adapterLocale={ptBR}
+          >
             <Grid container spacing={2} marginTop={2}>
               <Grid item xs={12} mb={1.5}>
                 <Stack spacing={1}>
@@ -255,17 +272,39 @@ function DrawerAcionista({ acionista, hideButton = false }) {
               <Grid item xs={12} mb={1.5}>
                 <Stack spacing={1}>
                   <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                    Porcentagem
+                    Tipo de participação
+                  </InputLabel>
+                  <Select
+                    value={idActionType}
+                    onChange={(e) => setIdActionType(e.target.value)}
+                    displayEmpty
+                    fullWidth
+                  >
+                    <MenuItem value="" disabled>
+                      Selecione...
+                    </MenuItem>
+                    <MenuItem value={1}>Cotista</MenuItem>
+                    <MenuItem value={2}>Acionista</MenuItem>
+                    <MenuItem value={3}>Procurador</MenuItem>
+                    <MenuItem value={4}>Diretor Estatutário</MenuItem>
+                  </Select>
+                </Stack>
+              </Grid>
+
+              {/* CAMPO ALTERADO: Quantidade */}
+              <Grid item xs={12} mb={1.5}>
+                <Stack spacing={1}>
+                  <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                    Quantidade
                   </InputLabel>
                   <TextField
-                    onChange={handlePorcentagemChange}
+                    onChange={handleQuantidadeChange}
                     fullWidth
-                    value={porcentagem}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">%</InputAdornment>
-                      ),
-                      inputProps: { min: 0, max: 100, type: "number" },
+                    value={quantidade}
+                    
+                    inputProps={{
+                      inputMode: "decimal",
+                      step: "any",
                     }}
                   />
                 </Stack>
