@@ -1,4 +1,4 @@
-import { API_URL} from 'config';
+import { API_URL } from "config";
 import PropTypes from "prop-types";
 import React from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
@@ -41,18 +41,23 @@ const AuthLogin = ({ isDemo = false }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { setToken } = useToken();
+  const [loginMessage, setLoginMessage] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('sessionExpired') === 'true') {
+    if (location.state && location.state.from) {
+      setLoginMessage(
+        "Você precisa efetuar o login para visualizar este questionário.",
+      );
+    }
+    if (params.get("sessionExpired") === "true") {
       setShowExpiredAlert(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-    }, 10000);
+    const timer = setTimeout(() => {}, 10000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -66,16 +71,18 @@ const AuthLogin = ({ isDemo = false }) => {
 
   const handleTenantClick = async (idTenant) => {
     try {
-      const selectedTenant = tenants.find((tenantOption) => String(tenantOption.idTenant) === String(idTenant));
+      const selectedTenant = tenants.find(
+        (tenantOption) => String(tenantOption.idTenant) === String(idTenant),
+      );
 
       if (selectedTenant) {
-        localStorage.setItem('selected_tenant', JSON.stringify(selectedTenant));
+        localStorage.setItem("selected_tenant", JSON.stringify(selectedTenant));
       } else {
-        localStorage.removeItem('selected_tenant');
+        localStorage.removeItem("selected_tenant");
       }
 
       const currentAccessToken = localStorage.getItem("access_token");
-  
+
       const tokenResponse = await axios.post(
         `${API_URL}accounts/token`,
         { id_tenant: idTenant },
@@ -83,13 +90,13 @@ const AuthLogin = ({ isDemo = false }) => {
           headers: {
             Authorization: `Bearer ${currentAccessToken}`,
           },
-        }
+        },
       );
-  
+
       const newToken = tokenResponse.data.access_token;
       localStorage.setItem("access_token", newToken);
       setToken(newToken);
-  
+
       const loginResponse = await axios.post(
         `${API_URL}accounts/login`,
         {},
@@ -97,15 +104,15 @@ const AuthLogin = ({ isDemo = false }) => {
           headers: {
             Authorization: `Bearer ${newToken}`,
           },
-        }
+        },
       );
-  
+
       const finalToken = loginResponse.data.accessToken;
       localStorage.setItem("access_token", finalToken);
       setToken(finalToken);
-  
+
       const decoded = jwt_decode(finalToken);
-      const idUser = decoded.idUser 
+      const idUser = decoded.idUser;
       localStorage.setItem("id_user", idUser);
 
       const collaboratorResponse = await axios.get(
@@ -114,16 +121,19 @@ const AuthLogin = ({ isDemo = false }) => {
           headers: {
             Authorization: `Bearer ${finalToken}`,
           },
-        }
+        },
       );
-      
+
       const userData = collaboratorResponse.data;
       localStorage.setItem("username", userData.name);
 
-      
-      login(finalToken, userData); 
-  
-      navigate("/dashboard/resumo");
+      login(finalToken, userData);
+
+      if (location.state && location.state.from) {
+        navigate(location.state.from);
+      } else {
+        navigate("/dashboard/resumo");
+      }
     } catch (error) {
       console.error("Erro no processo de login:", error);
     }
@@ -139,86 +149,91 @@ const AuthLogin = ({ isDemo = false }) => {
     setCurrentPage(value);
   };
 
- return (
-  <Box
-    sx={{
-      display: 'flex',
-      flexDirection: { xs: 'column', md: 'row' },
-      width: '100%',
-      minHeight: '100vh',
-      overflowX: 'hidden',
-      overflowY: { xs: 'auto', md: 'hidden' }
-    }}
-  >
-    {}
+  return (
     <Box
       sx={{
-        display: { xs: 'none', md: 'flex' },
-        flex: 1,
-        bgcolor: '#202533',
-        color: '#fff',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        px: { xs: 2, sm: 6 }
-      }}
-    >
-      <Typography
-        sx={{
-          typography: { xs: 'h4', md: 'h2' },
-          fontWeight: 'bold',
-          mb: 2
-        }}
-      >
-        GRCTeam
-      </Typography>
-      <Typography sx={{ typography: { xs: 'body1', md: 'h6' } }}>
-        eGRC - Plataforma integrada e colaborativa de GRC e muito mais.
-      </Typography>
-    </Box>
-
-    {}
-    <Box
-      sx={{
-        flex: 1,
-        bgcolor: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        px: { xs: 2, sm: 4 },
-        py: { xs: 4, md: 0 }
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        width: "100%",
+        minHeight: "100vh",
+        overflowX: "hidden",
+        overflowY: { xs: "auto", md: "hidden" },
       }}
     >
       {}
-      <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: 400 }, mx: 'auto' }}>
+      <Box
+        sx={{
+          display: { xs: "none", md: "flex" },
+          flex: 1,
+          bgcolor: "#202533",
+          color: "#fff",
+          flexDirection: "column",
+          justifyContent: "center",
+          px: { xs: 2, sm: 6 },
+        }}
+      >
+        <Typography
+          sx={{
+            typography: { xs: "h4", md: "h2" },
+            fontWeight: "bold",
+            mb: 2,
+          }}
+        >
+          GRCTeam
+        </Typography>
+        <Typography sx={{ typography: { xs: "body1", md: "h6" } }}>
+          eGRC - Plataforma integrada e colaborativa de GRC e muito mais.
+        </Typography>
+      </Box>
+
+      {}
+      <Box
+        sx={{
+          flex: 1,
+          bgcolor: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          px: { xs: 2, sm: 4 },
+          py: { xs: 4, md: 0 },
+        }}
+      >
+        {}
+        <Box
+          sx={{ width: "100%", maxWidth: { xs: "100%", sm: 400 }, mx: "auto" }}
+        >
           {tenants.length === 0 ? (
             <>
               <Typography variant="h4" sx={{ mb: 3 }}>
-	                Entrar
-	              </Typography>
-                {showExpiredAlert && (
-                  <Alert severity="warning" sx={{ mb: 3 }}>
-                    Sua sessão expirou. Por favor, faça login novamente.
-                  </Alert>
-                )}
+                Entrar
+              </Typography>
+              {showExpiredAlert && (
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                  Sua sessão expirou. Por favor, faça login novamente.
+                </Alert>
+              )}
 
               <Formik
-                initialValues={{ email: '', password: '', submit: null }}
+                initialValues={{ email: "", password: "", submit: null }}
                 validationSchema={Yup.object().shape({
                   email: Yup.string()
-                    .email('Deve ser um email válido')
+                    .email("Deve ser um email válido")
                     .max(255)
-                    .required('Email é obrigatório'),
+                    .required("Email é obrigatório"),
                   password: Yup.string()
                     .max(255)
-                    .required('Senha é obrigatória')
+                    .required("Senha é obrigatória"),
                 })}
-                onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
+                onSubmit={async (
+                  values,
+                  { setErrors, setStatus, setSubmitting },
+                ) => {
                   try {
                     const { data } = await axios.post(
-                        `${API_URL}accounts/tenants`,
-                      values
+                      `${API_URL}accounts/tenants`,
+                      values,
                     );
-                    localStorage.setItem('access_token', data.access_token);
+                    localStorage.setItem("access_token", data.access_token);
                     setTenants(data.tenants);
                     setStatus({ success: true });
                   } catch (err) {
@@ -226,8 +241,8 @@ const AuthLogin = ({ isDemo = false }) => {
                     setErrors({
                       submit:
                         err.response?.status === 400
-                          ? 'Login inválido'
-                          : err.message
+                          ? "Login inválido"
+                          : err.message,
                     });
                   }
                   setSubmitting(false);
@@ -240,7 +255,7 @@ const AuthLogin = ({ isDemo = false }) => {
                   handleSubmit,
                   isSubmitting,
                   touched,
-                  values
+                  values,
                 }) => (
                   <form noValidate onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
@@ -268,11 +283,13 @@ const AuthLogin = ({ isDemo = false }) => {
 
                       <Grid item xs={12}>
                         <Stack spacing={1}>
-                          <InputLabel htmlFor="password-login">Senha</InputLabel>
+                          <InputLabel htmlFor="password-login">
+                            Senha
+                          </InputLabel>
                           <OutlinedInput
                             fullWidth
                             id="password-login"
-                            type={showPassword ? 'text' : 'password'}
+                            type={showPassword ? "text" : "password"}
                             value={values.password}
                             name="password"
                             onBlur={handleBlur}
@@ -304,21 +321,18 @@ const AuthLogin = ({ isDemo = false }) => {
                       </Grid>
 
                       <Grid item xs={12} sx={{ mt: -1 }}>
-                        <Stack
-                          direction="row"
-                          justifyContent="flex-end"
-                        >
+                        <Stack direction="row" justifyContent="flex-end">
                           <Typography
                             component={RouterLink}
                             to={
                               isDemo
-                                ? '/auth/forgot-password'
-                                : '/forgot-password'
+                                ? "/auth/forgot-password"
+                                : "/forgot-password"
                             }
                             sx={{
-                              textDecoration: 'none',
-                              color: '#262626',
-                              '&:hover': { textDecoration: 'underline' }
+                              textDecoration: "none",
+                              color: "#262626",
+                              "&:hover": { textDecoration: "underline" },
                             }}
                           >
                             Esqueceu sua senha?
@@ -341,9 +355,9 @@ const AuthLogin = ({ isDemo = false }) => {
                             variant="contained"
                             disabled={isSubmitting}
                             sx={{
-                              backgroundColor: '#0f1117',
-                              color: '#fff',
-                              ':hover': { backgroundColor: '#14151b' }
+                              backgroundColor: "#0f1117",
+                              color: "#fff",
+                              ":hover": { backgroundColor: "#14151b" },
                             }}
                           >
                             Entrar
@@ -357,94 +371,93 @@ const AuthLogin = ({ isDemo = false }) => {
             </>
           ) : (
             <Fade in={true} timeout={600}>
-          <Box sx={{ p: 1 }}>
-            <Grid item xs={12}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="baseline"
-              >
-                <Typography variant="h3">
-                  Selecione uma opção de acesso
-                </Typography>
-              </Stack>
-            </Grid>
-            <Grid item xs={12}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="baseline"
-                sx={{ mb: 4, mt: 1 }}
-              >
-                <Typography variant="h6">
-                  Escolha a opção que melhor se adapta ao seu perfil
-                </Typography>
-              </Stack>
-            </Grid>
-            <Grid container spacing={2} justifyContent="center">
-              {currentTenants.map((tenant) => (
-                <Grid item key={tenant.idTenant}>
-                  <AnimateButton>
-                    <Button
-                      variant="outlined"
-                      onClick={() => handleTenantClick(tenant.idTenant)}
-                      sx={{
-                        textTransform: "none",
-                        borderColor: "#854fff",
-                        color: "#854fff",
-                        "&:hover": {
-                          backgroundColor: "#854fff",
-                          color: "#fff",
-                        },
-                        transition: "all 0.3s ease",
-                      }}
-                    >
-                      {tenant.name}
-                    </Button>
-                  </AnimateButton>
+              <Box sx={{ p: 1 }}>
+                <Grid item xs={12}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="baseline"
+                  >
+                    <Typography variant="h3">
+                      Selecione uma opção de acesso
+                    </Typography>
+                  </Stack>
                 </Grid>
-              ))}
-            </Grid>
-            {totalPages > 1 && (
-              <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
-                <Pagination
-                  count={totalPages}
-                  page={currentPage}
-                  onChange={handlePageChange}
-                  color="primary"
-                />
-              </Stack>
-            )}
-            {}
-            <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setTenants([]);
-                  setCurrentPage(1);
-                }}
-                sx={{
-                  textTransform: "none",
-                  borderColor: "#854fff",
-                  color: "#854fff",
-                  "&:hover": {
-                    backgroundColor: "#854fff",
-                    color: "#fff",
-                  },
-                  transition: "all 0.3s ease",
-                }}
-              >
-                Voltar para Login
-              </Button>
-            </Stack>
-          </Box>
-        </Fade>
+                <Grid item xs={12}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="baseline"
+                    sx={{ mb: 4, mt: 1 }}
+                  >
+                    <Typography variant="h6">
+                      Escolha a opção que melhor se adapta ao seu perfil
+                    </Typography>
+                  </Stack>
+                </Grid>
+                <Grid container spacing={2} justifyContent="center">
+                  {currentTenants.map((tenant) => (
+                    <Grid item key={tenant.idTenant}>
+                      <AnimateButton>
+                        <Button
+                          variant="outlined"
+                          onClick={() => handleTenantClick(tenant.idTenant)}
+                          sx={{
+                            textTransform: "none",
+                            borderColor: "#854fff",
+                            color: "#854fff",
+                            "&:hover": {
+                              backgroundColor: "#854fff",
+                              color: "#fff",
+                            },
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          {tenant.name}
+                        </Button>
+                      </AnimateButton>
+                    </Grid>
+                  ))}
+                </Grid>
+                {totalPages > 1 && (
+                  <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
+                    <Pagination
+                      count={totalPages}
+                      page={currentPage}
+                      onChange={handlePageChange}
+                      color="primary"
+                    />
+                  </Stack>
+                )}
+                {}
+                <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setTenants([]);
+                      setCurrentPage(1);
+                    }}
+                    sx={{
+                      textTransform: "none",
+                      borderColor: "#854fff",
+                      color: "#854fff",
+                      "&:hover": {
+                        backgroundColor: "#854fff",
+                        color: "#fff",
+                      },
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    Voltar para Login
+                  </Button>
+                </Stack>
+              </Box>
+            </Fade>
           )}
         </Box>
+      </Box>
     </Box>
-  </Box>
-);
-
+  );
 };
 
 AuthLogin.propTypes = {
