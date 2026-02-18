@@ -281,7 +281,7 @@ function ColumnsLayouts() {
   // Em caso de edição
   useEffect(() => {
     if (dadosApi && dadosApi.idAssessment) {
-      setLoading(true)
+      setLoading(true);
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
@@ -505,9 +505,9 @@ function ColumnsLayouts() {
           setNormativaDados(data);
         } catch (err) {
           console.error("Erro ao buscar os dados:", err.message);
-          setLoading(false)
+          setLoading(false);
         } finally {
-          setLoading(false)
+          setLoading(false);
         }
       };
 
@@ -969,6 +969,10 @@ function ColumnsLayouts() {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 2 || null,
           active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1074,6 +1078,10 @@ function ColumnsLayouts() {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 5 || null, // Status "Finalizada"
           active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1201,6 +1209,10 @@ function ColumnsLayouts() {
           idAssessment: normativaDados?.idAssessment,
           assessmentStatus: 4 || null,
           active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
           replaceUser: sobrepor
             ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
                 ?.nome || null
@@ -1298,9 +1310,12 @@ function ColumnsLayouts() {
       // Payload preenchido
       const payload = {
         idAssessment: normativaDados?.idAssessment,
-        // Ao retornar, o status volta para Iniciado/Em andamento?
-        // No seu código original você seta localmente o status para 2.
-        // Se a API aceitar, enviamos o status desejado.
+
+        idRisk: formData.risco,
+        idCycle: formData.ciclo,
+        idRespondents: formData.respondente,
+        idResponsible: formData.responsavelAv,
+
         assessmentStatus: 2,
         active: status,
         replaceUser: sobrepor
