@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import {
   Accordion,
   AccordionDetails,
@@ -37,14 +36,13 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ListagemAcionistas from "../configuracoes/listaQuestionarios";
 import emitter from "../configuracoes/eventEmitter";
 
-// ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
   const { dadosApi } = location.state || {};
   const idUser = localStorage.getItem("id_user");
-  const [questionariosApi, setQuestionariosApi] = useState([]); // <- NOVO
+  const [questionariosApi, setQuestionariosApi] = useState([]);
   const [filledQuestionarios, setFilledQuestionarios] = useState([]);
   const [loadingText, setLoadingText] = useState("");
   const [status, setStatus] = useState(true);
@@ -77,9 +75,8 @@ function ColumnsLayouts() {
   const [statuss] = useState([
     { id: 1, nome: "Não iniciada" },
     { id: 2, nome: "Em avaliação" },
-    { id: 3, nome: "Em avaliação" },
-    { id: 4, nome: "Completa" },
-    { id: 5, nome: "Finalizada" },
+    { id: 3, nome: "Completa" },
+    { id: 4, nome: "Finalizada" },
   ]);
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
@@ -125,7 +122,7 @@ function ColumnsLayouts() {
     idSeverityResidual: null,
     idProbabilityPlanned: null,
     idSeverityPlanned: null,
-    status: 1, // Default status
+    status: 1,
   });
 
   const [formValidation, setFormValidation] = useState({
@@ -138,7 +135,6 @@ function ColumnsLayouts() {
   const formatDateConclusion = (raw) => {
     if (!raw) return "";
 
-    // Normaliza frações de segundo longas: .0047459 -> .004
     const normalized = String(raw).replace(/\.(\d{3})\d+/, ".$1");
 
     const d = new Date(normalized);
@@ -153,21 +149,17 @@ function ColumnsLayouts() {
     return `${DD}-${MM}-${YYYY}`;
   };
 
-  // --- REGRAS DE PERMISSIONAMENTO (Baseado no PDF 1.1) ---
   const isEditing = requisicao === "Editar";
   const statusAtual = formData.status;
   const isResponsibleAv = String(idUser) === String(formData.responsavelAv);
 
-  // 2. Respondentes e Responsável: Editáveis na criação e na alteração se status for "Não iniciada" (1) ou "Iniciada" (2).
-  const isPeopleEditable =
-    !statusAtual || statusAtual === 1;
+  const isPeopleEditable = !statusAtual || statusAtual === 1;
 
-  // 3. Avaliação (Heatmap, Justificativa, Switch): Apenas Responsável nos status "Em avaliação" (3) e "Completa" (4).
   const isEvaluationEditable =
-    isResponsibleAv && (statusAtual === 2 || statusAtual === 3 || statusAtual === 4);
+    isResponsibleAv && (statusAtual === 2 || statusAtual === 3);
 
-  const isComplete = statusAtual === 4;
-  const isFinalizada = statusAtual === 5;
+  const isComplete = statusAtual === 3;
+  const isFinalizada = statusAtual === 4;
   localStorage.setItem("AvConcluida", isComplete || isFinalizada);
 
   const initialOverlay = useMemo(
@@ -205,7 +197,6 @@ function ColumnsLayouts() {
         },
       });
 
-      // Transformando os dados para alterar idRisk, idLedgerAccount e idProcess -> id, e name -> nome
       const transformedData = response.data.map((item) => ({
         id:
           item.idRisk ||
@@ -233,7 +224,7 @@ function ColumnsLayouts() {
           item.idStrategicGuideline ||
           item.idDeficiency,
         nome: item.name,
-        ...item, // Mantém os outros campos intactos
+        ...item,
       }));
 
       setState(transformedData);
@@ -278,7 +269,6 @@ function ColumnsLayouts() {
     window.scrollTo(0, 0);
   }, []);
 
-  // Em caso de edição
   useEffect(() => {
     if (dadosApi && dadosApi.idAssessment) {
       setLoading(true);
@@ -373,24 +363,23 @@ function ColumnsLayouts() {
           setRequisicao("Editar");
           setMensagemFeedback("editada");
           setStatus(data.active);
-          // Se necessário, atualize outros estados individuais
+
           setDescricaoRisco(data.riskDescription || "");
           setComentario(data.justification || "");
           const normalizeReplaceUserFlag = (v) => {
-            if (v == null) return false; // null/undefined
+            if (v == null) return false;
             const s = String(v).trim().toLowerCase();
-            if (!s) return false; // ""
+            if (!s) return false;
             if (["false", "null", "undefined", "0"].includes(s)) return false;
-            return true; // qualquer nome real → true
+            return true;
           };
 
           setSobrepor(normalizeReplaceUserFlag(data.replaceUser));
 
-          // Atualiza o formData garantindo que os campos que devem ser arrays, sejam arrays
           setFormData((prev) => ({
             ...prev,
             status: data.assessmentStatus || null,
-            // Para campos que devem ser arrays, utiliza um fallback para []
+
             categoria: dataRisk.idCategory || null,
             dataIdentificacao: data.identificationDate
               ? new Date(data.identificationDate)
@@ -481,7 +470,7 @@ function ColumnsLayouts() {
             justificationInerent: data.justificationInerent || "",
             justificationResidual: data.justificationResidual || "",
             justificationPlanned: data.justificationPlanned || "",
-            // se existir campo de replace, usamos ele; senão, caímos no original
+
             idProbabilityInherent:
               data.replaceProbabilityInherent ??
               data.idProbabilityInherent ??
@@ -517,7 +506,6 @@ function ColumnsLayouts() {
 
   const handleOverlayChange = useCallback((newOverlay) => {
     setFormData((prev) => {
-      // se não mudou nada, retorna o próprio objeto (sem disparar re-render)
       if (
         prev.idProbabilityInherent === newOverlay.inherent.probId &&
         prev.idSeverityInherent === newOverlay.inherent.impactId &&
@@ -531,7 +519,7 @@ function ColumnsLayouts() {
       ) {
         return prev;
       }
-      // só atualiza quando algo de fato for diferente
+
       return {
         ...prev,
         idProbabilityInherent: newOverlay.inherent.probId,
@@ -550,10 +538,8 @@ function ColumnsLayouts() {
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "prioridade") {
-      // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
-      // Para outros campos
       setFormData({ ...formData, [field]: value });
     }
   };
@@ -571,8 +557,8 @@ function ColumnsLayouts() {
           { headers: { Authorization: `Bearer ${token}` } },
         )
         .then((res) => {
-          setQuestionariosApi(res.data); // <- NOVO (lista completa)
-          setFilledQuestionarios(res.data); // mantém compatibilidade (heatmap etc.)
+          setQuestionariosApi(res.data);
+          setFilledQuestionarios(res.data);
         })
 
         .catch((err) => console.error("Erro ao refazer quiz:", err));
@@ -625,16 +611,113 @@ function ColumnsLayouts() {
     };
   }, [filledQuestionarios, tipoConsolidacao]);
 
+  const autoAtualizarParaCompleta = async () => {
+    if (!normativaDados?.idAssessment || !formData.risco) return;
+
+    try {
+      const url = `${process.env.REACT_APP_API_URL}assessments`;
+
+      const findProb = (name) =>
+        heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
+      const findImp = (name) =>
+        heatmapDataAv?.heatMapImpacts?.find((i) => i.name === name);
+
+      const inhProb = findProb(formData.idProbabilityInherent);
+      const inhImp = findImp(formData.idSeverityInherent);
+      const resProb = findProb(formData.idProbabilityResidual);
+      const resImp = findImp(formData.idSeverityResidual);
+      const plnProb = findProb(formData.idProbabilityPlanned);
+      const plnImp = findImp(formData.idSeverityPlanned);
+
+      const payload = {
+        idAssessment: normativaDados.idAssessment,
+        assessmentStatus: 3,
+        active: status,
+        idRisk: formData.risco,
+        idCycle: formData.ciclo,
+        idRespondents: formData.respondente,
+        idResponsible: formData.responsavelAv,
+        replaceUser: sobrepor
+          ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
+            null
+          : null,
+
+        justification: comentario,
+
+        idProbabilityInherent:
+          inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
+        idSeverityInherent:
+          inhImp?.idHeatMapImpact || formData.idSeverityInherent,
+        idProbabilityResidual:
+          resProb?.idHeatMapProbability || formData.idProbabilityResidual,
+        idSeverityResidual:
+          resImp?.idHeatMapImpact || formData.idSeverityResidual,
+        idProbabilityPlanned:
+          plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
+        idSeverityPlanned:
+          plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
+
+        replaceProbabilityPlanned: formData.idProbabilityPlanned,
+        replaceProbabilityResidual: formData.idProbabilityResidual,
+        replaceSeverityResidual: formData.idSeverityResidual,
+        replaceSeverityPlanned: formData.idSeverityPlanned,
+        replaceProbabilityInherent: formData.idProbabilityInherent,
+        replaceSeverityInherent: formData.idSeverityInherent,
+
+        justificationInerent: formData.justificationInerent,
+        justificationResidual: formData.justificationResidual,
+        justificationPlanned: formData.justificationPlanned,
+      };
+
+      await axios.put(url, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setFormData((prev) => ({ ...prev, status: 3 }));
+      setNormativaDados((prev) => ({ ...prev, assessmentStatus: 3 }));
+
+      enqueueSnackbar(
+        "Todos os questionários concluídos. Status atualizado para 'Completa'.",
+        {
+          variant: "success",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+    } catch (error) {
+      console.error("Erro ao atualizar status automaticamente:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (!questionariosApi || questionariosApi.length === 0) return;
+
+    const questionariosAtivos = questionariosApi.filter(
+      (q) => q.active !== false,
+    );
+
+    if (questionariosAtivos.length === 0) return;
+
+    const todosConcluidos = questionariosAtivos.every(
+      (q) => Number(q.statusQuiz || q.status) >= 3,
+    );
+
+    const statusPermiteAtualizacao =
+      formData.status === 2 || formData.status === 3;
+
+    if (todosConcluidos && statusPermiteAtualizacao && isResponsibleAv) {
+      console.log("Auto-completando avaliação...");
+      autoAtualizarParaCompleta();
+    }
+  }, [questionariosApi, formData.status, isResponsibleAv]);
+
   const handleSelectAllEmpresas = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.controle.length === controles.length) {
-        // Deselect all
         setFormData({ ...formData, controle: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
-          controle: controles.map((controle) => controle.id),
+          controles: controles.map((controle) => controle.id),
         });
       }
     } else {
@@ -648,10 +731,8 @@ function ColumnsLayouts() {
   const handleSelectAllDiretrizes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.diretriz.length === diretrizes.length) {
-        // Deselect all
         setFormData({ ...formData, diretriz: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           diretriz: diretrizes.map((diretriz) => diretriz.id),
@@ -668,10 +749,8 @@ function ColumnsLayouts() {
   const handleSelectAllResponsaveis = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.responsavel.length === responsaveis.length) {
-        // Deselect all
         setFormData({ ...formData, responsavel: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           responsavel: responsaveis.map((responsavel) => responsavel.id),
@@ -688,10 +767,8 @@ function ColumnsLayouts() {
   const handleSelectAllRespondentes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.respondente.length === respondentes.length) {
-        // Deselect all
         setFormData({ ...formData, respondente: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           respondente: respondentes.map((respondente) => respondente.id),
@@ -708,10 +785,8 @@ function ColumnsLayouts() {
   const handleSelectAllCausa = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.causa.length === causas.length) {
-        // Deselect all
         setFormData({ ...formData, causa: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           causa: causas.map((causa) => causa.id),
@@ -728,10 +803,8 @@ function ColumnsLayouts() {
   const handleSelectAllKri = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.kri.length === kris.length) {
-        // Deselect all
         setFormData({ ...formData, kri: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           kri: kris.map((kri) => kri.id),
@@ -748,10 +821,8 @@ function ColumnsLayouts() {
   const handleSelectAllImpacto = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.impacto.length === impactos.length) {
-        // Deselect all
         setFormData({ ...formData, impacto: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           impacto: impactos.map((impacto) => impacto.id),
@@ -768,10 +839,8 @@ function ColumnsLayouts() {
   const handleSelectAllIncidentes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.incidente.length === incidentes.length) {
-        // Deselect all
         setFormData({ ...formData, incidente: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           incidente: incidentes.map((incidente) => incidente.id),
@@ -788,10 +857,8 @@ function ColumnsLayouts() {
   const handleSelectAllTratamentos = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.tratamento.length === tratamentos.length) {
-        // Deselect all
         setFormData({ ...formData, tratamento: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           tratamento: tratamentos.map((tratamento) => tratamento.id),
@@ -808,10 +875,8 @@ function ColumnsLayouts() {
   const handleSelectAll2 = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.processo.length === processos.length) {
-        // Deselect all
         setFormData({ ...formData, processo: [] });
       } else {
-        // Select all
         setFormData({
           ...formData,
           processo: processos.map((processo) => processo.id),
@@ -828,7 +893,6 @@ function ColumnsLayouts() {
   const voltarParaCadastroMenu = () => {
     navigate(-1);
     window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
   const continuarEdicao = (e) => {
@@ -840,13 +904,11 @@ function ColumnsLayouts() {
     navigate(0);
   };
 
-  // Função para voltar para a listagem
   const voltarParaListagem = () => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
   };
 
-  // Ao salvar com "Sobrepor resultado do risco" ligado, a atualização FINALIZA a avaliação.
   const handleAtualizarClick = () => {
     if (sobrepor) {
       setConfirmSobreporOpen(true);
@@ -910,7 +972,10 @@ function ColumnsLayouts() {
     let title = "";
 
     if (currentStatus === 1 && isResp) title = "INICIAR AVALIAÇÃO";
-    else if ((currentStatus === 2 || currentStatus === 3 || currentStatus === 4) && isResp)
+    else if (
+      (currentStatus === 2 || currentStatus === 3 || currentStatus === 4) &&
+      isResp
+    )
       title = "FINALIZAR";
 
     return { buttonTitle: title, isTester: isResp };
@@ -919,7 +984,7 @@ function ColumnsLayouts() {
   const hasQuestionarioConcluido = (questionariosApi ?? []).some((q) => {
     const status = Number(q?.statusQuiz ?? q?.status);
     const active = q?.active !== false;
-    return active && status >= 3; // pega statusQuiz 3 (e 4/5 se existirem)
+    return active && status >= 3;
   });
 
   console.log("DEBUG FINALIZAR", {
@@ -1015,31 +1080,24 @@ function ColumnsLayouts() {
         body: JSON.stringify(payload),
       });
 
-      // ✅ Aqui está a regra: se der 500 mas mesmo assim executou no backend, tratamos como sucesso
       const ignore500 = response.status === 500;
       if (!response.ok && !ignore500) {
         throw new Error("Não foi possível iniciar.");
       }
 
-      // Sucesso (response.ok ou 500 ignorado)
       setFormData((prev) => ({ ...prev, status: 3 }));
       setNormativaDados((prev) => ({ ...prev, assessmentStatus: 3 }));
 
-      // deixa o feedback de sucesso pós-refresh (você já tem o effect que lê isso)
       localStorage.setItem("avaliacaoIniciada", "1");
 
-      // avisa componentes/listagens
       emitter.emit("refreshQuestionarios");
 
-      // dá um tempinho pro usuário ver a mensagem antes do refresh
       await new Promise((r) => setTimeout(r, 800));
 
-      // ✅ refresh real da tela
       navigate(0);
     } catch (error) {
       console.error(error);
 
-      // mantém erro só quando NÃO for o 400 (pois acima já tratamos)
       enqueueSnackbar("Não foi possível iniciar.", {
         variant: "error",
         anchorOrigin: { vertical: "top", horizontal: "right" },
@@ -1061,138 +1119,6 @@ function ColumnsLayouts() {
         url = `${process.env.REACT_APP_API_URL}assessments`;
         method = "PUT";
 
-        // Lógica de mapeamento
-        const findProb = (name) =>
-          heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
-        const findImp = (name) =>
-          heatmapDataAv?.heatMapImpacts?.find((i) => i.name === name);
-
-        const inhProb = findProb(formData.idProbabilityInherent);
-        const inhImp = findImp(formData.idSeverityInherent);
-        const resProb = findProb(formData.idProbabilityResidual);
-        const resImp = findImp(formData.idSeverityResidual);
-        const plnProb = findProb(formData.idProbabilityPlanned);
-        const plnImp = findImp(formData.idSeverityPlanned);
-
-        payload = {
-          idAssessment: normativaDados?.idAssessment,
-          assessmentStatus: 5 || null, // Status "Finalizada"
-          active: status,
-          idRisk: formData.risco,
-          idCycle: formData.ciclo,
-          idRespondents: formData.respondente,
-          idResponsible: formData.responsavelAv,
-          replaceUser: sobrepor
-            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
-                ?.nome || null
-            : null,
-
-          // Campos adicionados
-          justification: comentario,
-
-          idProbabilityInherent:
-            inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
-          idSeverityInherent:
-            inhImp?.idHeatMapImpact || formData.idSeverityInherent,
-          idProbabilityResidual:
-            resProb?.idHeatMapProbability || formData.idProbabilityResidual,
-          idSeverityResidual:
-            resImp?.idHeatMapImpact || formData.idSeverityResidual,
-          idProbabilityPlanned:
-            plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
-          idSeverityPlanned:
-            plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
-
-          replaceProbabilityPlanned: formData.idProbabilityPlanned,
-          replaceProbabilityResidual: formData.idProbabilityResidual,
-          replaceSeverityResidual: formData.idSeverityResidual,
-          replaceSeverityPlanned: formData.idSeverityPlanned,
-          replaceProbabilityInherent: formData.idProbabilityInherent,
-          replaceSeverityInherent: formData.idSeverityInherent,
-
-          justificationInerent: formData.justificationInerent,
-          justificationResidual: formData.justificationResidual,
-          justificationPlanned: formData.justificationPlanned,
-        };
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
-
-      if (requisicao === "Criar" && data.data && data.data.idTestPhase) {
-        setNormativaDados(data.data);
-        setSuccessDialogOpen(true);
-      } else {
-        setFormData((prev) => ({ ...prev, status: 5 }));
-        setNormativaDados((prev) => ({ ...prev, assessmentStatus: 5 }));
-        enqueueSnackbar("Avaliação finalizada com sucesso!", {
-          variant: "success",
-          anchorOrigin: { vertical: "top", horizontal: "right" },
-        });
-        navigate(0);
-      }
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível finalizar.", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConcluirTeste = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!formData.revisor) {
-      // Nota: formData.revisor não parece estar definido no state inicial do seu código original,
-      // mas mantive a lógica de validação que você já tinha.
-      // Caso necessário, verifique se 'revisor' existe no formData.
-      setFormValidation((prev) => ({ ...prev, revisor: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      if (requisicao === "Editar") {
-        url = `${process.env.REACT_APP_API_URL}assessments`;
-        method = "PUT";
-
-        // Lógica de mapeamento
         const findProb = (name) =>
           heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
         const findImp = (name) =>
@@ -1218,7 +1144,6 @@ function ColumnsLayouts() {
                 ?.nome || null
             : null,
 
-          // Campos adicionados
           justification: comentario,
 
           idProbabilityInherent:
@@ -1272,6 +1197,131 @@ function ColumnsLayouts() {
       } else {
         setFormData((prev) => ({ ...prev, status: 4 }));
         setNormativaDados((prev) => ({ ...prev, assessmentStatus: 4 }));
+        enqueueSnackbar("Avaliação finalizada com sucesso!", {
+          variant: "success",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        });
+        navigate(0);
+      }
+    } catch (error) {
+      console.error(error.message);
+      enqueueSnackbar("Não foi possível finalizar.", {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConcluirTeste = async () => {
+    let url = "";
+    let method = "";
+    let payload = {};
+
+    const missingFields = [];
+    if (!formData.revisor) {
+      setFormValidation((prev) => ({ ...prev, revisor: false }));
+      missingFields.push("Processo");
+    }
+    if (missingFields.length > 0) {
+      const fieldsMessage = missingFields.join(" e ");
+      const singularOrPlural =
+        missingFields.length > 1
+          ? "são obrigatórios e devem estar válidos!"
+          : "é obrigatório e deve estar válido!";
+      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (requisicao === "Editar") {
+        url = `${process.env.REACT_APP_API_URL}assessments`;
+        method = "PUT";
+
+        const findProb = (name) =>
+          heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
+        const findImp = (name) =>
+          heatmapDataAv?.heatMapImpacts?.find((i) => i.name === name);
+
+        const inhProb = findProb(formData.idProbabilityInherent);
+        const inhImp = findImp(formData.idSeverityInherent);
+        const resProb = findProb(formData.idProbabilityResidual);
+        const resImp = findImp(formData.idSeverityResidual);
+        const plnProb = findProb(formData.idProbabilityPlanned);
+        const plnImp = findImp(formData.idSeverityPlanned);
+
+        payload = {
+          idAssessment: normativaDados?.idAssessment,
+          assessmentStatus: 3 || null,
+          active: status,
+          idRisk: formData.risco,
+          idCycle: formData.ciclo,
+          idRespondents: formData.respondente,
+          idResponsible: formData.responsavelAv,
+          replaceUser: sobrepor
+            ? responsaveisAv.find((r) => r.id === formData.responsavelAv)
+                ?.nome || null
+            : null,
+
+          justification: comentario,
+
+          idProbabilityInherent:
+            inhProb?.idHeatMapProbability || formData.idProbabilityInherent,
+          idSeverityInherent:
+            inhImp?.idHeatMapImpact || formData.idSeverityInherent,
+          idProbabilityResidual:
+            resProb?.idHeatMapProbability || formData.idProbabilityResidual,
+          idSeverityResidual:
+            resImp?.idHeatMapImpact || formData.idSeverityResidual,
+          idProbabilityPlanned:
+            plnProb?.idHeatMapProbability || formData.idProbabilityPlanned,
+          idSeverityPlanned:
+            plnImp?.idHeatMapImpact || formData.idSeverityPlanned,
+
+          replaceProbabilityPlanned: formData.idProbabilityPlanned,
+          replaceProbabilityResidual: formData.idProbabilityResidual,
+          replaceSeverityResidual: formData.idSeverityResidual,
+          replaceSeverityPlanned: formData.idSeverityPlanned,
+          replaceProbabilityInherent: formData.idProbabilityInherent,
+          replaceSeverityInherent: formData.idSeverityInherent,
+
+          justificationInerent: formData.justificationInerent,
+          justificationResidual: formData.justificationResidual,
+          justificationPlanned: formData.justificationPlanned,
+        };
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      let data = {};
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      }
+
+      if (!response.ok) {
+        throw new Error("O Código informado já foi cadastrado.");
+      }
+
+      if (requisicao === "Criar" && data.data && data.data.idTestPhase) {
+        setNormativaDados(data.data);
+        setSuccessDialogOpen(true);
+      } else {
+        setFormData((prev) => ({ ...prev, status: 3 }));
+        setNormativaDados((prev) => ({ ...prev, assessmentStatus: 3 }));
         enqueueSnackbar("Teste concluído com sucesso!", {
           variant: "success",
           anchorOrigin: { vertical: "top", horizontal: "right" },
@@ -1294,7 +1344,6 @@ function ColumnsLayouts() {
       setLoading(true);
       const url = `${process.env.REACT_APP_API_URL}assessments`;
 
-      // Lógica de mapeamento
       const findProb = (name) =>
         heatmapDataAv?.heatMapProbabilities?.find((p) => p.name === name);
       const findImp = (name) =>
@@ -1307,7 +1356,6 @@ function ColumnsLayouts() {
       const plnProb = findProb(formData.idProbabilityPlanned);
       const plnImp = findImp(formData.idSeverityPlanned);
 
-      // Payload preenchido
       const payload = {
         idAssessment: normativaDados?.idAssessment,
 
@@ -1396,7 +1444,7 @@ function ColumnsLayouts() {
       setFormValidation((prev) => ({ ...prev, respondente: false }));
       missingFields.push("Respondente");
     }
-    // Adicionada validação de responsável
+
     if (!formData.responsavelAv) {
       setFormValidation((prev) => ({ ...prev, responsavelAv: false }));
       missingFields.push("Responsável");
@@ -1411,10 +1459,9 @@ function ColumnsLayouts() {
       enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
         variant: "error",
       });
-      return; // Para a execução se a validação falhar
+      return;
     }
 
-    // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
       url = `${process.env.REACT_APP_API_URL}assessments`;
       method = "POST";
@@ -1427,13 +1474,12 @@ function ColumnsLayouts() {
     } else if (requisicao === "Editar") {
       url = `${process.env.REACT_APP_API_URL}assessments`;
       method = "PUT";
-      // mapeia nome → objeto dentro do heatmapDataAv
+
       const findProb = (name) =>
         heatmapDataAv.heatMapProbabilities.find((p) => p.name === name);
       const findImp = (name) =>
         heatmapDataAv.heatMapImpacts.find((i) => i.name === name);
 
-      // extrai itens
       const inhProb = findProb(formData.idProbabilityInherent);
       const inhImp = findImp(formData.idSeverityInherent);
       const resProb = findProb(formData.idProbabilityResidual);
@@ -1447,7 +1493,7 @@ function ColumnsLayouts() {
         idCycle: formData.ciclo,
         idRespondents: formData.respondente,
         idResponsible: formData.responsavelAv,
-        assessmentStatus: sobrepor ? 5 : formData.status,
+        assessmentStatus: sobrepor ? 4 : formData.status,
         active: status,
         replaceUser: sobrepor
           ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
@@ -1483,7 +1529,6 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
 
-      // Primeira requisição (POST ou PUT inicial)
       const response = await fetch(url, {
         method,
         headers: {
@@ -1717,7 +1762,8 @@ function ColumnsLayouts() {
                 </Grid>
               )}
 
-              {requisicao === "Editar" && !!buttonTitle && (
+              {/* Botões do Meio - Adicionado !isFinalizada */}
+              {requisicao === "Editar" && !isFinalizada && !!buttonTitle && (
                 <Grid item xs={3} mt={4} ml={5}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     {buttonTitle === "INICIAR AVALIAÇÃO" ? (
@@ -2448,7 +2494,7 @@ function ColumnsLayouts() {
             </>
           )}
 
-          {/* Botões de ação */}
+          {/* Botões de ação inferior */}
           <Grid item xs={12} mt={-5}>
             <Box
               sx={{
