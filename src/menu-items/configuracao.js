@@ -57,6 +57,13 @@ const pages = {
           // Este item será escondido pelo CSS injetado acima
         },
         {
+          id: '3456786543',
+          title: <FormattedMessage id="Questionários" />,
+          type: 'item',
+          url: '/questionarios/lista',
+          // Este item será escondido pelo CSS injetado acima
+        },
+        {
           id: '4',
           title: <FormattedMessage id="Índice" />,
           type: 'item',

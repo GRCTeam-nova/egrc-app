@@ -72,6 +72,8 @@ export const routeMapping = {
     parent: "/indices/lista",
   },
 
+  "/questionarios/lista": { title: "Questionários", parent: null },
+
   "/questionarios/criar": {
     title: "Novo Questionário",
     editTitle: "Editar Questionário",
