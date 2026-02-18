@@ -3,6 +3,7 @@ import {
   AccordionDetails,
   AccordionSummary,
   Button,
+  Divider,
   Box,
   TextField,
   Autocomplete,
@@ -32,6 +33,7 @@ import { useToken } from "../../../api/TokenContext";
 import { DatePicker } from "@mui/x-date-pickers";
 import HeatmapAvaliacaoRisco from "../configuracoes/avaliacaoRiscoGrafico";
 import HeatmapAvaliacaoRiscoFixo from "../configuracoes/avaliacaoRiscoGraficoFixo";
+import ResultadosAvaliacao from "../configuracoes/ResultadosAvaliacao";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ListagemAcionistas from "../configuracoes/listaQuestionarios";
 import emitter from "../configuracoes/eventEmitter";
@@ -1575,11 +1577,71 @@ function ColumnsLayouts() {
     }
   };
 
+const finalCoords = useMemo(() => {
+    // Chave única baseada no ID da avaliação para não misturar dados
+    const cacheKey = dadosApi?.idAssessment ? `risk_coords_cache_${dadosApi.idAssessment}` : null;
+
+    // 1. LEITURA SÍNCRONA (Anti-Flash): Tenta pegar do cache imediatamente
+    let cached = null;
+    if (cacheKey) {
+        try {
+            const raw = localStorage.getItem(cacheKey);
+            if (raw) cached = JSON.parse(raw);
+        } catch (e) { console.error(e); }
+    }
+
+    // 2. Dados atuais do React State
+    let inherent = formData.justificationInerent;
+    let residual = formData.justificationResidual;
+    let planned = formData.justificationPlanned;
+
+    // Helper de validação
+    const isInvalid = (val) => !val || val === "" || val === "null" || val === "undefined";
+
+    // 3. LÓGICA DE PREENCHIMENTO (Prioridade: State > Cache > AvgCoords)
+    // Se o State for inválido, tenta o Cache. Se o Cache falhar, tenta o AvgCoords.
+    if (isInvalid(inherent)) inherent = cached?.inherent || avgCoords.inherent;
+    if (isInvalid(residual)) residual = cached?.residual || avgCoords.residual;
+    if (isInvalid(planned)) planned = cached?.planned || avgCoords.planned;
+
+    // Se estiver no modo "Sobrepor", damos preferência ao que o usuário está digitando/salvou
+    if (sobrepor) {
+        inherent = formData.justificationInerent || avgCoords.inherent;
+        residual = formData.justificationResidual || avgCoords.residual;
+        planned = formData.justificationPlanned || avgCoords.planned;
+    }
+
+    // 4. GRAVAÇÃO FORÇADA (Side-Effect intencional dentro do Memo para garantir persistência imediata)
+    if (cacheKey && (inherent || residual || planned)) {
+        const newData = JSON.stringify({ inherent, residual, planned });
+        // Só grava se mudou para evitar loop infinito
+        if (localStorage.getItem(cacheKey) !== newData) {
+            localStorage.setItem(cacheKey, newData);
+        }
+    }
+
+    return { inherent, residual, planned };
+  }, [sobrepor, formData, avgCoords, isFinalizada, dadosApi]);
+
   return (
     <>
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={1} marginTop={2}>
+          {/* --- INSERÇÃO DO NOVO COMPONENTE --- */}
+          {isFinalizada && (
+            <Grid item xs={12} sx={{ mb: 2 }}>
+               <ResultadosAvaliacao
+                  heatmapData={heatmapDataAv}
+                  nivel={nivelAv}
+                  inherentCoords={finalCoords.inherent}
+                  residualCoords={finalCoords.residual}
+                  plannedCoords={finalCoords.planned}
+               />
+               <Divider sx={{ my: 3 }} />
+            </Grid>
+          )}
+          {/* --- FIM DA INSERÇÃO --- */}
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>Ciclo *</InputLabel>

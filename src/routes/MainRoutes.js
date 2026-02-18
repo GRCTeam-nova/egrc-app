@@ -18,6 +18,7 @@ const ListaProcessos = Loadable(lazy(() => import('../pages/apps/processos/lista
 const ListaDados = Loadable(lazy(() => import('../pages/apps/dados/listaDados')));
 const ListaContas = Loadable(lazy(() => import('../pages/apps/contas/listaContas')));
 const ListaFaseTeste = Loadable(lazy(() => import('../pages/apps/configuracoes/listaFaseTeste')));
+const ListaQuestionariosMain = Loadable(lazy(() => import('../pages/apps/configuracoes/listaQuestionariosMain')));
 const ListaAtivos = Loadable(lazy(() => import('../pages/apps/ativos/listaAtivos')));
 const ListaRiscos = Loadable(lazy(() => import('../pages/apps/riscos/listaRiscos')));
 const ListaCiclos = Loadable(lazy(() => import('../pages/apps/ciclos/listaCiclos')));
@@ -252,6 +253,10 @@ const MainRoutes = {
             {
               path: 'criar',
               element: <NovoQuestionario />
+            },
+            {
+              path: 'lista',
+              element: <ListaQuestionariosMain />
             },
           ]
         },
