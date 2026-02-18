@@ -1,9 +1,10 @@
 import React, { useMemo } from "react";
-import { Grid, Paper, Typography, Box, Divider } from "@mui/material";
+import { Grid, Paper, Typography, Box } from "@mui/material";
 
 /**
  * Componente para exibir os resultados consolidados da avaliação.
  * Versão Corrigida: Trata nomes de range vazios e coordenadas instáveis.
+ * Alteração: Removido o rodapé "Calculado via Matriz".
  */
 const ResultadosAvaliacao = ({
   heatmapData,
@@ -89,7 +90,7 @@ const ResultadosAvaliacao = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            minHeight: "120px"
+            minHeight: "100px" // Ajustei levemente a altura mínima já que removemos conteúdo
           }}
         >
           <Typography variant="body2" color="textSecondary">
@@ -110,7 +111,7 @@ const ResultadosAvaliacao = ({
           position: "relative",
           display: "flex",
           flexDirection: "column",
-          minHeight: "120px"
+          minHeight: "100px"
         }}
       >
         <Box
@@ -138,7 +139,7 @@ const ResultadosAvaliacao = ({
               alignItems: "baseline",
               gap: 1,
               mt: 1,
-              mb: 1,
+              mb: 0, // Removida margem inferior extra
             }}
           >
             <Typography
@@ -151,22 +152,6 @@ const ResultadosAvaliacao = ({
             <Typography variant="h6" color="textSecondary" sx={{ opacity: 0.6 }}>
               ({data.value})
             </Typography>
-          </Box>
-
-          <Divider sx={{ my: 1 }} />
-          
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box
-              sx={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                bgcolor: data.color,
-              }}
-            />
-             <Typography variant="caption" color="textSecondary">
-               Calculado via Matriz
-             </Typography>
           </Box>
         </Box>
       </Paper>
