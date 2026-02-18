@@ -1142,12 +1142,8 @@ const ListagemAcionistas = () => {
         accessorKey: "document",
       },
       {
-        header: "Porcentagem",
+        header: "Quantidade",
         accessorKey: "percentage",
-        cell: ({ getValue }) => {
-          const value = getValue();
-          return value !== null && value !== "" ? `${value}%` : "";
-        },
       },
       {
         header: "Status",
