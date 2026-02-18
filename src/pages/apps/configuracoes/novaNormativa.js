@@ -2676,7 +2676,7 @@ const actionButtons = useMemo(() => {
               <Grid item xs={12} mt={2}>
                 <Accordion sx={{ backgroundColor: "#fdfdfd", border: "1px solid #e0e0e0", boxShadow: "none" }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1" fontWeight="bold">6. Regras de Revisão Periódica</Typography>
+                    <Typography variant="subtitle1" fontWeight="bold">6. Revisão Periódica</Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
@@ -2726,7 +2726,7 @@ const actionButtons = useMemo(() => {
                       </Grid>
                       <Grid item xs={12}>
                         <Stack spacing={1}>
-                          <InputLabel>Conclusão da revisão</InputLabel>
+                          <InputLabel>Comentário do revisor</InputLabel>
                           <TextField onChange={(event) => setConclusaoRevisao(event.target.value)} fullWidth multiline rows={3} value={conclusaoRevisao} disabled={isFormLocked} />
                         </Stack>
                       </Grid>
@@ -2762,7 +2762,7 @@ const actionButtons = useMemo(() => {
               {/* ================= 8. ANEXOS E TRECHOS ================= */}
               <Grid item xs={12} mt={2}>
                 <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
-                  8. Anexos e Integrações
+                  Anexos
                 </Typography>
               </Grid>
               <Grid item xs={12}>

@@ -76,7 +76,7 @@ function ColumnsLayouts() {
   const [hasChanges, setHasChanges] = useState(false);
   const [statuss] = useState([
     { id: 1, nome: "Não iniciada" },
-    { id: 2, nome: "Iniciada" },
+    { id: 2, nome: "Em avaliação" },
     { id: 3, nome: "Em avaliação" },
     { id: 4, nome: "Completa" },
     { id: 5, nome: "Finalizada" },
@@ -160,11 +160,11 @@ function ColumnsLayouts() {
 
   // 2. Respondentes e Responsável: Editáveis na criação e na alteração se status for "Não iniciada" (1) ou "Iniciada" (2).
   const isPeopleEditable =
-    !statusAtual || statusAtual === 1 || statusAtual === 2;
+    !statusAtual || statusAtual === 1;
 
   // 3. Avaliação (Heatmap, Justificativa, Switch): Apenas Responsável nos status "Em avaliação" (3) e "Completa" (4).
   const isEvaluationEditable =
-    isResponsibleAv && (statusAtual === 3 || statusAtual === 4);
+    isResponsibleAv && (statusAtual === 2 || statusAtual === 3 || statusAtual === 4);
 
   const isComplete = statusAtual === 4;
   const isFinalizada = statusAtual === 5;
@@ -910,7 +910,7 @@ function ColumnsLayouts() {
     let title = "";
 
     if (currentStatus === 1 && isResp) title = "INICIAR AVALIAÇÃO";
-    else if ((currentStatus === 3 || currentStatus === 4) && isResp)
+    else if ((currentStatus === 2 || currentStatus === 3 || currentStatus === 4) && isResp)
       title = "FINALIZAR";
 
     return { buttonTitle: title, isTester: isResp };
