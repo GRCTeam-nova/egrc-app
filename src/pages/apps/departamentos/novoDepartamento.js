@@ -65,6 +65,21 @@ function ColumnsLayouts() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
+  // --- ESTADOS DOS FILTROS EM CASCATA ---
+  const [riscosFiltrados, setRiscosFiltrados] = useState([]);
+  const [normativasFiltradas, setNormativasFiltradas] = useState([]);
+  const [dadosFiltrados, setDadosFiltrados] = useState([]);
+  const [incidentesFiltrados, setIncidentesFiltrados] = useState([]);
+  
+  const [riscoOrigemMap, setRiscoOrigemMap] = useState({});
+  const [normativaOrigemMap, setNormativaOrigemMap] = useState({});
+  const [dadoOrigemMap, setDadoOrigemMap] = useState({});
+  const [incidenteOrigemMap, setIncidenteOrigemMap] = useState({});
+
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  // --------------------------------------
+
   const [formData, setFormData] = useState({
     departamentoInferior: [],
     departamentoLateral: [],
@@ -119,14 +134,14 @@ function ColumnsLayouts() {
               ? data.departmentSides.map((u) => u.idDepartmentSide)
               : [],
             departamentoSuperior: data.idDepartmentSuperior || null,
-            normativa: data.idNormatives || null,
-            risco: data.idRisks || null,
-            processo: data.idProcesses || null,
+            normativa: data.idNormatives || [],
+            risco: data.idRisks || [],
+            processo: data.idProcesses || [],
             tipoResponsabilidade: data.idResponsabilityType || null,
             formatoUnidade: data.idUnitFormat || null,
-            incidente: data.idIncidents || null,
-            planoAcao: data.idActionPlans || null,
-            dado: data.idLgpds || null,
+            incidente: data.idIncidents || [],
+            planoAcao: data.idActionPlans || [],
+            dado: data.idLgpds || [],
             responsavel: data.idResponsible || null,
           }));
 
@@ -143,54 +158,21 @@ function ColumnsLayouts() {
         fetchDepartamentosDados();
       }
     }
-  }, [dadosApi]);
+  }, [dadosApi, token]);
 
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
-      setDepartamentosInferiores
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
-      setDepartamentosLaterais
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
-      setDepartamentosSuperiores
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}departments`, setDepartamentosInferiores);
+    fetchData(`${process.env.REACT_APP_API_URL}departments`, setDepartamentosLaterais);
+    fetchData(`${process.env.REACT_APP_API_URL}departments`, setDepartamentosSuperiores);
     fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments/responsability-types`,
-      setTiposResponsabilidades
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments/unit-formats`,
-      setFormatoUnidades
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsavel
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}incidents`,
-      setIncidentes
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}datas`,
-      setDados
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}normatives`,
-      setNormativas
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}action-plans`,
-      setPlanosAcao
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
+    fetchData(`${process.env.REACT_APP_API_URL}departments/responsability-types`, setTiposResponsabilidades);
+    fetchData(`${process.env.REACT_APP_API_URL}departments/unit-formats`, setFormatoUnidades);
+    fetchData(`${process.env.REACT_APP_API_URL}collaborators/responsibles`, setResponsavel);
+    fetchData(`${process.env.REACT_APP_API_URL}incidents`, setIncidentes);
+    fetchData(`${process.env.REACT_APP_API_URL}datas`, setDados);
+    fetchData(`${process.env.REACT_APP_API_URL}normatives`, setNormativas);
+    fetchData(`${process.env.REACT_APP_API_URL}action-plans`, setPlanosAcao);
     window.scrollTo(0, 0);
   }, []);
 
@@ -202,7 +184,7 @@ function ColumnsLayouts() {
         },
       });
 
-      // Transformando os dados para alterar idCompany, idLedgerAccount e idProcess -> id, e name -> nome
+      // Transformando os dados
       const transformedData = response.data.map((item) => ({
         id:
           item.idCompany ||
@@ -217,9 +199,10 @@ function ColumnsLayouts() {
           item.idResponsabilityType ||
           item.idCollaborator ||
           item.idLgpd ||
-          item.idNormative,
+          item.idNormative ||
+          item.id,
         nome: item.name,
-        ...item, // Mantém os outros campos intactos
+        ...item,
       }));
 
       setState(transformedData);
@@ -233,73 +216,215 @@ function ColumnsLayouts() {
   useEffect(() => {
     const nomeDigitado = formatarNome(nomeDepartamento);
 
-    // Verifica e remove o departamento superior se necessário
     const superiorSelecionada = departamentosSuperiores.find(
       (departamento) => departamento.id === formData.departamentoSuperior
     );
-    if (
-      superiorSelecionada &&
-      formatarNome(superiorSelecionada.nome) === nomeDigitado
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        departamentoSuperior: null,
-      }));
+    if (superiorSelecionada && formatarNome(superiorSelecionada.nome) === nomeDigitado) {
+      setFormData((prev) => ({ ...prev, departamentoSuperior: null }));
     }
 
-    // Atualiza os departamentos inferiores removendo os que conflitam
     const inferioresAtualizadas = formData.departamentoInferior.filter((id) => {
-      const departamentoInferior = departamentosInferiores.find(
-        (departamento) => departamento.id === id
-      );
+      const departamentoInferior = departamentosInferiores.find((departamento) => departamento.id === id);
       if (!departamentoInferior) return false;
       return formatarNome(departamentoInferior.nome) !== nomeDigitado;
     });
     if (inferioresAtualizadas.length !== formData.departamentoInferior.length) {
-      setFormData((prev) => ({
-        ...prev,
-        departamentoInferior: inferioresAtualizadas,
-      }));
+      setFormData((prev) => ({ ...prev, departamentoInferior: inferioresAtualizadas }));
     }
 
-    // **Novo bloco: Atualiza os departamentos laterais**
     const lateraisAtualizadas = formData.departamentoLateral.filter((id) => {
-      const departamentoLateral = departamentosLateral.find(
-        (departamento) => departamento.id === id
-      );
+      const departamentoLateral = departamentosLateral.find((departamento) => departamento.id === id);
       if (!departamentoLateral) return false;
       return formatarNome(departamentoLateral.nome) !== nomeDigitado;
     });
     if (lateraisAtualizadas.length !== formData.departamentoLateral.length) {
-      setFormData((prev) => ({
-        ...prev,
-        departamentoLateral: lateraisAtualizadas,
-      }));
+      setFormData((prev) => ({ ...prev, departamentoLateral: lateraisAtualizadas }));
     }
   }, [
     nomeDepartamento,
     departamentosSuperiores,
     departamentosInferiores,
     departamentosLateral,
+    formData.departamentoSuperior,
     formData.departamentoInferior,
     formData.departamentoLateral,
   ]);
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "departamentoSuperior") {
-      // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
-      // Para outros campos
       setFormData({ ...formData, [field]: value });
     }
   };
 
+  // --- EFEITO 1: PROCESSO FILTRA RISCO, NORMATIVA E DADO ---
+  useEffect(() => {
+    const atualizarDependentesDeProcesso = async () => {
+      if (formData.processo.length === 0) {
+        setRiscosFiltrados(riscos);
+        setNormativasFiltradas(normativas);
+        setDadosFiltrados(dados);
+        setRiscoOrigemMap({});
+        setNormativaOrigemMap({});
+        setDadoOrigemMap({});
+        return;
+      }
+
+      const idsRiscoPermitidos = new Set();
+      const idsNormativaPermitidos = new Set();
+      const idsDadoPermitidos = new Set();
+      const novoMapaRisco = {};
+      const novoMapaNormativa = {};
+      const novoMapaDado = {};
+
+      const promises = formData.processo.map((id) =>
+        axios.get(`${process.env.REACT_APP_API_URL}processes/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      );
+
+      try {
+        const results = await Promise.all(promises);
+        results.forEach((res) => {
+          const nomeProc = res.data.name;
+
+          // Processa Riscos
+          const proRiscos = res.data.risks || res.data.idRisks || [];
+          proRiscos.forEach((r) => {
+            const idRisco = typeof r === "object" ? r.idRisk || r.id : r;
+            if (idRisco) {
+              idsRiscoPermitidos.add(idRisco);
+              if (!novoMapaRisco[idRisco]) novoMapaRisco[idRisco] = [];
+              if (!novoMapaRisco[idRisco].includes(nomeProc)) novoMapaRisco[idRisco].push(nomeProc);
+            }
+          });
+
+          // Processa Normativas
+          const proNorms = res.data.normatives || res.data.idNormatives || [];
+          proNorms.forEach((n) => {
+            const idNorm = typeof n === "object" ? n.idNormative || n.id : n;
+            if (idNorm) {
+              idsNormativaPermitidos.add(idNorm);
+              if (!novoMapaNormativa[idNorm]) novoMapaNormativa[idNorm] = [];
+              if (!novoMapaNormativa[idNorm].includes(nomeProc)) novoMapaNormativa[idNorm].push(nomeProc);
+            }
+          });
+
+          // Processa Dados
+          const proDados = res.data.lgpds || res.data.datas || res.data.idLgpds || res.data.idDatas || [];
+          proDados.forEach((d) => {
+            const idDado = typeof d === "object" ? d.idLgpd || d.idData || d.id : d;
+            if (idDado) {
+              idsDadoPermitidos.add(idDado);
+              if (!novoMapaDado[idDado]) novoMapaDado[idDado] = [];
+              if (!novoMapaDado[idDado].includes(nomeProc)) novoMapaDado[idDado].push(nomeProc);
+            }
+          });
+        });
+
+        // Função de segurança rigorosa para identificar itens órfãos 
+        // caso o backend retorne o campo, mas ele esteja vazio.
+        const isOrphan = (item, keys) => {
+          let hasField = false;
+          for (const key of keys) {
+            if (item[key] !== undefined) {
+              hasField = true;
+              if (Array.isArray(item[key]) && item[key].length > 0) return false;
+            }
+          }
+          return hasField; 
+        };
+
+        setRiscosFiltrados(
+          riscos.filter((r) => idsRiscoPermitidos.has(r.id) || isOrphan(r, ['processes', 'idProcesses']))
+        );
+        setNormativasFiltradas(
+          normativas.filter((n) => idsNormativaPermitidos.has(n.id) || isOrphan(n, ['processes', 'idProcesses']))
+        );
+        setDadosFiltrados(
+          dados.filter((d) => idsDadoPermitidos.has(d.id) || isOrphan(d, ['processes', 'idProcesses']))
+        );
+
+        setRiscoOrigemMap(novoMapaRisco);
+        setNormativaOrigemMap(novoMapaNormativa);
+        setDadoOrigemMap(novoMapaDado);
+      } catch (e) {
+        console.error("Erro ao buscar dependências de processo:", e);
+      }
+    };
+
+    if (riscos.length > 0 || normativas.length > 0 || dados.length > 0) {
+      atualizarDependentesDeProcesso();
+    }
+  }, [formData.processo, riscos, normativas, dados, token]);
+
+
+  // --- EFEITO 2: RISCO FILTRA INCIDENTE ---
+  useEffect(() => {
+    const atualizarIncidentes = async () => {
+      if (formData.risco.length === 0) {
+        setIncidentesFiltrados(incidentes);
+        setIncidenteOrigemMap({});
+        return;
+      }
+
+      const idsIncidentePermitidos = new Set();
+      const novoMapaIncidente = {};
+
+      const promises = formData.risco.map((id) =>
+        axios.get(`${process.env.REACT_APP_API_URL}risks/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      );
+
+      try {
+        const results = await Promise.all(promises);
+        results.forEach((res) => {
+          const nomeRisco = res.data.name;
+          // Pega diretamente a key 'incidents' ou 'idIncidents' que retornam do backend
+          const incs = res.data.incidents || res.data.idIncidents || [];
+          incs.forEach((i) => {
+            const idInc = typeof i === "object" ? i.idIncident || i.id : i;
+            if (idInc) {
+              idsIncidentePermitidos.add(idInc);
+              if (!novoMapaIncidente[idInc]) novoMapaIncidente[idInc] = [];
+              if (!novoMapaIncidente[idInc].includes(nomeRisco)) novoMapaIncidente[idInc].push(nomeRisco);
+            }
+          });
+        });
+
+        // Mesmo isolamento rigoroso de órfãos para os incidentes
+        const isOrphan = (item, keys) => {
+          let hasField = false;
+          for (const key of keys) {
+            if (item[key] !== undefined) {
+              hasField = true;
+              if (Array.isArray(item[key]) && item[key].length > 0) return false;
+            }
+          }
+          return hasField; 
+        };
+
+        setIncidentesFiltrados(
+          incidentes.filter((i) => idsIncidentePermitidos.has(i.id) || isOrphan(i, ['risks', 'idRisks']))
+        );
+        setIncidenteOrigemMap(novoMapaIncidente);
+      } catch (e) {
+        console.error("Erro ao buscar dependências de risco:", e);
+      }
+    };
+
+    if (incidentes.length > 0) {
+      atualizarIncidentes();
+    }
+  }, [formData.risco, incidentes, token]);
+
   const handleProcessCreated = (newProcesso) => {
-    setProcessos((prevProcessos) => [...prevProcessos, newProcesso]); // Adiciona o novo processo à lista
+    setProcessos((prevProcessos) => [...prevProcessos, newProcesso]);
     setFormData((prev) => ({
       ...prev,
-      processo: [...prev.processo, newProcesso.id], // Seleciona o novo processo automaticamente
+      processo: [...prev.processo, newProcesso.id],
     }));
   };
 
@@ -329,41 +454,30 @@ function ColumnsLayouts() {
 
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      // Aplica o mesmo filtro usado nas opções do Autocomplete para Departamentos Inferiores
-      const filteredInferiores = departamentosInferiores.filter(
-        (departamento) => {
-          const superiorId = formData.departamentoSuperior;
-          const lateralIds = formData.departamentoLateral || [];
-          return (
-            departamento.id !== superiorId &&
-            !lateralIds.includes(departamento.id) &&
-            formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
-          );
-        }
-      );
+      const filteredInferiores = departamentosInferiores.filter((departamento) => {
+        const superiorId = formData.departamentoSuperior;
+        const lateralIds = formData.departamentoLateral || [];
+        return (
+          departamento.id !== superiorId &&
+          !lateralIds.includes(departamento.id) &&
+          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
+        );
+      });
       if (formData.departamentoInferior.length === filteredInferiores.length) {
-        // Deseleciona todos se já estiverem todos selecionados
         setFormData({ ...formData, departamentoInferior: [] });
       } else {
-        // Seleciona apenas os itens filtrados
         setFormData({
           ...formData,
-          departamentoInferior: filteredInferiores.map(
-            (departamento) => departamento.id
-          ),
+          departamentoInferior: filteredInferiores.map((departamento) => departamento.id),
         });
       }
     } else {
-      tratarMudancaInputGeral(
-        "departamentoInferior",
-        newValue.map((item) => item.id)
-      );
+      tratarMudancaInputGeral("departamentoInferior", newValue.map((item) => item.id));
     }
   };
 
   const handleSelectDepartamentoLateral = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      // Aplica o mesmo filtro usado nas opções do Autocomplete para Departamentos Laterais
       const filteredLaterais = departamentosLateral.filter((departamento) => {
         const superiorId = formData.departamentoSuperior;
         const inferiorIds = formData.departamentoInferior || [];
@@ -374,144 +488,129 @@ function ColumnsLayouts() {
         );
       });
       if (formData.departamentoLateral.length === filteredLaterais.length) {
-        // Deseleciona todos se já estiverem todos selecionados
         setFormData({ ...formData, departamentoLateral: [] });
       } else {
-        // Seleciona apenas os itens filtrados
         setFormData({
           ...formData,
-          departamentoLateral: filteredLaterais.map(
-            (departamento) => departamento.id
-          ),
+          departamentoLateral: filteredLaterais.map((departamento) => departamento.id),
         });
       }
     } else {
-      tratarMudancaInputGeral(
-        "departamentoLateral",
-        newValue.map((item) => item.id)
-      );
+      tratarMudancaInputGeral("departamentoLateral", newValue.map((item) => item.id));
     }
   };
 
-  const handleSelectAll2 = (event, newValue) => {
+  // --- HANDLERS COM INTERCEPTAÇÃO E AVISO ---
+  const handleSelectAllProcessos = (event, newValue) => {
+    let novosIds = [];
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          processo: processos.map((processo) => processo.id),
-        });
-      }
+      if (formData.processo.length === processos.length) novosIds = [];
+      else novosIds = processos.map((p) => p.id);
     } else {
-      tratarMudancaInputGeral(
-        "processo",
-        newValue.map((item) => item.id)
-      );
+      novosIds = newValue.map((item) => item.id);
     }
+
+    if (
+      formData.processo.length === 0 &&
+      novosIds.length > 0 &&
+      (formData.risco.length > 0 || formData.normativa.length > 0 || formData.dado.length > 0)
+    ) {
+      setPendingAction({ type: "processo", ids: novosIds });
+      setWarningDialogOpen(true);
+      return;
+    }
+    tratarMudancaInputGeral("processo", novosIds);
   };
 
-  const handleSelectAllConta = (event, newValue) => {
+  const handleSelectAllRiscos = (event, newValue) => {
+    let novosIds = [];
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.risco.length === riscos.length) {
-        // Deselect all
-        setFormData({ ...formData, risco: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, risco: riscos.map((risco) => risco.id) });
-      }
+      if (formData.risco.length === riscosFiltrados.length) novosIds = [];
+      else novosIds = riscosFiltrados.map((r) => r.id);
     } else {
-      tratarMudancaInputGeral(
-        "risco",
-        newValue.map((item) => item.id)
-      );
+      novosIds = newValue.map((item) => item.id);
     }
+
+    if (formData.risco.length === 0 && novosIds.length > 0 && formData.incidente.length > 0) {
+      setPendingAction({ type: "risco", ids: novosIds });
+      setWarningDialogOpen(true);
+      return;
+    }
+    tratarMudancaInputGeral("risco", novosIds);
+  };
+
+  const confirmarMudancaFiltro = () => {
+    if (pendingAction.type === "processo") {
+      setFormData((prev) => ({
+        ...prev,
+        processo: pendingAction.ids,
+        risco: [],
+        normativa: [],
+        dado: [],
+        incidente: [],
+      }));
+    } else if (pendingAction.type === "risco") {
+      setFormData((prev) => ({
+        ...prev,
+        risco: pendingAction.ids,
+        incidente: [],
+      }));
+    }
+    setWarningDialogOpen(false);
+    setPendingAction(null);
   };
 
   const handleSelectAllIncidentes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.incidente.length === incidentes.length) {
-        // Deselect all
+      if (formData.incidente.length === incidentesFiltrados.length) {
         setFormData({ ...formData, incidente: [] });
       } else {
-        // Select all
-        setFormData({
-          ...formData,
-          incidente: incidentes.map((incidente) => incidente.id),
-        });
+        setFormData({ ...formData, incidente: incidentesFiltrados.map((incidente) => incidente.id) });
       }
     } else {
-      tratarMudancaInputGeral(
-        "incidente",
-        newValue.map((item) => item.id)
-      );
+      tratarMudancaInputGeral("incidente", newValue.map((item) => item.id));
     }
   };
 
-    const handleSelectAllDados = (event, newValue) => {
+  const handleSelectAllDados = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.dado.length === dados.length) {
-        // Deselect all
+      if (formData.dado.length === dadosFiltrados.length) {
         setFormData({ ...formData, dado: [] });
       } else {
-        // Select all
-        setFormData({
-          ...formData,
-          dado: dados.map((dado) => dado.id),
-        });
+        setFormData({ ...formData, dado: dadosFiltrados.map((dado) => dado.id) });
       }
     } else {
-      tratarMudancaInputGeral(
-        "dado",
-        newValue.map((item) => item.id)
-      );
+      tratarMudancaInputGeral("dado", newValue.map((item) => item.id));
     }
   };
+
   const handleSelectAllNormativas = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.normativa.length === normativas.length) {
-        // Deselect all
+      if (formData.normativa.length === normativasFiltradas.length) {
         setFormData({ ...formData, normativa: [] });
       } else {
-        // Select all
-        setFormData({
-          ...formData,
-          normativa: normativas.map((normativa) => normativa.id),
-        });
+        setFormData({ ...formData, normativa: normativasFiltradas.map((normativa) => normativa.id) });
       }
     } else {
-      tratarMudancaInputGeral(
-        "normativa",
-        newValue.map((item) => item.id)
-      );
+      tratarMudancaInputGeral("normativa", newValue.map((item) => item.id));
     }
   };
+
   const handleSelectAllPlanos = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.planoAcao.length === planosAcao.length) {
-        // Deselect all
         setFormData({ ...formData, planoAcao: [] });
       } else {
-        // Select all
-        setFormData({
-          ...formData,
-          planoAcao: planosAcao.map((planoAcao) => planoAcao.id),
-        });
+        setFormData({ ...formData, planoAcao: planosAcao.map((planoAcao) => planoAcao.id) });
       }
     } else {
-      tratarMudancaInputGeral(
-        "planoAcao",
-        newValue.map((item) => item.id)
-      );
+      tratarMudancaInputGeral("planoAcao", newValue.map((item) => item.id));
     }
   };
 
   const voltarParaCadastroMenu = () => {
     navigate(-1);
     window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
   };
 
   const [formValidation, setFormValidation] = useState({
@@ -525,16 +624,18 @@ function ColumnsLayouts() {
   const allSelectedDepartamentoLateral =
     formData.departamentoLateral.length === departamentosLateral.length &&
     departamentosLateral.length > 0;
-  const allSelectedRiscos =
-    formData.risco.length === riscos.length && riscos.length > 0;
-  const allSelected2 =
+  
+  const allSelectedProcessos =
     formData.processo.length === processos.length && processos.length > 0;
+  const allSelectedRiscos =
+    formData.risco.length === riscosFiltrados.length && riscosFiltrados.length > 0;
   const allSelectedIncidentes =
-    formData.incidente.length === incidentes.length && incidentes.length > 0;
+    formData.incidente.length === incidentesFiltrados.length && incidentesFiltrados.length > 0;
   const allSelectedDados =
-    formData.dado.length === dados.length && dados.length > 0;
+    formData.dado.length === dadosFiltrados.length && dadosFiltrados.length > 0;
   const allSelectedNormativas =
-    formData.normativa.length === normativas.length && normativas.length > 0;
+    formData.normativa.length === normativasFiltradas.length && normativasFiltradas.length > 0;
+  
   const allSelectedPlanos =
     formData.planoAcao.length === planosAcao.length && planosAcao.length > 0;
 
@@ -545,7 +646,6 @@ function ColumnsLayouts() {
     setSuccessDialogOpen(false);
   };
 
-  // Função para voltar para a listagem
   const voltarParaListagem = () => {
     setSuccessDialogOpen(false);
     voltarParaCadastroMenu();
@@ -574,21 +674,16 @@ function ColumnsLayouts() {
       enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
         variant: "error",
       });
-      return; // Para a execução se a validação falhar
+      return;
     }
 
-    // Separe os arquivos novos dos já existentes:
     const newFiles = formData.files.filter((file) => file instanceof File);
-    const existingFiles = formData.files.filter(
-      (file) => !(file instanceof File)
-    );
+    const existingFiles = formData.files.filter((file) => !(file instanceof File));
 
-    // Realiza upload dos novos arquivos, se houver
     let uploadFilesResult = { files: [] };
     if (newFiles.length > 0) {
       const formDataUpload = new FormData();
-      formDataUpload.append("ContainerFolder", 2); // 1 para empresa
-      // Em edição, já temos o id da empresa; em criação, envia string vazia
+      formDataUpload.append("ContainerFolder", 2);
       formDataUpload.append(
         "IdContainer",
         requisicao === "Editar" ? departamentoDados?.idDepartment : ""
@@ -607,21 +702,17 @@ function ColumnsLayouts() {
           },
         }
       );
-      uploadFilesResult = uploadResponse.data; // Supõe-se que seja um objeto do tipo { files: [...] }
+      uploadFilesResult = uploadResponse.data;
     }
 
-    // Combina os arquivos já existentes com os novos enviados (retornados pelo endpoint)
     const finalFiles = [...existingFiles, ...uploadFilesResult.files];
 
-    // Transforma cada item para que o payload contenha somente a URL (string)
     const finalFilesPayload = finalFiles.map((file) => {
-      // Se for uma string já, retorna-a; se for objeto e tiver a propriedade "path", retorna o valor dela.
       if (typeof file === "string") return file;
       if (file.path) return file.path;
       return file;
     });
 
-    // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
       url = `${process.env.REACT_APP_API_URL}departments`;
       method = "POST";
@@ -643,25 +734,14 @@ function ColumnsLayouts() {
         files: finalFilesPayload,
         idNormatives: formData.normativa?.length ? formData.normativa : null,
         idLgpds: formData.dado?.length ? formData.dado : null,
-        idResponsible:
-          formData.responsavel === "" ? null : formData.responsavel,
-        idDepartmentSuperior: formData.departamentoSuperior?.length
-          ? formData.departamentoSuperior
-          : null,
-        idDepartmentBottoms: formData.departamentoInferior?.length
-          ? formData.departamentoInferior
-          : null,
-        idDepartmentSides: formData.departamentoLateral?.length
-          ? formData.departamentoLateral
-          : null,
+        idResponsible: formData.responsavel === "" ? null : formData.responsavel,
+        idDepartmentSuperior: formData.departamentoSuperior?.length ? formData.departamentoSuperior : null,
+        idDepartmentBottoms: formData.departamentoInferior?.length ? formData.departamentoInferior : null,
+        idDepartmentSides: formData.departamentoLateral?.length ? formData.departamentoLateral : null,
         idIncidents: formData.incidente?.length ? formData.incidente : null,
-        idUnitFormat: formData.formatoUnidade?.length
-          ? formData.formatoUnidade
-          : null,
+        idUnitFormat: formData.formatoUnidade?.length ? formData.formatoUnidade : null,
         idRisks: formData.risco?.length ? formData.risco : null,
-        idResponsabilityType: formData.tipoResponsabilidade?.length
-          ? formData.tipoResponsabilidade
-          : null,
+        idResponsabilityType: formData.tipoResponsabilidade?.length ? formData.tipoResponsabilidade : null,
         idProcesses: formData.processo?.length ? formData.processo : null,
         idActionPlans: formData.planoAcao?.length ? formData.planoAcao : null,
       };
@@ -670,7 +750,6 @@ function ColumnsLayouts() {
     try {
       setLoading(true);
 
-      // Primeira requisição (POST ou PUT inicial)
       const response = await fetch(url, {
         method,
         headers: {
@@ -695,7 +774,6 @@ function ColumnsLayouts() {
       }
 
       if (requisicao === "Criar" && data.data.idDepartment) {
-        // Atualiza o estado para modo de edição
         setDepartamentosDados(data.data);
         setSuccessDialogOpen(true);
       } else {
@@ -737,9 +815,7 @@ function ColumnsLayouts() {
                 onChange={(event) => setNome(event.target.value)}
                 fullWidth
                 value={nomeDepartamento}
-                error={
-                  !nomeDepartamento && formValidation.nomeDepartamento === false
-                }
+                error={!nomeDepartamento && formValidation.nomeDepartamento === false}
               />
             </Stack>
           </Grid>
@@ -764,12 +840,10 @@ function ColumnsLayouts() {
                   <InputLabel>Tipos de Responsabilidade</InputLabel>
                   <Autocomplete
                     options={tiposResponsabilidades}
-                    getOptionLabel={(option) => option.nome}
+                    getOptionLabel={(option) => option.nome || ""}
                     value={
                       tiposResponsabilidades.find(
-                        (tipoResponsabilidade) =>
-                          tipoResponsabilidade.id ===
-                          formData.tipoResponsabilidade
+                        (tipoResponsabilidade) => tipoResponsabilidade.id === formData.tipoResponsabilidade
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -781,10 +855,7 @@ function ColumnsLayouts() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        error={
-                          !formData.tipoResponsabilidade &&
-                          formValidation.tipoResponsabilidade === false
-                        }
+                        error={!formData.tipoResponsabilidade && formValidation.tipoResponsabilidade === false}
                       />
                     )}
                   />
@@ -796,11 +867,10 @@ function ColumnsLayouts() {
                   <InputLabel>Formato de Unidade</InputLabel>
                   <Autocomplete
                     options={formatosUnidades}
-                    getOptionLabel={(option) => option.nome}
+                    getOptionLabel={(option) => option.nome || ""}
                     value={
                       formatosUnidades.find(
-                        (formatoUnidade) =>
-                          formatoUnidade.id === formData.formatoUnidade
+                        (formatoUnidade) => formatoUnidade.id === formData.formatoUnidade
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -812,10 +882,7 @@ function ColumnsLayouts() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        error={
-                          !formData.formatoUnidade &&
-                          formValidation.formatoUnidade === false
-                        }
+                        error={!formData.formatoUnidade && formValidation.formatoUnidade === false}
                       />
                     )}
                   />
@@ -827,41 +894,28 @@ function ColumnsLayouts() {
                   <InputLabel>Departamento superior</InputLabel>
                   <Autocomplete
                     options={departamentosSuperiores.filter((departamento) => {
-                      // IDs dos departamentos já selecionados nos outros campos:
-                      const selectedInferior =
-                        formData.departamentoInferior || [];
-                      const selectedLateral =
-                        formData.departamentoLateral || [];
-                      const selectedIds = [
-                        ...selectedInferior,
-                        ...selectedLateral,
-                      ];
+                      const selectedInferior = formData.departamentoInferior || [];
+                      const selectedLateral = formData.departamentoLateral || [];
+                      const selectedIds = [...selectedInferior, ...selectedLateral];
 
-                      // Se for o valor atual selecionado, não filtra
-                      if (formData.departamentoSuperior === departamento.id)
-                        return true;
+                      if (formData.departamentoSuperior === departamento.id) return true;
 
-                      // Exclui se já estiver selecionado em outro campo ou se o nome for igual ao nome do departamento atual
                       return (
                         !selectedIds.includes(departamento.id) &&
-                        formatarNome(departamento.nome) !==
-                          formatarNome(nomeDepartamento)
+                        formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
                       );
                     })}
-                    getOptionLabel={(option) => option.nome}
+                    getOptionLabel={(option) => option.nome || ""}
                     value={
                       departamentosSuperiores.find(
-                        (departamento) =>
-                          departamento.id === formData.departamentoSuperior
+                        (departamento) => departamento.id === formData.departamentoSuperior
                       ) || null
                     }
                     onChange={(event, newValue) => {
-                      // Quando selecionar um departamento superior, removemos dele dos inferiores (por exemplo)
                       setFormData((prev) => {
-                        const updatedInferior =
-                          prev.departamentoInferior.filter((id) =>
-                            newValue ? id !== newValue.id : true
-                          );
+                        const updatedInferior = prev.departamentoInferior.filter((id) =>
+                          newValue ? id !== newValue.id : true
+                        );
                         return {
                           ...prev,
                           departamentoSuperior: newValue ? newValue.id : "",
@@ -872,10 +926,7 @@ function ColumnsLayouts() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        error={
-                          !formData.departamentoSuperior &&
-                          formValidation.departamentoSuperior === false
-                        }
+                        error={!formData.departamentoSuperior && formValidation.departamentoSuperior === false}
                       />
                     )}
                   />
@@ -891,46 +942,29 @@ function ColumnsLayouts() {
                     options={[
                       { id: "all", nome: "Selecionar todos" },
                       ...departamentosInferiores.filter((departamento) => {
-                        // IDs já selecionados em outros autocompletes:
                         const superiorId = formData.departamentoSuperior;
                         const lateralIds = formData.departamentoLateral || [];
 
-                        // Se o departamento estiver selecionado neste campo, mantenha-o
-                        if (
-                          formData.departamentoInferior.includes(
-                            departamento.id
-                          )
-                        )
-                          return true;
+                        if (formData.departamentoInferior.includes(departamento.id)) return true;
 
                         return (
                           departamento.id !== superiorId &&
                           !lateralIds.includes(departamento.id) &&
-                          formatarNome(departamento.nome) !==
-                            formatarNome(nomeDepartamento)
+                          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
                         );
                       }),
                     ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.departamentoInferior.map(
-                      (id) =>
-                        departamentosInferiores.find(
-                          (departamento) => departamento.id === id
-                        ) || id
-                    )}
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.departamentoInferior
+                      .map((id) => departamentosInferiores.find((departamento) => departamento.id === id))
+                      .filter(Boolean)}
                     onChange={handleSelectAll}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelected : selected
-                              }
-                            />
+                            <Checkbox checked={option.id === "all" ? allSelected : selected} />
                           </Grid>
                           <Grid item xs>
                             {option.nome}
@@ -943,9 +977,7 @@ function ColumnsLayouts() {
                         {...params}
                         error={
                           (formData.departamentoInferior.length === 0 ||
-                            formData.departamentoInferior.every(
-                              (val) => val === 0
-                            )) &&
+                            formData.departamentoInferior.every((val) => val === 0)) &&
                           formValidation.departamentoInferior === false
                         }
                       />
@@ -966,41 +998,26 @@ function ColumnsLayouts() {
                         const superiorId = formData.departamentoSuperior;
                         const inferiorIds = formData.departamentoInferior || [];
 
-                        if (
-                          formData.departamentoLateral.includes(departamento.id)
-                        )
-                          return true;
+                        if (formData.departamentoLateral.includes(departamento.id)) return true;
 
                         return (
                           departamento.id !== superiorId &&
                           !inferiorIds.includes(departamento.id) &&
-                          formatarNome(departamento.nome) !==
-                            formatarNome(nomeDepartamento)
+                          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
                         );
                       }),
                     ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.departamentoLateral.map(
-                      (id) =>
-                        departamentosLateral.find(
-                          (departamento) => departamento.id === id
-                        ) || id
-                    )}
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.departamentoLateral
+                      .map((id) => departamentosLateral.find((departamento) => departamento.id === id))
+                      .filter(Boolean)}
                     onChange={handleSelectDepartamentoLateral}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedDepartamentoLateral
-                                  : selected
-                              }
-                            />
+                            <Checkbox checked={option.id === "all" ? allSelectedDepartamentoLateral : selected} />
                           </Grid>
                           <Grid item xs>
                             {option.nome}
@@ -1013,9 +1030,7 @@ function ColumnsLayouts() {
                         {...params}
                         error={
                           (formData.departamentoLateral.length === 0 ||
-                            formData.departamentoLateral.every(
-                              (val) => val === 0
-                            )) &&
+                            formData.departamentoLateral.every((val) => val === 0)) &&
                           formValidation.departamentoInferior === false
                         }
                       />
@@ -1024,44 +1039,32 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
+              {/* AUTOCOMPLETE: PROCESSOS */}
               <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
                   <InputLabel>
                     Processos{" "}
                     <DrawerProcesso
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
+                      buttonSx={{ marginLeft: 1.5, height: "20px", minWidth: "20px" }}
                       onProcessCreated={handleProcessCreated}
                     />
                   </InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...processos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processo.map(
-                      (id) =>
-                        processos.find((processo) => processo.id === id) || id
-                    )}
-                    onChange={handleSelectAll2}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
+                    options={processos.length > 0 ? [{ id: "all", nome: "Selecionar todas" }, ...processos] : []}
+                    noOptionsText="Nenhum processo encontrado"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.processo
+                      .map((id) => processos.find((processo) => processo.id === id))
+                      .filter(Boolean)}
+                    onChange={handleSelectAllProcessos}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelected2 : selected
-                              }
-                            />
+                            <Checkbox checked={option.id === "all" ? allSelectedProcessos : selected} />
                           </Grid>
                           <Grid item xs>
                             {option.nome}
@@ -1073,8 +1076,7 @@ function ColumnsLayouts() {
                       <TextField
                         {...params}
                         error={
-                          (formData.processo.length === 0 ||
-                            formData.processo.every((val) => val === 0)) &&
+                          (formData.processo.length === 0 || formData.processo.every((val) => val === 0)) &&
                           formValidation.processo === false
                         }
                       />
@@ -1083,58 +1085,52 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
+              {/* AUTOCOMPLETE: RISCOS */}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>
                     Risco{" "}
                     <DrawerRisco
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
+                      buttonSx={{ marginLeft: 1.5, height: "20px", minWidth: "20px" }}
                       onRiscoCreated={handleRiskCreated}
                     />
                   </InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...riscos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.risco.map(
-                      (id) => riscos.find((risco) => risco.id === id) || id
-                    )}
-                    onChange={handleSelectAllConta}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedRiscos
-                                  : selected
-                              }
-                            />
+                    options={riscosFiltrados.length > 0 ? [{ id: "all", nome: "Selecionar todas" }, ...riscosFiltrados] : []}
+                    noOptionsText="Nenhum risco encontrado"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.risco
+                      .map((id) => riscos.find((risco) => risco.id === id))
+                      .filter(Boolean)}
+                    onChange={handleSelectAllRiscos}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => {
+                      const origens = riscoOrigemMap[option.id] ? riscoOrigemMap[option.id].join(", ") : "";
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox checked={option.id === "all" ? allSelectedRiscos : selected} />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">{option.nome}</Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography variant="caption" display="block" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+                                  Processo(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         error={
-                          (formData.risco.length === 0 ||
-                            formData.risco.every((val) => val === 0)) &&
+                          (formData.risco.length === 0 || formData.risco.every((val) => val === 0)) &&
                           formValidation.risco === false
                         }
                       />
@@ -1143,60 +1139,52 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
+              {/* AUTOCOMPLETE: INCIDENTES */}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>
                     Incidente{" "}
                     <DrawerIncidente
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
+                      buttonSx={{ marginLeft: 1.5, height: "20px", minWidth: "20px" }}
                       onIncidentCreated={handleIncidentCreated}
                     />
                   </InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...incidentes,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.incidente.map(
-                      (id) =>
-                        incidentes.find((incidente) => incidente.id === id) ||
-                        id
-                    )}
+                    options={incidentesFiltrados.length > 0 ? [{ id: "all", nome: "Selecionar todas" }, ...incidentesFiltrados] : []}
+                    noOptionsText="Nenhum incidente encontrado"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.incidente
+                      .map((id) => incidentes.find((incidente) => incidente.id === id))
+                      .filter(Boolean)}
                     onChange={handleSelectAllIncidentes}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedIncidentes
-                                  : selected
-                              }
-                            />
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => {
+                      const origens = incidenteOrigemMap[option.id] ? incidenteOrigemMap[option.id].join(", ") : "";
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox checked={option.id === "all" ? allSelectedIncidentes : selected} />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">{option.nome}</Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography variant="caption" display="block" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+                                  Risco(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         error={
-                          (formData.incidente.length === 0 ||
-                            formData.incidente.every((val) => val === 0)) &&
+                          (formData.incidente.length === 0 || formData.incidente.every((val) => val === 0)) &&
                           formValidation.incidente === false
                         }
                       />
@@ -1204,50 +1192,47 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
+
+              {/* AUTOCOMPLETE: NORMATIVAS */}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Normativas</InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...normativas,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.normativa.map(
-                      (id) =>
-                        normativas.find((normativa) => normativa.id === id) ||
-                        id
-                    )}
+                    options={normativasFiltradas.length > 0 ? [{ id: "all", nome: "Selecionar todas" }, ...normativasFiltradas] : []}
+                    noOptionsText="Nenhuma normativa encontrada"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.normativa
+                      .map((id) => normativas.find((normativa) => normativa.id === id))
+                      .filter(Boolean)}
                     onChange={handleSelectAllNormativas}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedNormativas
-                                  : selected
-                              }
-                            />
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => {
+                      const origens = normativaOrigemMap[option.id] ? normativaOrigemMap[option.id].join(", ") : "";
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox checked={option.id === "all" ? allSelectedNormativas : selected} />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">{option.nome}</Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography variant="caption" display="block" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+                                  Processo(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         error={
-                          (formData.normativa.length === 0 ||
-                            formData.normativa.every((val) => val === 0)) &&
+                          (formData.normativa.length === 0 || formData.normativa.every((val) => val === 0)) &&
                           formValidation.normativa === false
                         }
                       />
@@ -1255,50 +1240,47 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
+
+              {/* AUTOCOMPLETE: DADOS */}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Dados</InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...dados,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.dado.map(
-                      (id) =>
-                        dados.find((dado) => dado.id === id) ||
-                        id
-                    )}
+                    options={dadosFiltrados.length > 0 ? [{ id: "all", nome: "Selecionar todos" }, ...dadosFiltrados] : []}
+                    noOptionsText="Nenhum dado encontrado"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.dado
+                      .map((id) => dados.find((dado) => dado.id === id))
+                      .filter(Boolean)}
                     onChange={handleSelectAllDados}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedDados
-                                  : selected
-                              }
-                            />
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => {
+                      const origens = dadoOrigemMap[option.id] ? dadoOrigemMap[option.id].join(", ") : "";
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox checked={option.id === "all" ? allSelectedDados : selected} />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">{option.nome}</Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography variant="caption" display="block" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+                                  Processo(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
                         error={
-                          (formData.dado.length === 0 ||
-                            formData.dado.every((val) => val === 0)) &&
+                          (formData.dado.length === 0 || formData.dado.every((val) => val === 0)) &&
                           formValidation.dado === false
                         }
                       />
@@ -1306,47 +1288,32 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
+
+              {/* AUTOCOMPLETE: PLANO DE AÇÃO */}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>
                     Plano de ação{" "}
                     <DrawerPlanos
-                      buttonSx={{
-                        marginLeft: 1.5,
-                        height: "20px",
-                        minWidth: "20px",
-                      }}
+                      buttonSx={{ marginLeft: 1.5, height: "20px", minWidth: "20px" }}
                       onPlansCreated={handlePlanCreated}
                     />
                   </InputLabel>
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...planosAcao,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.planoAcao.map(
-                      (id) =>
-                        planosAcao.find((planoAcao) => planoAcao.id === id) ||
-                        id
-                    )}
+                    options={planosAcao.length > 0 ? [{ id: "all", nome: "Selecionar todos" }, ...planosAcao] : []}
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.planoAcao
+                      .map((id) => planosAcao.find((plano) => plano.id === id))
+                      .filter(Boolean)}
                     onChange={handleSelectAllPlanos}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedPlanos
-                                  : selected
-                              }
-                            />
+                            <Checkbox checked={option.id === "all" ? allSelectedPlanos : selected} />
                           </Grid>
                           <Grid item xs>
                             {option.nome}
@@ -1358,8 +1325,7 @@ function ColumnsLayouts() {
                       <TextField
                         {...params}
                         error={
-                          (formData.planoAcao.length === 0 ||
-                            formData.planoAcao.every((val) => val === 0)) &&
+                          (formData.planoAcao.length === 0 || formData.planoAcao.every((val) => val === 0)) &&
                           formValidation.planoAcao === false
                         }
                       />
@@ -1370,46 +1336,30 @@ function ColumnsLayouts() {
 
               <Grid item xs={2}>
                 <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                    style={{ marginLeft: 25, marginTop: 35.5 }}
-                  >
-                    <Switch
-                      checked={temporario}
-                      onChange={(event) => setTemporario(event.target.checked)}
-                    />
+                  <Stack direction="row" alignItems="center" spacing={1} style={{ marginLeft: 25, marginTop: 35.5 }}>
+                    <Switch checked={temporario} onChange={(event) => setTemporario(event.target.checked)} />
                     <Typography>{"Temporário"}</Typography>
                   </Stack>
                 </Stack>
               </Grid>
+
               <Grid item xs={4}>
                 <Stack spacing={1}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                    style={{ marginLeft: 15, marginTop: 35.5 }}
-                  >
-                    <Switch
-                      checked={colegiada}
-                      onChange={(event) => setColegiada(event.target.checked)}
-                    />
+                  <Stack direction="row" alignItems="center" spacing={1} style={{ marginLeft: 15, marginTop: 35.5 }}>
+                    <Switch checked={colegiada} onChange={(event) => setColegiada(event.target.checked)} />
                     <Typography>{"Colegiada"}</Typography>
                   </Stack>
                 </Stack>
               </Grid>
+
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Responsável</InputLabel>
                   <Autocomplete
                     options={responsaveis}
-                    getOptionLabel={(option) => option.nome}
+                    getOptionLabel={(option) => option.nome || ""}
                     value={
-                      responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
-                      ) || null
+                      responsaveis.find((responsavel) => responsavel.id === formData.responsavel) || null
                     }
                     onChange={(event, newValue) => {
                       setFormData((prev) => ({
@@ -1420,24 +1370,20 @@ function ColumnsLayouts() {
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        error={
-                          !formData.responsavel &&
-                          formValidation.responsavel === false
-                        }
+                        error={!formData.responsavel && formValidation.responsavel === false}
                       />
                     )}
                   />
                 </Stack>
               </Grid>
+
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Anexo</InputLabel>
                   <FileUploader
                     containerFolder={2}
                     initialFiles={formData.files}
-                    onFilesChange={(files) =>
-                      setFormData((prev) => ({ ...prev, files }))
-                    }
+                    onFilesChange={(files) => setFormData((prev) => ({ ...prev, files }))}
                   />
                 </Stack>
               </Grid>
@@ -1446,31 +1392,19 @@ function ColumnsLayouts() {
 
           {/* Botões de ação */}
           <Grid item xs={12} mt={-5}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-start",
-                gap: "8px",
-                marginRight: "20px",
-                marginTop: 5,
-              }}
-            >
+            <Box sx={{ display: "flex", justifyContent: "flex-start", gap: "8px", marginRight: "20px", marginTop: 5 }}>
               <Button
                 variant="contained"
                 color="primary"
-                style={{
-                  width: "91px",
-                  height: "32px",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
+                style={{ width: "91px", height: "32px", borderRadius: "4px", fontSize: "14px", fontWeight: 600 }}
                 onClick={tratarSubmit}
               >
                 Atualizar
               </Button>
             </Box>
           </Grid>
+
+          {/* Dialog de Sucesso */}
           <Dialog
             open={successDialogOpen}
             onClose={voltarParaListagem}
@@ -1483,32 +1417,18 @@ function ColumnsLayouts() {
               },
             }}
           >
-            {/* Ícone de Sucesso */}
             <Box display="flex" justifyContent="center" mt={2}>
               <CheckCircleOutlineIcon sx={{ fontSize: 50, color: "#28a745" }} />
             </Box>
-
-            {/* Título Centralizado */}
-            <DialogTitle
-              sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
-            >
+            <DialogTitle sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}>
               Departamento Criado com Sucesso!
             </DialogTitle>
-
-            {/* Mensagem */}
             <DialogContent>
-              <DialogContentText
-                sx={{ fontSize: "16px", color: "#555", px: 2 }}
-              >
-                O departamento foi cadastrado com sucesso. Você pode voltar para
-                a listagem ou adicionar mais informações a esse departamento.
+              <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>
+                O departamento foi cadastrado com sucesso. Você pode voltar para a listagem ou adicionar mais informações a esse departamento.
               </DialogContentText>
             </DialogContent>
-
-            {/* Botões */}
-            <DialogActions
-              sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
-            >
+            <DialogActions sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}>
               <Button
                 onClick={voltarParaListagem}
                 variant="outlined"
@@ -1516,9 +1436,7 @@ function ColumnsLayouts() {
                   borderColor: "#007bff",
                   color: "#007bff",
                   fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "rgba(0, 123, 255, 0.1)",
-                  },
+                  "&:hover": { backgroundColor: "rgba(0, 123, 255, 0.1)" },
                 }}
               >
                 Voltar para a listagem
@@ -1529,9 +1447,7 @@ function ColumnsLayouts() {
                 sx={{
                   backgroundColor: "#007bff",
                   fontWeight: 600,
-                  "&:hover": {
-                    backgroundColor: "#0056b3",
-                  },
+                  "&:hover": { backgroundColor: "#0056b3" },
                 }}
                 autoFocus
               >
@@ -1539,6 +1455,27 @@ function ColumnsLayouts() {
               </Button>
             </DialogActions>
           </Dialog>
+
+          {/* Dialog de Aviso de Filtro */}
+          <Dialog open={warningDialogOpen} onClose={() => setWarningDialogOpen(false)}>
+            <DialogTitle sx={{ fontWeight: 600 }}>{"Alteração de filtro"}</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                Ao alterar a seleção de {pendingAction?.type === "processo" ? "Processos" : "Riscos"}, a lista de dependentes será filtrada e exibirá apenas correspondências válidas.
+                <br /><br />
+                <strong>Os dependentes vinculados que não corresponderem à nova seleção serão removidos.</strong>
+                <br /><br />
+                Deseja continuar?
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setWarningDialogOpen(false)} color="primary">Cancelar</Button>
+              <Button onClick={confirmarMudancaFiltro} color="error" variant="contained" autoFocus>
+                Limpar Seleções Incompatíveis
+              </Button>
+            </DialogActions>
+          </Dialog>
+
         </Grid>
       </LocalizationProvider>
     </>
