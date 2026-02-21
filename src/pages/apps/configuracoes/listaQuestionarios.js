@@ -599,7 +599,7 @@ function ActionCell({ row, refreshData, normativaDados, canEdit = true }) {
                 idAssessment: normativaDados.idAssessment,
               };
 
-              navigation(`/questionarios/criar`, {
+              navigation(`app/questionarios/criar`, {
                 state: {
                   indoPara: "NovoQuestionario",
                   dadosApi,
