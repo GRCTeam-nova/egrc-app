@@ -74,7 +74,7 @@ export const routeMapping = {
 
   "/questionarios/lista": { title: "Questionários", parent: null },
 
-  "app/questionarios/criar": {
+  "/questionarios/criar": {
     title: "Novo Questionário",
     editTitle: "Editar Questionário",
     parent: "/avaliacoes/criar",

@@ -410,7 +410,7 @@ function ReactTable({
                 variant="contained"
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigation(`app/questionarios/criar`);
+                  navigation(`/questionarios/criar`);
                 }}
                 startIcon={<PlusOutlined />}
                 style={{ borderRadius: "20px", height: "32px" }}
