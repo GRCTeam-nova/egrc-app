@@ -911,12 +911,74 @@ function ColumnsLayouts() {
     voltarParaCadastroMenu();
   };
 
+  const validarCampos = () => {
+    const missingFields = [];
+
+    // Validações padrões existentes
+    if (!formData.ciclo) {
+      setFormValidation((prev) => ({ ...prev, ciclo: false }));
+      missingFields.push("Ciclo");
+    }
+    if (!formData.risco) {
+      setFormValidation((prev) => ({ ...prev, risco: false }));
+      missingFields.push("Risco");
+    }
+    if (!formData.respondente || formData.respondente.length === 0) {
+      setFormValidation((prev) => ({ ...prev, respondente: false }));
+      missingFields.push("Respondente");
+    }
+    if (!formData.responsavelAv) {
+      setFormValidation((prev) => ({ ...prev, responsavelAv: false }));
+      missingFields.push("Responsável");
+    }
+
+    // NOVA VALIDAÇÃO: Bloqueia se 'Sobrepor' estiver ativo e faltar dados
+    if (sobrepor) {
+      const nivelNum = Number(nivelAv) || 1; // Garante que temos um número válido
+
+      if (!formData.idProbabilityInherent || !formData.idSeverityInherent) {
+        missingFields.push("Probabilidade/Impacto Inerente");
+      }
+      // Nível 2 exige Residual
+      if (nivelNum >= 2 && (!formData.idProbabilityResidual || !formData.idSeverityResidual)) {
+        missingFields.push("Probabilidade/Impacto Residual");
+      }
+      // Nível 3 exige Planejado
+      if (nivelNum >= 3 && (!formData.idProbabilityPlanned || !formData.idSeverityPlanned)) {
+        missingFields.push("Probabilidade/Impacto Planejado");
+      }
+      if (!comentario || comentario.trim() === "") {
+        missingFields.push("Justificativa");
+      }
+    }
+
+    if (missingFields.length > 0) {
+      // Formata a mensagem lindamente com vírgulas e "e" no final (Ex: Ciclo, Risco e Justificativa)
+      const fieldsMessage = missingFields.join(", ").replace(/,([^,]*)$/, ' e$1');
+      const singularOrPlural =
+        missingFields.length > 1
+          ? "são obrigatórios e devem ser preenchidos!"
+          : "é obrigatório e deve ser preenchido!";
+
+      enqueueSnackbar(`O(s) campo(s) ${fieldsMessage} ${singularOrPlural}`, {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleAtualizarClick = () => {
+    // Trava o fluxo aqui se a validação falhar
+    if (!validarCampos()) return; 
+
     if (sobrepor) {
       setConfirmSobreporOpen(true);
       return;
     }
-    tratarSubmit();
+    tratarSubmit(true); // Passa 'true' para sinalizar que já validamos
   };
 
   const handleConfirmSobrepor = () => {
@@ -1428,7 +1490,11 @@ function ColumnsLayouts() {
     }
   };
 
-  const tratarSubmit = async () => {
+  const tratarSubmit = async (alreadyValidated = false) => {
+    // Se não veio do botão Atualizar (já validado), validamos agora
+    if (!alreadyValidated && !validarCampos()) {
+      return;
+    }
     let url = "";
     let method = "";
     let payload = {};
