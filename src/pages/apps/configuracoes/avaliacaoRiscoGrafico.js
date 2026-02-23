@@ -396,7 +396,7 @@ function HeatmapAvaliacaoRisco({
       {/* Probabilidade e Impacto Inerente */}
       <Grid item xs={6} sx={{ pb: 5 }}>
         <Stack spacing={1}>
-          <InputLabel>Probabilidade Sobreposto Inerente</InputLabel>
+          <InputLabel>Probabilidade Sobreposto Inerente *</InputLabel>
           <Autocomplete
             disabled={disableOverlay}
             options={probabilityCategories}
@@ -410,7 +410,7 @@ function HeatmapAvaliacaoRisco({
       </Grid>
       <Grid item xs={6} sx={{ pb: 5 }}>
         <Stack spacing={1}>
-          <InputLabel>Impacto Sobreposto Inerente</InputLabel>
+          <InputLabel>Impacto Sobreposto Inerente *</InputLabel>
           <Autocomplete
             disabled={disableOverlay}
             options={impactCategories}
@@ -428,7 +428,7 @@ function HeatmapAvaliacaoRisco({
         <>
           <Grid item xs={6} sx={{ pb: 5 }}>
             <Stack spacing={1}>
-              <InputLabel>Probabilidade Sobreposta Residual</InputLabel>
+              <InputLabel>Probabilidade Sobreposta Residual *</InputLabel>
               <Autocomplete
                 disabled={disableOverlay}
                 options={probabilityCategories}
@@ -442,7 +442,7 @@ function HeatmapAvaliacaoRisco({
           </Grid>
           <Grid item xs={6} sx={{ pb: 5 }}>
             <Stack spacing={1}>
-              <InputLabel>Impacto Sobreposto Residual</InputLabel>
+              <InputLabel>Impacto Sobreposto Residual *</InputLabel>
               <Autocomplete
                 disabled={disableOverlay}
                 options={impactCategories}
@@ -462,7 +462,7 @@ function HeatmapAvaliacaoRisco({
         <>
           <Grid item xs={6} sx={{ pb: 5 }}>
             <Stack spacing={1}>
-              <InputLabel>Probabilidade Sobreposta Planejada</InputLabel>
+              <InputLabel>Probabilidade Sobreposta Planejada *</InputLabel>
               <Autocomplete
                 disabled={disableOverlay}
                 options={probabilityCategories}
@@ -476,7 +476,7 @@ function HeatmapAvaliacaoRisco({
           </Grid>
           <Grid item xs={6} sx={{ pb: 5 }}>
             <Stack spacing={1}>
-              <InputLabel>Impacto Sobreposto Planejada</InputLabel>
+              <InputLabel>Impacto Sobreposto Planejada *</InputLabel>
               <Autocomplete
                 disabled={disableOverlay}
                 options={impactCategories}
@@ -494,7 +494,7 @@ function HeatmapAvaliacaoRisco({
       {/* Justificativa, sempre visível */}
       <Grid item xs={12} sx={{ pb: 5 }}>
         <Stack spacing={1}>
-          <InputLabel>Justificativa</InputLabel>
+          <InputLabel>Justificativa *</InputLabel>
           <TextField
             disabled={disableOverlay}
             onChange={(e) => setJustificativa(e.target.value)}
