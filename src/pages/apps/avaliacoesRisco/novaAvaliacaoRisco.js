@@ -83,6 +83,23 @@ function ColumnsLayouts() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
+  const uniqueQuestionariosApi = useMemo(() => {
+    if (!questionariosApi || !questionariosApi.length) return [];
+
+    const map = new Map();
+    questionariosApi.forEach((item) => {
+      const current = map.get(item.idRespondent);
+      const currentStatus = Number(current?.statusQuiz || current?.status || 0);
+      const itemStatus = Number(item.statusQuiz || item.status || 0);
+
+      if (!current || itemStatus > currentStatus) {
+        map.set(item.idRespondent, item);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [questionariosApi]);
+
   const [formData, setFormData] = useState({
     sobrepor: "",
     tipoNorma: "",
@@ -691,9 +708,10 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    if (!questionariosApi || questionariosApi.length === 0) return;
+    // Usando a lista limpa agora
+    if (!uniqueQuestionariosApi || uniqueQuestionariosApi.length === 0) return;
 
-    const questionariosAtivos = questionariosApi.filter(
+    const questionariosAtivos = uniqueQuestionariosApi.filter(
       (q) => q.active !== false,
     );
 
@@ -710,7 +728,7 @@ function ColumnsLayouts() {
       console.log("Auto-completando avaliação...");
       autoAtualizarParaCompleta();
     }
-  }, [questionariosApi, formData.status, isResponsibleAv]);
+  }, [uniqueQuestionariosApi, formData.status, isResponsibleAv]); // Dependência atualizada
 
   const handleSelectAllEmpresas = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
@@ -940,11 +958,17 @@ function ColumnsLayouts() {
         missingFields.push("Probabilidade/Impacto Inerente");
       }
       // Nível 2 exige Residual
-      if (nivelNum >= 2 && (!formData.idProbabilityResidual || !formData.idSeverityResidual)) {
+      if (
+        nivelNum >= 2 &&
+        (!formData.idProbabilityResidual || !formData.idSeverityResidual)
+      ) {
         missingFields.push("Probabilidade/Impacto Residual");
       }
       // Nível 3 exige Planejado
-      if (nivelNum >= 3 && (!formData.idProbabilityPlanned || !formData.idSeverityPlanned)) {
+      if (
+        nivelNum >= 3 &&
+        (!formData.idProbabilityPlanned || !formData.idSeverityPlanned)
+      ) {
         missingFields.push("Probabilidade/Impacto Planejado");
       }
       if (!comentario || comentario.trim() === "") {
@@ -954,7 +978,9 @@ function ColumnsLayouts() {
 
     if (missingFields.length > 0) {
       // Formata a mensagem lindamente com vírgulas e "e" no final (Ex: Ciclo, Risco e Justificativa)
-      const fieldsMessage = missingFields.join(", ").replace(/,([^,]*)$/, ' e$1');
+      const fieldsMessage = missingFields
+        .join(", ")
+        .replace(/,([^,]*)$/, " e$1");
       const singularOrPlural =
         missingFields.length > 1
           ? "são obrigatórios e devem ser preenchidos!"
@@ -972,7 +998,7 @@ function ColumnsLayouts() {
 
   const handleAtualizarClick = () => {
     // Trava o fluxo aqui se a validação falhar
-    if (!validarCampos()) return; 
+    if (!validarCampos()) return;
 
     if (sobrepor) {
       setConfirmSobreporOpen(true);
@@ -1045,14 +1071,14 @@ function ColumnsLayouts() {
     return { buttonTitle: title, isTester: isResp };
   }, [idUser, formData.status, formData.responsavelAv]);
 
-  const hasQuestionarioConcluido = (questionariosApi ?? []).some((q) => {
+  const hasQuestionarioConcluido = (uniqueQuestionariosApi ?? []).some((q) => {
     const status = Number(q?.statusQuiz ?? q?.status);
     const active = q?.active !== false;
     return active && status >= 3;
   });
 
   console.log("DEBUG FINALIZAR", {
-    totalApi: questionariosApi?.map((q) => ({
+    totalApiLimpo: uniqueQuestionariosApi?.map((q) => ({
       id: q.idQuiz,
       statusQuiz: q.statusQuiz,
       active: q.active,
@@ -1643,17 +1669,21 @@ function ColumnsLayouts() {
     }
   };
 
-const finalCoords = useMemo(() => {
+  const finalCoords = useMemo(() => {
     // Chave única baseada no ID da avaliação para não misturar dados
-    const cacheKey = dadosApi?.idAssessment ? `risk_coords_cache_${dadosApi.idAssessment}` : null;
+    const cacheKey = dadosApi?.idAssessment
+      ? `risk_coords_cache_${dadosApi.idAssessment}`
+      : null;
 
     // 1. LEITURA SÍNCRONA (Anti-Flash): Tenta pegar do cache imediatamente
     let cached = null;
     if (cacheKey) {
-        try {
-            const raw = localStorage.getItem(cacheKey);
-            if (raw) cached = JSON.parse(raw);
-        } catch (e) { console.error(e); }
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) cached = JSON.parse(raw);
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     // 2. Dados atuais do React State
@@ -1662,7 +1692,8 @@ const finalCoords = useMemo(() => {
     let planned = formData.justificationPlanned;
 
     // Helper de validação
-    const isInvalid = (val) => !val || val === "" || val === "null" || val === "undefined";
+    const isInvalid = (val) =>
+      !val || val === "" || val === "null" || val === "undefined";
 
     // 3. LÓGICA DE PREENCHIMENTO (Prioridade: State > Cache > AvgCoords)
     // Se o State for inválido, tenta o Cache. Se o Cache falhar, tenta o AvgCoords.
@@ -1672,18 +1703,18 @@ const finalCoords = useMemo(() => {
 
     // Se estiver no modo "Sobrepor", damos preferência ao que o usuário está digitando/salvou
     if (sobrepor) {
-        inherent = formData.justificationInerent || avgCoords.inherent;
-        residual = formData.justificationResidual || avgCoords.residual;
-        planned = formData.justificationPlanned || avgCoords.planned;
+      inherent = formData.justificationInerent || avgCoords.inherent;
+      residual = formData.justificationResidual || avgCoords.residual;
+      planned = formData.justificationPlanned || avgCoords.planned;
     }
 
     // 4. GRAVAÇÃO FORÇADA (Side-Effect intencional dentro do Memo para garantir persistência imediata)
     if (cacheKey && (inherent || residual || planned)) {
-        const newData = JSON.stringify({ inherent, residual, planned });
-        // Só grava se mudou para evitar loop infinito
-        if (localStorage.getItem(cacheKey) !== newData) {
-            localStorage.setItem(cacheKey, newData);
-        }
+      const newData = JSON.stringify({ inherent, residual, planned });
+      // Só grava se mudou para evitar loop infinito
+      if (localStorage.getItem(cacheKey) !== newData) {
+        localStorage.setItem(cacheKey, newData);
+      }
     }
 
     return { inherent, residual, planned };
@@ -1697,14 +1728,14 @@ const finalCoords = useMemo(() => {
           {/* --- INSERÇÃO DO NOVO COMPONENTE --- */}
           {isFinalizada && (
             <Grid item xs={12} sx={{ mb: 2 }}>
-               <ResultadosAvaliacao
-                  heatmapData={heatmapDataAv}
-                  nivel={nivelAv}
-                  inherentCoords={finalCoords.inherent}
-                  residualCoords={finalCoords.residual}
-                  plannedCoords={finalCoords.planned}
-               />
-               <Divider sx={{ my: 3 }} />
+              <ResultadosAvaliacao
+                heatmapData={heatmapDataAv}
+                nivel={nivelAv}
+                inherentCoords={finalCoords.inherent}
+                residualCoords={finalCoords.residual}
+                plannedCoords={finalCoords.planned}
+              />
+              <Divider sx={{ my: 3 }} />
             </Grid>
           )}
           {/* --- FIM DA INSERÇÃO --- */}
