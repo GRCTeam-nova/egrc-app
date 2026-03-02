@@ -289,6 +289,7 @@ function ColumnsLayouts() {
   }, []);
 
   useEffect(() => {
+    console.log(dadosApi)
     if (dadosApi && dadosApi.idAssessment) {
       setLoading(true);
       const fetchAssessmentDados = async () => {
