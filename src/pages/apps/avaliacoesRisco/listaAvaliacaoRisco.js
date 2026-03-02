@@ -704,10 +704,11 @@ function ActionCell({ row, refreshData }) {
 
       const dadosEndpoint = getResponse.data;
 
-      // Definir o novo status do campo "active"
+      // Definir o novo status do campo "active" e adicionar isList: true
       const dadosAtualizados = {
         ...dadosEndpoint,
         active: newStatus === "Ativo",
+        isList: true, // <-- Nova propriedade adicionada aqui
       };
 
       // Enviar os dados atualizados via PUT
