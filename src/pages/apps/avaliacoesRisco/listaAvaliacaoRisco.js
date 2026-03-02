@@ -1,23 +1,20 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { API_URL } from "config";
 import PropTypes from "prop-types";
 import { API_COMMAND } from "../../../config";
-import { Fragment, useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect, useRef } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/avaliacaoRisco";
+// Importação ajustada para o novo hook de avaliações (crie este arquivo conforme necessário)
+import { useGetAvaliacoes } from "../../../api/avaliacaoRisco"; 
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useRef } from "react";
 import emitter from "../tela2/eventEmitter";
-// project import
 import MainCard from "../../../components/MainCard";
 
-// material-ui
 import { useTheme } from "@mui/material/styles";
 
 import {
@@ -43,18 +40,15 @@ import {
   useMediaQuery,
 } from "@mui/material";
 
-// third-party
 import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
   getFilteredRowModel,
-  getExpandedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 
-// project-import
 import ScrollX from "../../../components/ScrollX";
 import IconButton from "../../../components/@extended/IconButton";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -65,9 +59,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
   faXmark,
-  faBan,
   faTrash,
   faExclamation,
+  faBan, // <- NOVO
+  faCheck, // <- NOVO
 } from "@fortawesome/free-solid-svg-icons";
 
 import {
@@ -76,117 +71,207 @@ import {
   EmptyTable,
   RowSelection,
   TablePagination,
+  SelectColumnVisibility,
 } from "../../../components/third-party/react-table";
-import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
-// assets
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
+import { faFilter } from "@fortawesome/free-solid-svg-icons";
 
 export const fuzzyFilter = (row, columnId, value) => {
-  // Obter o valor da célula na coluna especificada
-  let cellValue = row.getValue(columnId);
+  const cellValue = row.getValue(columnId);
 
-  // Verificar se o valor da célula e o valor do filtro não são undefined
-  if (cellValue === undefined || value === undefined) {
-    // Retornar false se algum valor for undefined
+  if (
+    cellValue === undefined ||
+    cellValue === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return false;
   }
 
-  // Função para normalizar o texto removendo acentos
-  const normalizeText = (text) => {
-    return text
-      .toString()
+  const normalize = (val) => {
+    if (val === null || val === undefined) return "";
+    return String(val)
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
   };
 
-  // Converter valores para string, normalizar e realizar a comparação
-  cellValue = normalizeText(cellValue);
-  const valueStr = normalizeText(value);
+  let cellString = "";
+  if (Array.isArray(cellValue)) {
+    cellString = cellValue.map((item) => normalize(item)).join(" ");
+  } else {
+    cellString = normalize(cellValue);
+  }
 
-  return cellValue.includes(valueStr);
+  const searchTerms = normalize(value)
+    .split(" ")
+    .filter((term) => term.trim() !== "");
+
+  return searchTerms.every((term) => cellString.includes(term));
 };
 
-// ==============================|| REACT TABLE - LIST ||============================== //
+const defaultVisibility = {
+  cycle: true,
+  risk: true,
+  responsible: true,
+  status: true,
+  dateOfConclusion: true,
+  inherent: false,
+  residual: false,
+  planned: false,
+  quizCount: true,
+  active: true,
+  actions: true,
+};
 
-function ReactTable({ data, columns, processosTotal, isLoading }) {
+function ReactTable({
+  data,
+  columns,
+  totalRows,
+  isLoading,
+  onApplyFilters,
+  onExportExcel,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
-  const [columnVisibility, setColumnVisibility] = useState({});
-  const recordType = "Avaliação de risco";
+  const STORAGE_KEY = "egrc_table_visibility_avaliacoes";
+
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : defaultVisibility;
+    } catch (error) {
+      console.error("Erro ao carregar visibilidade das colunas", error);
+      return defaultVisibility;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility));
+  }, [columnVisibility]);
+
+  const recordType = "Avaliações";
   const tableRef = useRef(null);
-  const [sorting, setSorting] = useState([{ id: "nome", asc: true }]);
+  const [sorting, setSorting] = useState([{ id: "cycle", asc: true }]);
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
   const navigation = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState([]);
-  const [empresaOptions, setEmpresaOptions] = useState([]);
-  const [statusOptions] = useState([
-    { label: "Ativo", value: true },
-    { label: "Inativo", value: false },
+  const [selectedFilters, setSelectedFilters] = useState([
+    { type: "Status do Registro", values: ["Ativo"] },
   ]);
+
+  const [cycleOptions, setCycleOptions] = useState([]);
+  const [riskOptions, setRiskOptions] = useState([]);
+  const [responsibleOptions, setResponsibleOptions] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
+
   const [draftFilters, setDraftFilters] = useState({
-    avaliacaoRisco: [],
-    cnpj: [],
+    activeStatus: ["Ativo"],
+    cycle: [],
+    risk: [],
+    responsible: [],
     status: [],
+    startDate: null,
+    endDate: null,
   });
 
-  // Abre ou fecha o drawer
+  const statusTranslation = {
+    "Completed": "Completa",
+    "Finished": "Finalizado",
+    "InAssessment": "Em Avaliação",
+    "NotStarted": "Não Iniciado"
+  };
+
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
   useEffect(() => {
-    const planos = [...new Set(data.map((item) => item.name))];
-    setEmpresaOptions(planos);
+    const getUniqueValues = (key, isArray = false) => {
+      if (!data) return [];
+      const values = data.flatMap((item) => {
+        const value = item[key];
+        if (isArray && Array.isArray(value)) {
+          return value.filter((v) => v !== null && v !== undefined && v !== "");
+        }
+        return value !== null && value !== undefined && value !== ""
+          ? [value]
+          : [];
+      });
+      return [...new Set(values)].sort();
+    };
+
+    setCycleOptions(getUniqueValues("cycle"));
+    setRiskOptions(getUniqueValues("risk"));
+    setResponsibleOptions(getUniqueValues("responsible"));
+    const rawStatusOptions = getUniqueValues("status");
+    setStatusOptions(rawStatusOptions.map(status => statusTranslation[status] || status));
   }, [data]);
 
-  // Aplica os filtros selecionados
   const applyFilters = () => {
     const newFilters = [];
-    if (draftFilters.avaliacaoRisco.length > 0) {
-      newFilters.push({
-        type: "Avaliação de risco",
-        values: draftFilters.avaliacaoRisco,
-      });
+
+    if (draftFilters.activeStatus.length > 0) {
+      newFilters.push({ type: "Status do Registro", values: draftFilters.activeStatus });
     }
-    if (draftFilters.status.length > 0) {
-      newFilters.push({
-        type: "Status",
-        values: draftFilters.status.map((s) => s.value),
-      });
-    }
+    if (draftFilters.cycle.length > 0)
+      newFilters.push({ type: "Ciclo", values: draftFilters.cycle });
+    if (draftFilters.risk.length > 0)
+      newFilters.push({ type: "Risco", values: draftFilters.risk });
+    if (draftFilters.responsible.length > 0)
+      newFilters.push({ type: "Responsável", values: draftFilters.responsible });
+    if (draftFilters.status.length > 0)
+      newFilters.push({ type: "Status da Avaliação", values: draftFilters.status });
+
+    if (draftFilters.startDate)
+      newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
+    if (draftFilters.endDate)
+      newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
+
     setSelectedFilters(newFilters);
+
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: draftFilters.startDate,
+        EndDate: draftFilters.endDate,
+      });
+    }
+
     toggleDrawer();
   };
 
-  // Remove filtro selecionado
   const removeFilter = (index) => {
     setSelectedFilters((prev) => {
       const filterToRemove = prev[index];
 
-      // Atualiza os filtros no drawer com base no tipo de filtro removido
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
-        if (filterToRemove.type === "Avaliação de risco") {
-          updatedDraft.avaliacaoRisco = updatedDraft.avaliacaoRisco.filter(
+        const filterType = filterToRemove.type;
+
+        const mapTypeToKey = {
+          "Status do Registro": "activeStatus",
+          "Ciclo": "cycle",
+          "Risco": "risk",
+          "Responsável": "responsible",
+          "Status da Avaliação": "status",
+        };
+
+        const key = mapTypeToKey[filterType];
+        if (key) {
+          updatedDraft[key] = updatedDraft[key].filter(
             (value) => !filterToRemove.values.includes(value),
           );
-        } else if (filterToRemove.type === "CNPJ") {
-          updatedDraft.cnpj = updatedDraft.cnpj.filter(
-            (value) => !filterToRemove.values.includes(value),
-          );
-        } else if (filterToRemove.type === "Status") {
-          updatedDraft.status = updatedDraft.status.filter(
-            (value) => !filterToRemove.values.includes(value.value),
-          );
+        } else if (filterType === "Data Inicial") {
+          updatedDraft.startDate = null;
+        } else if (filterType === "Data Final") {
+          updatedDraft.endDate = null;
         }
+
         return updatedDraft;
       });
 
-      // Remove o filtro da lista de filtros selecionados
       return prev.filter((_, i) => i !== index);
     });
   };
@@ -194,17 +279,55 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const handleRemoveAllFilters = () => {
     setSelectedFilters([]);
     setGlobalFilter("");
-    setDraftFilters({ avaliacaoRisco: [], cnpj: [], status: [] });
+    setDraftFilters({
+      activeStatus: [],
+      cycle: [],
+      risk: [],
+      responsible: [],
+      status: [],
+      startDate: null,
+      endDate: null,
+    });
+    if (onApplyFilters) {
+      onApplyFilters({
+        StartDate: null,
+        EndDate: null,
+      });
+    }
   };
 
-  // Filtra os dados com base nos filtros selecionados
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       return selectedFilters.every((filter) => {
-        if (filter.type === "Avaliação de risco")
-          return filter.values.includes(item.name);
-        if (filter.type === "Status")
-          return filter.values.includes(item.active);
+        const filterType = filter.type;
+        const filterValues = filter.values;
+
+        if (filterType === "Data Inicial" || filterType === "Data Final") return true;
+
+        // 1. Lógica do Ativar/Inativar (Status do Registro)
+        if (filterType === "Status do Registro") {
+          const showActive = filterValues.includes("Ativo");
+          const showInactive = filterValues.includes("Inativo");
+
+          if (showActive && showInactive) return true;
+          if (showActive) return item.active === true;
+          if (showInactive) return item.active === false;
+
+          return true;
+        }
+
+        // 2. Filtros padrões
+        if (filterType === "Ciclo") return filterValues.includes(item.cycle);
+        if (filterType === "Risco") return filterValues.includes(item.risk);
+        if (filterType === "Responsável") return filterValues.includes(item.responsible);
+        
+        // 3. Nossa nova lógica com a tradução do Status da Avaliação
+        if (filterType === "Status da Avaliação") {
+          // Traduz o status da API para comparar com o valor em PT-BR selecionado no filtro
+          const itemStatusPt = statusTranslation[item.status] || item.status;
+          return filterValues.includes(itemStatusPt);
+        }
+
         return true;
       });
     });
@@ -219,30 +342,17 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
-    getRowCanExpand: () => true,
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     globalFilterFn: fuzzyFilter,
     debugTable: true,
   });
 
-  useEffect(
-    () =>
-      setColumnVisibility({
-        comarca: false,
-        instancia: false,
-        dataDistribuicao: false,
-        orgao: false,
-        valorCausa: false,
-        acao: false,
-        posicaoProcessual: false,
-        area: false,
-      }),
-    [],
-  );
+  const getAllColumnsFiltered = () => {
+    return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
+  };
 
   const verticalDividerStyle = {
     width: "0.5px",
@@ -254,21 +364,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
     marginLeft: "7px",
   };
 
-  let headers = [];
-  table.getVisibleLeafColumns().map((columns) =>
-    headers.push({
-      label:
-        typeof columns.columnDef.header === "string"
-          ? columns.columnDef.header
-          : "#",
-      key: columns.columnDef.accessorKey,
-    }),
-  );
-
-  // Função para realizar a marcação de texto
   useEffect(() => {
     const markInstance = new Mark(tableRef.current);
-
     if (globalFilter) {
       markInstance.unmark({
         done: () => {
@@ -302,10 +399,18 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         }}
       >
         <Stack direction="row" spacing={1} alignItems="center">
+          <SelectColumnVisibility
+            {...{
+              getVisibleLeafColumns: table.getVisibleLeafColumns,
+              getIsAllColumnsVisible: table.getIsAllColumnsVisible,
+              getToggleAllColumnsVisibilityHandler: table.getToggleAllColumnsVisibilityHandler,
+              getAllColumns: getAllColumnsFiltered,
+            }}
+          />
           <DebouncedInput
             value={globalFilter ?? ""}
             onFilterChange={(value) => setGlobalFilter(String(value))}
-            placeholder={`Pesquise pelo nome`}
+            placeholder={`Pesquise pelo ciclo`}
             style={{
               width: "350px",
               height: "33px",
@@ -314,7 +419,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
               backgroundColor: "#FFFFFF",
             }}
           />
-          {/* <Button
+          <Button
             onClick={() => toggleDrawer(true)}
             startIcon={
               <FontAwesomeIcon icon={faFilter} style={{ color: "#00000080" }} />
@@ -322,7 +427,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
             style={{
               width: "90px",
               color: "#00000080",
-              backgroundColor: 'white',
+              backgroundColor: "white",
               fontSize: "13px",
               marginLeft: 24,
               fontWeight: 400,
@@ -332,7 +437,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
             }}
           >
             Filtros
-          </Button> */}
+          </Button>
         </Stack>
 
         <Stack
@@ -341,10 +446,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           alignItems="center"
           sx={{ width: { xs: "100%", sm: "auto" } }}
         >
-          <div style={verticalDividerStyle}></div>
-
+          <div style={{ ...verticalDividerStyle }}></div>
           <Stack direction="row" spacing={2} alignItems="center">
-            {/* Inserir o botão aqui */}
             <Box
               sx={{
                 display: "flex",
@@ -358,13 +461,33 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                 onClick={(e) => {
                   e.stopPropagation();
                   navigation(`/avaliacoes/criar`, {
-                    state: { indoPara: "NovaAvaliacaoRisco" },
+                    state: { indoPara: "NovaAvaliacao" },
                   });
                 }}
                 startIcon={<PlusOutlined />}
                 style={{ borderRadius: "20px", height: "32px" }}
               >
-                Nova
+                Novo
+              </Button>
+            </Box>
+          </Stack>
+          <Stack>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+                ml: 0.75,
+              }}
+            >
+              <Button
+                variant="outlined"
+                onClick={onExportExcel}
+                startIcon={<DownloadOutlined />}
+                disabled={isLoading}
+                style={{ borderRadius: "20px", height: "32px" }}
+              >
+                Exportar Excel
               </Button>
             </Box>
           </Stack>
@@ -383,11 +506,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                   {filter.type}:
                 </Typography>
                 <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
-                  {filter.values
-                    .map((v) =>
-                      v === true ? "Ativo" : v === false ? "Inativo" : v,
-                    )
-                    .join(", ")}
+                  {filter.values.join(", ")}
                 </Typography>
               </Box>
             }
@@ -415,7 +534,6 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         )}
       </Box>
 
-      {/* Drawer para filtros */}
       <Drawer
         anchor="right"
         open={drawerOpen}
@@ -443,19 +561,16 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                Avaliação de risco
+                Status do Registro
               </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
-                  options={empresaOptions}
-                  value={draftFilters.avaliacaoRisco}
+                  options={["Ativo", "Inativo"]}
+                  value={draftFilters.activeStatus}
                   onChange={(event, value) =>
-                    setDraftFilters((prev) => ({
-                      ...prev,
-                      avaliacaoRisco: value,
-                    }))
+                    setDraftFilters((prev) => ({ ...prev, activeStatus: value }))
                   }
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -464,18 +579,110 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
 
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                Status
+                Ciclo
               </InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
+                  disableCloseOnSelect
+                  options={cycleOptions}
+                  value={draftFilters.cycle}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, cycle: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Risco
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={riskOptions}
+                  value={draftFilters.risk}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, risk: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Responsável
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={responsibleOptions}
+                  value={draftFilters.responsible}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, responsible: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status da Avaliação
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
                   options={statusOptions}
                   value={draftFilters.status}
                   onChange={(event, value) =>
                     setDraftFilters((prev) => ({ ...prev, status: value }))
                   }
-                  getOptionLabel={(option) => option.label}
                   renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data de Conclusão Inicial
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.startDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={6}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Data de Conclusão Final
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <TextField
+                  type="date"
+                  value={draftFilters.endDate || ""}
+                  onChange={(e) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
+                  InputLabelProps={{ shrink: true }}
                 />
               </FormControl>
             </Grid>
@@ -564,18 +771,20 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          sx={{ textAlign: "center" }}
-                        >
+                        <TableCell colSpan={columns.length} sx={{ textAlign: "center" }}>
                           <CircularProgress />
                         </TableCell>
                       </TableRow>
                     ) : data ? (
                       data.length > 0 ? (
-                        table.getRowModel().rows.map((row, index) => (
+                        table.getRowModel().rows.map((row) => (
                           <Fragment key={row.id}>
-                            <TableRow>
+                            <TableRow
+                              sx={{
+                                "&:last-child td": { borderBottom: "none" },
+                                backgroundColor: isDarkMode ? "#14141" : "#fff",
+                              }}
+                            >
                               {row.getVisibleCells().map((cell) => (
                                 <TableCell
                                   key={cell.id}
@@ -606,16 +815,13 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={columns.length}>
-                            <EmptyTable msg="Dados não encontrados" />
+                            <EmptyTable msg="Avaliações não encontradas" />
                           </TableCell>
                         </TableRow>
                       )
                     ) : (
                       <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          sx={{ textAlign: "left" }}
-                        >
+                        <TableCell colSpan={columns.length} sx={{ textAlign: "left" }}>
                           <CircularProgress />
                         </TableCell>
                       </TableRow>
@@ -632,7 +838,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                       setPageIndex: table.setPageIndex,
                       getState: table.getState,
                       getPageCount: table.getPageCount,
-                      totalItems: processosTotal,
+                      totalItems: totalRows,
                       recordType: recordType,
                     }}
                   />
@@ -649,21 +855,20 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
 ReactTable.propTypes = {
   columns: PropTypes.array,
   data: PropTypes.array,
-  getHeaderProps: PropTypes.func,
-  handleAdd: PropTypes.func,
-  modalToggler: PropTypes.func,
-  renderRowSubComponent: PropTypes.any,
-  refreshData: PropTypes.func,
+  totalRows: PropTypes.number,
+  isLoading: PropTypes.bool,
+  onApplyFilters: PropTypes.func,
+  onExportExcel: PropTypes.func,
 };
 
 function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
   const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [status, setStatus] = useState(row.original.active);
-  const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openErrorDialog, setOpenErrorDialog] = useState(false);
+  // 1. Novo estado para o modal de Ativar/Inativar
+  const [openToggleDialog, setOpenToggleDialog] = useState(false); 
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -673,122 +878,80 @@ function ActionCell({ row, refreshData }) {
     setAnchorEl(null);
   };
 
-  const handleDialogOpen = () => {
-    setOpenDialog(true);
-  };
-
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    handleClose();
-  };
-
   const handleDeleteDialogClose = () => {
     setOpenDeleteDialog(false);
     handleClose();
   };
 
-  const toggleStatus = async () => {
-    const idAssessment = row.original.idAssessment;
-    const newStatus = status === true ? "Inativo" : "Ativo";
+  const handleToggleDialogClose = () => {
+    setOpenToggleDialog(false);
+    handleClose();
+  };
+
+  const handleToggleActive = async () => {
+    handleToggleDialogClose(); // Fecha o modal após confirmar
+    const authToken = token || localStorage.getItem("access_token");
 
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}assessments/${idAssessment}`,
+      const responseGet = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/assessments/${row.original.id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${authToken}` },
         },
       );
 
-      const dadosEndpoint = getResponse.data;
+      if (!responseGet.ok) throw new Error("Erro ao buscar dados da avaliação.");
+      const data = await responseGet.json();
 
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = {
-        ...dadosEndpoint,
-        active: newStatus === "Ativo",
+      // 2. Adicionado o isList: true conforme solicitado
+      const payload = {
+        ...data,
+        active: !data.active,
+        isList: true, 
       };
 
-      // Enviar os dados atualizados via PUT
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}assessments`,
-        dadosAtualizados,
+      const responsePut = await fetch(
+        `https://api.egrc.homologacao.com.br/api/v1/assessments`,
         {
+          method: "PUT",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
           },
+          body: JSON.stringify(payload),
         },
       );
 
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Avaliação de risco ${newStatus.toLowerCase()}.`;
+      if (!responsePut.ok) {
+        throw new Error("Erro ao atualizar status da avaliação.");
+      }
 
-      enqueueSnackbar(message, {
-        variant: "success",
-        autoHideDuration: 3000,
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        },
-      });
+      enqueueSnackbar(
+        `Avaliação ${data.active ? "inativada" : "ativada"} com sucesso!`,
+        { variant: "success" },
+      );
 
       refreshData();
     } catch (error) {
-      console.error("Erro:", error);
-
-      const apiData = error?.response?.data;
-
-      // Variável para armazenar a mensagem tratada
-      let apiMessage;
-
-      // Verifica se a API retornou o array 'notifications' e se ele tem conteúdo
-      if (
-        apiData?.notifications &&
-        Array.isArray(apiData.notifications) &&
-        apiData.notifications.length > 0
-      ) {
-        apiMessage = apiData.notifications[0].message;
-      }
-      // Fallbacks originais para outros tipos de erro
-      else if (typeof apiData === "string") {
-        apiMessage = apiData;
-      } else {
-        apiMessage =
-          apiData?.message ||
-          apiData?.Message ||
-          apiData?.error ||
-          apiData?.title;
-      }
-
-      // Define a mensagem final (com fallback para erro genérico se a API não retornar nada)
-      const message =
-        apiMessage || error.message || "Erro inesperado ao alterar o status.";
-
-      // Dispara o snackbar com a mensagem exata retornada pela API
-      enqueueSnackbar(message, {
+      console.error(error);
+      enqueueSnackbar("Erro ao alterar o status da avaliação.", {
         variant: "error",
-        autoHideDuration: 4000,
-        anchorOrigin: { vertical: "top", horizontal: "center" },
       });
     }
-
-    handleDialogClose();
   };
 
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+        `${API_COMMAND}/api/v1/assessments/${row.original.id}`,
         {
           method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
         },
       );
 
       if (response.ok) {
-        enqueueSnackbar(`Avaliação de risco ${row.original.nome} excluído.`, {
+        enqueueSnackbar(`Avaliação ${row.original.cycle} excluída.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
@@ -800,7 +963,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o avaliacaoRisco: ${response.status} ${response.statusText} - ${errorBody}`,
+          `Falha ao excluir a avaliação: ${response.status} ${response.statusText} - ${errorBody}`,
         );
       }
     } catch (error) {
@@ -820,20 +983,11 @@ function ActionCell({ row, refreshData }) {
 
   const open = Boolean(anchorEl);
   const id = open ? "simple-popover" : undefined;
+  const isActive = row.original.active !== false;
 
   return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      justifyContent="center"
-      spacing={0}
-    >
-      <IconButton
-        aria-describedby={id}
-        color="primary"
-        onClick={handleClick}
-        style={buttonStyle}
-      >
+    <Stack direction="row" alignItems="center" justifyContent="center" spacing={0}>
+      <IconButton aria-describedby={id} color="primary" onClick={handleClick} style={buttonStyle}>
         <MoreVertIcon />
       </IconButton>
       <Popover
@@ -852,7 +1006,7 @@ function ActionCell({ row, refreshData }) {
               const dadosApi = row.original;
               navigation(`/avaliacoes/criar`, {
                 state: {
-                  indoPara: "NovoPlano",
+                  indoPara: "NovaAvaliacao",
                   dadosApi,
                 },
               });
@@ -864,20 +1018,23 @@ function ActionCell({ row, refreshData }) {
             Editar
           </Button>
 
-          <Button
+          {/* 3. Botão agora abre o modal em vez de chamar a API direto */}
+          <Button 
             onClick={() => {
-              if (row.original.active === true) handleDialogOpen();
-              else toggleStatus();
-            }}
+              setOpenToggleDialog(true);
+              handleClose();
+            }} 
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            {row.original.active === true ? "Inativar" : "Ativar"}
+            {isActive ? "Inativar" : "Ativar"}
           </Button>
         </Stack>
       </Popover>
+
+      {/* --- MODAL DE CONFIRMAÇÃO DE ATIVAR/INATIVAR --- */}
       <Dialog
-        open={openDialog}
-        onClose={handleDialogClose}
+        open={openToggleDialog} // Usando a variável de estado que criamos
+        onClose={handleToggleDialogClose} // Usando a nossa função de fechar
         sx={{
           "& .MuiPaper-root": {
             width: "547px",
@@ -888,7 +1045,7 @@ function ActionCell({ row, refreshData }) {
       >
         <DialogTitle
           sx={{
-            background: "#ED5565",
+            background: isActive ? "#ED5565" : "#1C5297", // Vermelho para inativar, Azul para ativar
             width: "auto",
             height: "42px",
             borderRadius: "4px 4px 0px 0px",
@@ -900,7 +1057,7 @@ function ActionCell({ row, refreshData }) {
         >
           <div style={{ display: "flex", alignItems: "center" }}>
             <IconButton
-              aria-label="delete"
+              aria-label="status-icon"
               sx={{
                 fontSize: "16px",
                 marginRight: "2px",
@@ -913,7 +1070,7 @@ function ActionCell({ row, refreshData }) {
                 },
               }}
             >
-              <FontAwesomeIcon icon={faBan} />
+              <FontAwesomeIcon icon={isActive ? faBan : faCheck} />
             </IconButton>
 
             <Typography
@@ -929,12 +1086,12 @@ function ActionCell({ row, refreshData }) {
                 flexGrow: 1,
               }}
             >
-              Inativar
+              {isActive ? "Inativar" : "Ativar"}
             </Typography>
           </div>
           <IconButton
             aria-label="close"
-            onClick={handleDialogClose}
+            onClick={handleToggleDialogClose}
             sx={{
               color: "rgba(255, 255, 255, 1)",
               "&:hover": {
@@ -952,18 +1109,20 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja inativar a essa avaliação?
+            Tem certeza que deseja {isActive ? "inativar" : "ativar"} essa avaliação?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Ao inativar, essa avaliação não aparecerá mais no cadastro manual.
+            {isActive
+              ? "Ao inativar, essa avaliação não aparecerá mais no cadastro manual."
+              : "Ao ativar, essa avaliação voltará a ficar disponível no sistema."}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={toggleStatus}
+            onClick={handleToggleActive} // Usando a nossa função que bate na API
             color="primary"
             autoFocus
             style={{
@@ -972,17 +1131,17 @@ function ActionCell({ row, refreshData }) {
               height: "32px",
               padding: "8px 16px",
               borderRadius: "4px",
-              background: "#ED5565",
+              background: isActive ? "#ED5565" : "#1C5297",
               fontSize: "13px",
               fontWeight: 600,
               color: "#fff",
               textTransform: "none",
             }}
           >
-            Sim, inativar
+            Sim, {isActive ? "inativar" : "ativar"}
           </Button>
           <Button
-            onClick={handleDialogClose}
+            onClick={handleToggleDialogClose}
             style={{
               marginTop: "-55px",
               padding: "8px 16px",
@@ -1000,15 +1159,13 @@ function ActionCell({ row, refreshData }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* --- MODAL DE EXCLUSÃO (MANTIDO IGUAL) --- */}
       <Dialog
         open={openDeleteDialog}
         onClose={handleDeleteDialogClose}
         sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
+          "& .MuiPaper-root": { width: "547px", height: "290px", maxWidth: "none" },
         }}
       >
         <DialogTitle
@@ -1030,12 +1187,7 @@ function ActionCell({ row, refreshData }) {
                 fontSize: "16px",
                 marginRight: "2px",
                 color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
+                "&:hover": { backgroundColor: "transparent", boxShadow: "none", color: "white" },
               }}
             >
               <FontAwesomeIcon icon={faTrash} />
@@ -1048,8 +1200,6 @@ function ActionCell({ row, refreshData }) {
                 fontSize: "16px",
                 fontWeight: 500,
                 lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
                 color: "rgba(255, 255, 255, 1)",
                 flexGrow: 1,
               }}
@@ -1062,30 +1212,18 @@ function ActionCell({ row, refreshData }) {
             onClick={handleDeleteDialogClose}
             sx={{
               color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
+              "&:hover": { backgroundColor: "transparent", boxShadow: "none", color: "white" },
             }}
           >
             <FontAwesomeIcon icon={faXmark} />
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Tem certeza que deseja excluir o avaliacaoRisco "{row.original.nome}
-            "?
+          <Typography component="div" style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}>
+            Tem certeza que deseja excluir a avaliação "{row.original.cycle}"?
           </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            Esse avaliacaoRisco não será mais disponibilizado ao cadastrar um
-            novo processo.
+          <Typography component="div" style={{ marginTop: "20px", color: "#717171" }}>
+            Esta ação não poderá ser desfeita.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1127,15 +1265,13 @@ function ActionCell({ row, refreshData }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* --- MODAL DE ERRO (MANTIDO IGUAL) --- */}
       <Dialog
         open={openErrorDialog}
         onClose={() => setOpenErrorDialog(false)}
         sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
+          "& .MuiPaper-root": { width: "547px", height: "290px", maxWidth: "none" },
         }}
       >
         <DialogTitle
@@ -1157,12 +1293,7 @@ function ActionCell({ row, refreshData }) {
                 fontSize: "16px",
                 marginRight: "2px",
                 color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
+                "&:hover": { backgroundColor: "transparent", boxShadow: "none", color: "white" },
               }}
             >
               <FontAwesomeIcon icon={faExclamation} />
@@ -1175,13 +1306,11 @@ function ActionCell({ row, refreshData }) {
                 fontSize: "16px",
                 fontWeight: 500,
                 lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
                 color: "rgba(255, 255, 255, 1)",
                 flexGrow: 1,
               }}
             >
-              Exclusão não permitida
+              Erro na Exclusão
             </Typography>
           </div>
           <IconButton
@@ -1189,30 +1318,15 @@ function ActionCell({ row, refreshData }) {
             onClick={() => setOpenErrorDialog(false)}
             sx={{
               color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
+              "&:hover": { backgroundColor: "transparent", boxShadow: "none", color: "white" },
             }}
           >
             <FontAwesomeIcon icon={faXmark} />
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Não é possível excluir o Avaliação de risco.
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            O avaliacaoRisco não pode ser excluído pois está vinculado a
-            processos. É possível inativar o avaliacaoRisco nas configurações de
-            edição.
+          <Typography component="div" style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}>
+            Não foi possível excluir.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -1244,27 +1358,31 @@ ActionCell.propTypes = {
   refreshData: PropTypes.func.isRequired,
 };
 
-// ==============================|| LISTAGEM ||============================== //
-
-// Componente principal da página de listagem de registros
-const ListagemAvRisco = () => {
+const ListagemAvaliacoes = () => {
   const theme = useTheme();
-  const navigation = useNavigate();
   const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
+  const navigation = useNavigate();
+  const { avaliacaoSelecionadaId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const { acoesJudiciais: lists, isLoading } = useGetPlanos(
-    formData,
-    processoSelecionadoId,
+  const [backendFilters, setBackendFilters] = useState({});
+  const { acoesJudiciais: resultData, isLoading } = useGetAvaliacoes(
+    { ...formData, ...backendFilters },
+    avaliacaoSelecionadaId,
   );
-  const processosTotal = lists ? lists.length : 0;
+
+  const lists = resultData || [];
+
+  const handleBackendFiltersChange = (newFilters) => {
+    setBackendFilters(newFilters);
+  };
+
+  const totalRows = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
-  const [selectedCustomer] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Handler para atualizar 'formData' e disparar uma nova consulta
   const refreshOrgaos = () => {
     setFormData((currentData) => ({
       ...currentData,
@@ -1284,50 +1402,145 @@ const ListagemAvRisco = () => {
     };
   }, []);
 
-  // Função para fechar modais
   const handleClose = () => {
     setOpen(!open);
   };
 
-  // Função callback para atualizar formData
   const handleFormDataChange = (newFormData) => {
     setFormData(newFormData);
   };
 
-  // Definição das colunas da tabela
+  const handleExportExcel = () => {
+    setFormData((prev) => ({
+      ...prev,
+      ...backendFilters,
+      GenerateExcel: true,
+      refreshCount: prev.refreshCount + 1,
+    }));
+  };
+
   const columns = useMemo(
     () => [
       {
         header: "Ciclo",
         accessorKey: "cycle",
-        cell: ({ row }) => {
-          return (
-            <Typography
-              sx={{
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
-              onClick={() => {
-                const dadosApi = row.original;
-                navigation(`/avaliacoes/criar`, {
-                  state: {
-                    indoPara: "NovoPlano",
-                    dadosApi,
-                  },
-                });
-              }}
-            >
-              {row.original.cycle}
-            </Typography>
-          );
-        },
+        cell: ({ row }) => (
+          <Typography
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/avaliacoes/criar`, {
+                state: { indoPara: "NovaAvaliacao", dadosApi },
+              });
+            }}
+          >
+            {row.original.cycle}
+          </Typography>
+        ),
       },
       {
         header: "Risco",
         accessorKey: "risk",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.risk}</Typography>
+        ),
+      },
+      {
+        header: "Responsável",
+        accessorKey: "responsible",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.responsible}</Typography>
+        ),
       },
       {
         header: "Status",
+        accessorKey: "status",
+        cell: ({ row }) => {
+          const statusValue = row.original.status;
+
+          // Dicionário para traduzir e definir as cores de cada status
+          const statusConfig = {
+            "Completed": { label: "Completa", color: "info" },
+            "Finished": { label: "Finalizado", color: "success" },
+            "InAssessment": { label: "Em Avaliação", color: "warning" },
+            "NotStarted": { label: "Não Iniciado", color: "default" }
+          };
+
+          // Fallback caso venha algum status vazio ou diferente da API
+          const currentConfig = statusConfig[statusValue] || { 
+            label: statusValue || "—", 
+            color: "default" 
+          };
+
+          return (
+            <Chip
+              label={currentConfig.label}
+              color={currentConfig.color}
+              size="small"
+              sx={{
+                fontWeight: 600,
+                fontSize: "11px", // Ajustado para combinar com o padrão da sua tabela
+                height: "24px",
+                borderRadius: "6px" // Um leve arredondamento para ficar elegante
+              }}
+            />
+          );
+        },
+      },
+      {
+        header: "Data de Conclusão",
+        accessorKey: "dateOfConclusion",
+        cell: ({ row }) => {
+          try {
+            const dateStr = row.original.dateOfConclusion;
+            if (!dateStr || dateStr.startsWith('0001-01-01')) {
+              return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
+            }
+            return (
+              <Typography sx={{ fontSize: "13px" }}>
+                {new Date(dateStr).toLocaleDateString()}
+              </Typography>
+            );
+          } catch {
+            return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
+          }
+        },
+      },
+      {
+        header: "Risco Inerente",
+        accessorKey: "inherent",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.inherent || "—"}</Typography>
+        ),
+      },
+      {
+        header: "Risco Residual",
+        accessorKey: "residual",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.residual || "—"}</Typography>
+        ),
+      },
+      {
+        header: "Risco Planejado",
+        accessorKey: "planned",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.planned || "—"}</Typography>
+        ),
+      },
+      {
+        header: "Qtd. Questionários",
+        accessorKey: "quizCount",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.quizCount}</Typography>
+        ),
+      },
+      {
+        header: "Status do Registro",
         accessorKey: "active",
         cell: ({ row }) => (
           <Chip
@@ -1340,16 +1553,14 @@ const ListagemAvRisco = () => {
               fontSize: "12px",
               height: "28px",
               "& .MuiChip-icon": {
-                color:
-                  row.original.active === true ? "success.main" : "error.main",
+                color: row.original.active === true ? "success.main" : "error.main",
                 marginLeft: "4px",
               },
             }}
             icon={
               <span
                 style={{
-                  backgroundColor:
-                    row.original.active === true ? "green" : "red",
+                  backgroundColor: row.original.active === true ? "green" : "red",
                   borderRadius: "50%",
                   display: "inline-block",
                   width: "8px",
@@ -1363,12 +1574,13 @@ const ListagemAvRisco = () => {
         ),
       },
       {
+        id: "actions",
         header: " ",
-        disableSortBy: true,
-        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />, // Passa refreshData
+        enableHiding: false,
+        cell: ({ row }) => <ActionCell row={row} refreshData={refreshOrgaos} />,
       },
     ],
-    [theme],
+    [theme, navigation],
   );
 
   useEffect(() => {
@@ -1377,10 +1589,15 @@ const ListagemAvRisco = () => {
     }
   }, [isLoading, isInitialLoad]);
 
+  useEffect(() => {
+    if (!isLoading && formData.GenerateExcel) {
+      setFormData((prev) => ({ ...prev, GenerateExcel: false }));
+    }
+  }, [isLoading, formData.GenerateExcel]);
+
   return (
     <>
       {isInitialLoad && isLoading ? (
-        // Exibir indicador de carregamento apenas no carregamento inicial
         <div
           style={{
             display: "flex",
@@ -1393,48 +1610,24 @@ const ListagemAvRisco = () => {
         </div>
       ) : (
         <Box>
-          <ReactTable
-            {...{
-              data: lists,
-              columns,
-              onFormDataChange: handleFormDataChange,
-              isLoading,
-              processosTotal,
-              refreshData: refreshOrgaos,
-            }}
-          />
-          <Grid container spacing={2}>
-            {/* ReactTable com tamanho reduzido */}
-            <Grid item xs={12}>
-              <Box
-                sx={{ transform: "scale(0.9)", transformOrigin: "top left" }}
-              >
-                {" "}
-                {/* Redução de tamanho */}
-              </Box>
-            </Grid>
-
-            {/* Gráfico de Ativos/Inativos ao lado da tabela */}
-            {/* <Grid item xs={12} md={4}>
-              <ReactApexChart options={activeStatusData.options} series={activeStatusData.series} type="pie" height={300} />
-            </Grid> */}
-          </Grid>
-
-          {/* Restante dos gráficos abaixo */}
-          {/* <Grid container spacing={2} sx={{ marginTop: 4 }}>
-            <Grid item xs={12} md={6}>
-              <ReactApexChart options={yearlyProcessData.options} series={yearlyProcessData.series} type="bar" height={300} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <ReactApexChart options={monthlyProcessData.options} series={monthlyProcessData.series} type="bar" height={300} />
-            </Grid>
-            <Grid item xs={12}>
-              <ReactApexChart options={heatmapOptions} series={heatmapSeries} type="heatmap" height={350} />
-            </Grid>
-            <Grid item xs={12}>
-              <ReactApexChart options={stackedColumnOptions} series={stackedColumnSeries.series} type="bar" height={350} />
-            </Grid>
-          </Grid> */}
+          {lists && (
+            <ReactTable
+              {...{
+                data: lists,
+                columns,
+                modalToggler: () => {
+                  setCustomerModal(true);
+                  setSelectedCustomer(null);
+                },
+                totalRows,
+                onFormDataChange: handleFormDataChange,
+                isLoading,
+                refreshData: refreshOrgaos,
+                onApplyFilters: handleBackendFiltersChange,
+                onExportExcel: handleExportExcel,
+              }}
+            />
+          )}
         </Box>
       )}
       <AlertCustomerDelete
@@ -1452,4 +1645,4 @@ const ListagemAvRisco = () => {
   );
 };
 
-export default ListagemAvRisco;
+export default ListagemAvaliacoes;
