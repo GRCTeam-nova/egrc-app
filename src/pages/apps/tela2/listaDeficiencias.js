@@ -158,7 +158,7 @@ function ReactTable({
   const [drawerOpen, setDrawerOpen] = useState(false);
   
   const [selectedFilters, setSelectedFilters] = useState([
-    { type: "Status", values: ["Ativo"] },
+    { type: "Status da deficiência", values: ["Ativo"] },
   ]);
 
   // Opções de Filtro
@@ -228,7 +228,7 @@ function ReactTable({
   const applyFilters = () => {
     const newFilters = [];
 
-    if (draftFilters.status.length > 0) newFilters.push({ type: "Status", values: draftFilters.status });
+    if (draftFilters.status.length > 0) newFilters.push({ type: "Status da deficiência", values: draftFilters.status });
     if (draftFilters.startDate) newFilters.push({ type: "Data Inicial", values: [draftFilters.startDate] });
     if (draftFilters.endDate) newFilters.push({ type: "Data Final", values: [draftFilters.endDate] });
     if (draftFilters.deficiencia.length > 0) newFilters.push({ type: "Deficiência", values: draftFilters.deficiencia });
@@ -257,7 +257,7 @@ function ReactTable({
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
         const filterKey = {
-          "Status": "status",
+          "Status da deficiência": "status",
           "Deficiência": "deficiencia",
           "Tipo": "type",
           "Classificação": "classification",
@@ -314,7 +314,7 @@ function ReactTable({
         const filterType = filter.type;
         const filterValues = filter.values;
 
-        if (filterType === "Status") {
+        if (filterType === "Status da deficiência") {
           const showActive = filterValues.includes("Ativo");
           const showInactive = filterValues.includes("Inativo");
           if (showActive && showInactive) return true;
@@ -563,7 +563,7 @@ function ReactTable({
 
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Status</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Status da deficiência</InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
@@ -1156,7 +1156,7 @@ const ListagemDeficiencia = () => {
         },
       },
       {
-        header: "Status",
+        header: "Status da deficiência",
         accessorKey: "active",
         cell: ({ row }) => (
           <Chip

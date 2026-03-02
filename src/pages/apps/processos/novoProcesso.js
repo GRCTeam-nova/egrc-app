@@ -808,7 +808,7 @@ function ColumnsLayouts() {
         idProcessSuperior: formData.processoSuperior || null,
         idProcessPrevious: formData.processoAnterior || null,
 
-        idProcessNext: formData.processoPosterior || null,
+        idProcessNexts: formData.processoPosterior || null,
         idProcessBottoms: formData.processoInferior || null,
         idCompanies: formData.empresa,
         idDepartments: formData.departamentoInferior,

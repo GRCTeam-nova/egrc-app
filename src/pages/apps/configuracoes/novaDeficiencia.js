@@ -56,7 +56,7 @@ function ColumnsLayouts() {
   const [tipoDeficiencias, setTipoDeficiencias] = useState([]);
   const [statuss] = useState([
     { id: 1, nome: "Ativa" },
-    { id: 2, nome: "solucionada" },
+    { id: 2, nome: "Solucionada" },
   ]);
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;

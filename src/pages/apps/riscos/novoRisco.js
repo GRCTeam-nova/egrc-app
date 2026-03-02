@@ -104,6 +104,14 @@ function ColumnsLayoutsCorrigido() {
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
   const [riscoDados, setRiscoDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  // --- NOVOS ESTADOS PARA O FILTRO DE PROCESSOS ---
+  const [departamentosFiltrados, setDepartamentosFiltrados] = useState([]);
+  const [controlesFiltrados, setControlesFiltrados] = useState([]);
+  const [departamentoOrigemMap, setDepartamentoOrigemMap] = useState({});
+  const [controleOrigemMap, setControleOrigemMap] = useState({});
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+  const [pendingProcessos, setPendingProcessos] = useState([]);
+  // ------------------------------------------------
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
@@ -356,6 +364,83 @@ function ColumnsLayoutsCorrigido() {
       );
     }
   };
+
+  // Efeito para buscar e filtrar Departamentos e Controles baseado no Processo
+  useEffect(() => {
+    const atualizarFiltrosPorProcesso = async () => {
+      // CENÁRIO 1: Nenhum processo selecionado -> Mostra tudo
+      if (formData.processo.length === 0) {
+        setDepartamentosFiltrados(departamentos);
+        setControlesFiltrados(controles);
+        setDepartamentoOrigemMap({});
+        setControleOrigemMap({});
+        return;
+      }
+
+      // CENÁRIO 2: Processos selecionados -> Busca na API os departamentos e controles atrelados
+      const novoMapaDep = {};
+      const novoMapaCtrl = {};
+      const idsDepPermitidos = new Set();
+      const idsCtrlPermitidos = new Set();
+
+      const promises = formData.processo.map((procId) =>
+        axios.get(
+          `https://api.egrc.homologacao.com.br/api/v1/processes/${procId}`,
+          {
+            headers: { Authorization: `Bearer ${authToken}` },
+          },
+        ),
+      );
+
+      try {
+        const results = await Promise.all(promises);
+
+        results.forEach((response) => {
+          const dadosProc = response.data;
+          const nomeProc = dadosProc.name;
+
+          // Extraindo departamentos
+          const deps = dadosProc.departments || [];
+          deps.forEach((dep) => {
+            const idDep = dep.idDepartment;
+            idsDepPermitidos.add(idDep);
+            if (!novoMapaDep[idDep]) novoMapaDep[idDep] = [];
+            if (!novoMapaDep[idDep].includes(nomeProc))
+              novoMapaDep[idDep].push(nomeProc);
+          });
+
+          // Extraindo controles
+          const ctrls = dadosProc.controls || [];
+          ctrls.forEach((ctrl) => {
+            const idCtrl = ctrl.idControl;
+            idsCtrlPermitidos.add(idCtrl);
+            if (!novoMapaCtrl[idCtrl]) novoMapaCtrl[idCtrl] = [];
+            if (!novoMapaCtrl[idCtrl].includes(nomeProc))
+              novoMapaCtrl[idCtrl].push(nomeProc);
+          });
+        });
+
+        // Filtra as listas globais baseadas nos IDs que a API retornou
+        setDepartamentosFiltrados(
+          departamentos.filter((d) => idsDepPermitidos.has(d.id)),
+        );
+        setControlesFiltrados(
+          controles.filter((c) => idsCtrlPermitidos.has(c.id)),
+        );
+        setDepartamentoOrigemMap(novoMapaDep);
+        setControleOrigemMap(novoMapaCtrl);
+      } catch (error) {
+        console.error("Erro ao buscar detalhes dos processos:", error);
+        enqueueSnackbar("Erro ao carregar dependências dos processos.", {
+          variant: "error",
+        });
+      }
+    };
+
+    if (departamentos.length > 0 || controles.length > 0) {
+      atualizarFiltrosPorProcesso();
+    }
+  }, [formData.processo, departamentos, controles, authToken]);
 
   const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
 
@@ -621,24 +706,42 @@ function ColumnsLayoutsCorrigido() {
     }
   };
 
-  const handleSelectAll2 = (event, newValue) => {
+  const handleSelectAllProcessos = (event, newValue) => {
+    let novosProcessosIds = [];
+
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
+        novosProcessosIds = [];
       } else {
-        // Select all
-        setFormData({
-          ...formData,
-          processo: processos.map((processo) => processo.id),
-        });
+        novosProcessosIds = processos.map((p) => p.id);
       }
     } else {
-      tratarMudancaInputGeral(
-        "processo",
-        newValue.map((item) => item.id),
-      );
+      novosProcessosIds = newValue.map((item) => item.id);
     }
+
+    // INTERCEPTAÇÃO: Se escolheu um novo processo e já havia dep/ctrl selecionado, avisa!
+    if (
+      formData.processo.length === 0 &&
+      novosProcessosIds.length > 0 &&
+      (formData.departamento.length > 0 || formData.controle.length > 0)
+    ) {
+      setPendingProcessos(novosProcessosIds);
+      setWarningDialogOpen(true);
+      return;
+    }
+
+    tratarMudancaInputGeral("processo", novosProcessosIds);
+  };
+
+  const confirmarMudancaDeProcesso = () => {
+    setFormData((prev) => ({
+      ...prev,
+      processo: pendingProcessos,
+      departamento: [], // Limpa dependentes
+      controle: [], // Limpa dependentes
+    }));
+    setWarningDialogOpen(false);
+    setPendingProcessos([]);
   };
 
   const voltarParaCadastroMenu = () => {
@@ -952,7 +1055,6 @@ function ColumnsLayoutsCorrigido() {
                   />
                 </Stack>
               </Grid>
-
 
               {requisicao === "Editar" && (
                 <Grid item xs={12} md={6}>
@@ -1385,10 +1487,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[
-                          { id: "all", nome: "Selecionar todos" },
-                          ...controles,
-                        ]}
+                        options={
+                          controlesFiltrados.length > 0
+                            ? [
+                                { id: "all", nome: "Selecionar todos" },
+                                ...controlesFiltrados,
+                              ]
+                            : []
+                        }
+                        noOptionsText="Nenhum controle encontrado"
                         getOptionLabel={(option) => option.nome}
                         value={formData.controle.map(
                           (id) =>
@@ -1399,24 +1506,42 @@ function ColumnsLayoutsCorrigido() {
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
                         }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all"
-                                      ? allSelectedControles
-                                      : selected
-                                  }
-                                />
+                        renderOption={(props, option, { selected }) => {
+                          const origens = controleOrigemMap[option.id]
+                            ? controleOrigemMap[option.id].join(", ")
+                            : "";
+                          return (
+                            <li {...props}>
+                              <Grid container alignItems="center">
+                                <Grid item>
+                                  <Checkbox
+                                    checked={
+                                      option.id === "all"
+                                        ? allSelectedControles
+                                        : selected
+                                    }
+                                  />
+                                </Grid>
+                                <Grid item xs>
+                                  <Typography variant="body1">
+                                    {option.nome}
+                                  </Typography>
+                                  {option.id !== "all" && origens && (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "text.secondary",
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      Processo(s): {origens}
+                                    </Typography>
+                                  )}
+                                </Grid>
                               </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
+                            </li>
+                          );
+                        }}
                         renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
@@ -1626,7 +1751,7 @@ function ColumnsLayoutsCorrigido() {
                             processos.find((processo) => processo.id === id) ||
                             id,
                         )}
-                        onChange={handleSelectAll2}
+                        onChange={handleSelectAllProcessos}
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
                         }
@@ -1669,10 +1794,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[
-                          { id: "all", nome: "Selecionar todos" },
-                          ...departamentos,
-                        ]}
+                        options={
+                          departamentosFiltrados.length > 0
+                            ? [
+                                { id: "all", nome: "Selecionar todos" },
+                                ...departamentosFiltrados,
+                              ]
+                            : []
+                        }
+                        noOptionsText="Nenhum departamento encontrado"
                         getOptionLabel={(option) => option.nome}
                         value={formData.departamento.map(
                           (id) =>
@@ -1684,24 +1814,42 @@ function ColumnsLayoutsCorrigido() {
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
                         }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all"
-                                      ? allSelectedDepartamentos
-                                      : selected
-                                  }
-                                />
+                        renderOption={(props, option, { selected }) => {
+                          const origens = departamentoOrigemMap[option.id]
+                            ? departamentoOrigemMap[option.id].join(", ")
+                            : "";
+                          return (
+                            <li {...props}>
+                              <Grid container alignItems="center">
+                                <Grid item>
+                                  <Checkbox
+                                    checked={
+                                      option.id === "all"
+                                        ? allSelectedDepartamentos
+                                        : selected
+                                    }
+                                  />
+                                </Grid>
+                                <Grid item xs>
+                                  <Typography variant="body1">
+                                    {option.nome}
+                                  </Typography>
+                                  {option.id !== "all" && origens && (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "text.secondary",
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      Processo(s): {origens}
+                                    </Typography>
+                                  )}
+                                </Grid>
                               </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
+                            </li>
+                          );
+                        }}
                         renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
@@ -1760,35 +1908,30 @@ function ColumnsLayoutsCorrigido() {
                     </Stack>
                   </Grid>
 
-                  
-              {requisicao === "Editar" && (
-                <Grid item xs={12} md={12}>
-                  <Stack spacing={1}>
-                    <InputLabel>Outras categorias</InputLabel>
+                  {requisicao === "Editar" && (
+                    <Grid item xs={12} md={12}>
+                      <Stack spacing={1}>
+                        <InputLabel>Outras categorias</InputLabel>
 
-                    <Autocomplete
-                      multiple
-                      disableCloseOnSelect
-                      options={categorias}
-                      getOptionLabel={(option) => option.nome}
-                      value={formData.idCategories
-                        .map((id) => categorias.find((c) => c.id === id))
-                        .filter(Boolean)}
-                      onChange={(event, newValue) => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          idCategories: newValue.map((c) => c.id),
-                        }));
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
+                        <Autocomplete
+                          multiple
+                          disableCloseOnSelect
+                          options={categorias}
+                          getOptionLabel={(option) => option.nome}
+                          value={formData.idCategories
+                            .map((id) => categorias.find((c) => c.id === id))
+                            .filter(Boolean)}
+                          onChange={(event, newValue) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              idCategories: newValue.map((c) => c.id),
+                            }));
+                          }}
+                          renderInput={(params) => <TextField {...params} />}
                         />
-                      )}
-                    />
-                  </Stack>
-                </Grid>
-              )}
+                      </Stack>
+                    </Grid>
+                  )}
 
                   <Grid item xs={12}>
                     <Stack spacing={1}>
@@ -1893,6 +2036,44 @@ function ColumnsLayoutsCorrigido() {
               }}
             >
               Continuar Editando
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Dialog de Aviso de Filtro */}
+        <Dialog
+          open={warningDialogOpen}
+          onClose={() => setWarningDialogOpen(false)}
+        >
+          <DialogTitle sx={{ fontWeight: 600 }}>
+            {"Alteração de filtro de Processos"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Ao selecionar um Processo, as listas de Departamentos e Controles
+              serão filtradas para exibir apenas aqueles pertencentes ao
+              Processo escolhido.
+              <br />
+              <br />
+              <strong>
+                Os Departamentos e Controles selecionados anteriormente serão
+                removidos.
+              </strong>
+              <br />
+              <br />
+              Deseja continuar?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setWarningDialogOpen(false)} color="primary">
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarMudancaDeProcesso}
+              color="error"
+              variant="contained"
+              autoFocus
+            >
+              Limpar Seleções
             </Button>
           </DialogActions>
         </Dialog>
