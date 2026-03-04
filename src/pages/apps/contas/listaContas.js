@@ -119,6 +119,7 @@ const defaultVisibility = {
   name: true,
   code: true,
   type: true,
+  isRelevant: true,
   superior: true,
   responsible: true,
   ledgerAccountCompanies: true,
@@ -170,6 +171,7 @@ function ReactTable({
   const [responsibleOptions, setResponsibleOptions] = useState([]);
   const [superiorOptions, setSuperiorOptions] = useState([]); // Nova opção
 
+  const relevantOptions = ["Sim", "Não"];
   const [ledgerAccountCompaniesOptions, setLedgerAccountCompaniesOptions] =
     useState([]);
   const [ledgerAccountBottomsOptions, setLedgerAccountBottomsOptions] =
@@ -183,6 +185,7 @@ function ReactTable({
     status: ["Ativo"],
     responsible: [],
     type: [],
+    isRelevant: [],
     superior: [], // Adicionado
     ledgerAccountCompanies: [],
     ledgerAccountBottoms: [],
@@ -241,6 +244,11 @@ function ReactTable({
       });
     if (draftFilters.type.length > 0)
       newFilters.push({ type: "Tipo", values: draftFilters.type });
+    if (draftFilters.isRelevant.length > 0)
+      newFilters.push({
+        type: "Relevante",
+        values: draftFilters.isRelevant,
+      });
     
     if (draftFilters.superior.length > 0) // Adicionado
       newFilters.push({ type: "Conta Superior", values: draftFilters.superior });
@@ -301,6 +309,7 @@ function ReactTable({
           Status: "status",
           Responsável: "responsible",
           Tipo: "type",
+          Relevante: "isRelevant",
           "Conta Superior": "superior", // Adicionado
           Empresas: "ledgerAccountCompanies",
           "Contas Inferiores": "ledgerAccountBottoms", // Adicionado
@@ -335,6 +344,7 @@ function ReactTable({
       status: [],
       responsible: [],
       type: [],
+      isRelevant: [],
       superior: [], // Limpando Superior
       ledgerAccountCompanies: [],
       ledgerAccountBottoms: [], // Limpando Inferiores
@@ -370,6 +380,10 @@ function ReactTable({
         if (filterType === "Responsável")
           return filterValues.includes(item.responsible);
         if (filterType === "Tipo") return filterValues.includes(item.type);
+        if (filterType === "Relevante") {
+          const relevantLabel = item.isRelevant === true ? "Sim" : "Não";
+          return filterValues.includes(relevantLabel);
+        }
         if (filterType === "Conta Superior") return filterValues.includes(item.superior); // Lógica Superior
 
         const arrayFilters = {
@@ -666,6 +680,24 @@ function ReactTable({
                   value={draftFilters.type}
                   onChange={(event, value) =>
                     setDraftFilters((prev) => ({ ...prev, type: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Relevante
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={relevantOptions}
+                  value={draftFilters.isRelevant}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, isRelevant: value }))
                   }
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -1675,6 +1707,22 @@ const ListagemEmpresa = () => {
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>{row.original.type}</Typography>
         ),
+      },
+      {
+        header: "Relevante",
+        accessorKey: "isRelevant",
+        cell: ({ row }) => {
+          const isRelevant = row.original.isRelevant === true;
+          return (
+            <Chip
+              label={isRelevant ? "Sim" : "Não"}
+              size="small"
+              color={isRelevant ? "primary" : "default"}
+              variant={isRelevant ? "filled" : "outlined"}
+              sx={{ fontWeight: 600, minWidth: "52px" }}
+            />
+          );
+        },
       },
       {
         header: "Responsável",
