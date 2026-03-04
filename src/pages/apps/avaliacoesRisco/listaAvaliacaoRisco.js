@@ -894,7 +894,7 @@ function ActionCell({ row, refreshData }) {
 
     try {
       const responseGet = await fetch(
-        `https://api.egrc.homologacao.com.br/api/v1/assessments/${row.original.id}`,
+        `https://api.egrc.homologacao.com.br/api/v1/assessments/${row.original.idAssessment}`,
         {
           headers: { Authorization: `Bearer ${authToken}` },
         },
@@ -923,7 +923,11 @@ function ActionCell({ row, refreshData }) {
       );
 
       if (!responsePut.ok) {
-        throw new Error("Erro ao atualizar status da avaliação.");
+        const errorData = await responsePut.json().catch(() => ({}));
+        const errorMessage =
+          errorData?.notifications?.[0]?.message ||
+          "Erro ao alterar o status da avaliação.";
+        throw new Error(errorMessage);
       }
 
       enqueueSnackbar(
@@ -934,7 +938,7 @@ function ActionCell({ row, refreshData }) {
       refreshData();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Erro ao alterar o status da avaliação.", {
+      enqueueSnackbar(error?.message || "Erro ao alterar o status da avaliação.", {
         variant: "error",
       });
     }
