@@ -1097,6 +1097,62 @@ function ColumnsLayouts() {
     hasQuestionarioConcluido &&
     sobrepor === false;
 
+  const getRiskResultByCoords = useCallback(
+    (coords) => {
+      if (!coords || !heatmapDataAv?.heatMapQuadrants) return null;
+
+      const [rStr, cStr] = String(coords).split(":");
+      const r = Number.parseInt(rStr, 10);
+      const c = Number.parseInt(cStr, 10);
+
+      if (Number.isNaN(r) || Number.isNaN(c)) return null;
+
+      const candidates = [`${r - 1}:${c - 1}`, `${r}:${c}`];
+      let quadrant = null;
+
+      for (const coordinate of candidates) {
+        quadrant = heatmapDataAv.heatMapQuadrants.find(
+          (item) => item.coordinate === coordinate,
+        );
+        if (quadrant) break;
+      }
+
+      if (!quadrant) return null;
+
+      const range = heatmapDataAv?.heatMapRanges?.find(
+        (item) => quadrant.value >= item.start && quadrant.value <= item.end,
+      );
+
+      const rangeName =
+        range?.name && range.name.trim() !== ""
+          ? range.name
+          : `Nivel ${quadrant.value}`;
+
+      return {
+        name: rangeName,
+        color: range?.color || "#e0e0e0",
+      };
+    },
+    [heatmapDataAv],
+  );
+
+  const formatRiskResultString = useCallback(
+    (coords) => {
+      const riskResult = getRiskResultByCoords(coords);
+      return riskResult ? `${riskResult.name} - ${riskResult.color}` : null;
+    },
+    [getRiskResultByCoords],
+  );
+
+  const buildFinalizationResultPayload = useCallback(
+    (coords) => ({
+      resultInherent: formatRiskResultString(coords?.inherent),
+      resultResidual: formatRiskResultString(coords?.residual),
+      resultPlanned: formatRiskResultString(coords?.planned),
+    }),
+    [formatRiskResultString],
+  );
+
   const handleStart = async () => {
     let url = "";
     let method = "";
@@ -1221,6 +1277,7 @@ function ColumnsLayouts() {
         const resImp = findImp(formData.idSeverityResidual);
         const plnProb = findProb(formData.idProbabilityPlanned);
         const plnImp = findImp(formData.idSeverityPlanned);
+        const finalizationResults = buildFinalizationResultPayload(finalCoords);
 
         payload = {
           idAssessment: normativaDados?.idAssessment,
@@ -1260,6 +1317,7 @@ function ColumnsLayouts() {
           justificationInerent: formData.justificationInerent,
           justificationResidual: formData.justificationResidual,
           justificationPlanned: formData.justificationPlanned,
+          ...finalizationResults,
         };
       }
 
@@ -1581,6 +1639,11 @@ function ColumnsLayouts() {
       const resImp = findImp(formData.idSeverityResidual);
       const plnProb = findProb(formData.idProbabilityPlanned);
       const plnImp = findImp(formData.idSeverityPlanned);
+      const assessmentStatus = sobrepor ? 4 : formData.status;
+      const finalizationResults =
+        assessmentStatus === 4
+          ? buildFinalizationResultPayload(finalCoords)
+          : {};
 
       payload = {
         idAssessment: normativaDados?.idAssessment,
@@ -1588,7 +1651,7 @@ function ColumnsLayouts() {
         idCycle: formData.ciclo,
         idRespondents: formData.respondente,
         idResponsible: formData.responsavelAv,
-        assessmentStatus: sobrepor ? 4 : formData.status,
+        assessmentStatus,
         active: status,
         replaceUser: sobrepor
           ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
@@ -1618,6 +1681,7 @@ function ColumnsLayouts() {
         justificationInerent: formData.justificationInerent,
         justificationResidual: formData.justificationResidual,
         justificationPlanned: formData.justificationPlanned,
+        ...finalizationResults,
       };
     }
 

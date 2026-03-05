@@ -126,6 +126,87 @@ const defaultVisibility = {
   actions: true,
 };
 
+const HEX_COLOR_REGEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+const parseRiskResultValue = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const parts = raw.split(" - ");
+  if (parts.length < 2) return { name: raw, color: null };
+
+  const colorCandidate = parts[parts.length - 1].trim();
+  const name = parts.slice(0, -1).join(" - ").trim();
+
+  if (!name) return null;
+
+  return {
+    name,
+    color: HEX_COLOR_REGEX.test(colorCandidate) ? colorCandidate : null,
+  };
+};
+
+const CHIP_TEXT_LIGHT = "#FFFFFF";
+const CHIP_TEXT_DARK = "#111827";
+
+const hexToRgb = (hexColor) => {
+  if (!HEX_COLOR_REGEX.test(hexColor || "")) return null;
+  const normalized =
+    hexColor.length === 4
+      ? `#${hexColor[1]}${hexColor[1]}${hexColor[2]}${hexColor[2]}${hexColor[3]}${hexColor[3]}`
+      : hexColor;
+
+  const intValue = Number.parseInt(normalized.slice(1), 16);
+  return {
+    r: (intValue >> 16) & 255,
+    g: (intValue >> 8) & 255,
+    b: intValue & 255,
+  };
+};
+
+const channelToLinear = (channel) => {
+  const sRgb = channel / 255;
+  return sRgb <= 0.03928
+    ? sRgb / 12.92
+    : Math.pow((sRgb + 0.055) / 1.055, 2.4);
+};
+
+const getRelativeLuminance = (hexColor) => {
+  const rgb = hexToRgb(hexColor);
+  if (!rgb) return null;
+
+  const r = channelToLinear(rgb.r);
+  const g = channelToLinear(rgb.g);
+  const b = channelToLinear(rgb.b);
+
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const getContrastRatio = (lumA, lumB) => {
+  const lighter = Math.max(lumA, lumB);
+  const darker = Math.min(lumA, lumB);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const getReadableChipTextColor = (backgroundHex) => {
+  const bgLuminance = getRelativeLuminance(backgroundHex);
+  const lightLuminance = getRelativeLuminance(CHIP_TEXT_LIGHT);
+  const darkLuminance = getRelativeLuminance(CHIP_TEXT_DARK);
+
+  if (
+    bgLuminance == null ||
+    lightLuminance == null ||
+    darkLuminance == null
+  ) {
+    return CHIP_TEXT_DARK;
+  }
+
+  const lightContrast = getContrastRatio(bgLuminance, lightLuminance);
+  const darkContrast = getContrastRatio(bgLuminance, darkLuminance);
+
+  return lightContrast >= darkContrast ? CHIP_TEXT_LIGHT : CHIP_TEXT_DARK;
+};
+
 function ReactTable({
   data,
   columns,
@@ -1423,6 +1504,29 @@ const ListagemAvaliacoes = () => {
     }));
   };
 
+  const renderRiskResultChip = (value) => {
+    const parsed = parseRiskResultValue(value);
+
+    if (!parsed?.name) {
+      return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
+    }
+
+    return (
+      <Chip
+        label={parsed.name}
+        size="small"
+        sx={{
+          fontWeight: 600,
+          fontSize: "11px",
+          height: "24px",
+          borderRadius: "6px",
+          backgroundColor: parsed.color || "#f3f4f6",
+          color: parsed.color ? getReadableChipTextColor(parsed.color) : "#00000099",
+        }}
+      />
+    );
+  };
+
   const columns = useMemo(
     () => [
       {
@@ -1518,23 +1622,17 @@ const ListagemAvaliacoes = () => {
       {
         header: "Risco Inerente",
         accessorKey: "inherent",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.inherent || "—"}</Typography>
-        ),
+        cell: ({ row }) => renderRiskResultChip(row.original.inherent),
       },
       {
         header: "Risco Residual",
         accessorKey: "residual",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.residual || "—"}</Typography>
-        ),
+        cell: ({ row }) => renderRiskResultChip(row.original.residual),
       },
       {
         header: "Risco Planejado",
         accessorKey: "planned",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.planned || "—"}</Typography>
-        ),
+        cell: ({ row }) => renderRiskResultChip(row.original.planned),
       },
       {
         header: "Qtd. Questionários",

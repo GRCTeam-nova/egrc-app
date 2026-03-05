@@ -109,6 +109,89 @@ export const fuzzyFilter = (row, columnId, value) => {
   return cellValue.includes(valueStr);
 };
 
+const HEX_COLOR_REGEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+const parseRiskResultValue = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  const parts = raw.split(" - ");
+  if (parts.length < 2) return { name: raw, color: null };
+
+  const colorCandidate = parts[parts.length - 1].trim();
+  const name = parts.slice(0, -1).join(" - ").trim();
+
+  if (!name) return null;
+
+  return {
+    name,
+    color: HEX_COLOR_REGEX.test(colorCandidate) ? colorCandidate : null,
+  };
+};
+
+const getRiskResultLabel = (value) => parseRiskResultValue(value)?.name ?? null;
+
+const CHIP_TEXT_LIGHT = "#FFFFFF";
+const CHIP_TEXT_DARK = "#111827";
+
+const hexToRgb = (hexColor) => {
+  if (!HEX_COLOR_REGEX.test(hexColor || "")) return null;
+  const normalized =
+    hexColor.length === 4
+      ? `#${hexColor[1]}${hexColor[1]}${hexColor[2]}${hexColor[2]}${hexColor[3]}${hexColor[3]}`
+      : hexColor;
+
+  const intValue = Number.parseInt(normalized.slice(1), 16);
+  return {
+    r: (intValue >> 16) & 255,
+    g: (intValue >> 8) & 255,
+    b: intValue & 255,
+  };
+};
+
+const channelToLinear = (channel) => {
+  const sRgb = channel / 255;
+  return sRgb <= 0.03928
+    ? sRgb / 12.92
+    : Math.pow((sRgb + 0.055) / 1.055, 2.4);
+};
+
+const getRelativeLuminance = (hexColor) => {
+  const rgb = hexToRgb(hexColor);
+  if (!rgb) return null;
+
+  const r = channelToLinear(rgb.r);
+  const g = channelToLinear(rgb.g);
+  const b = channelToLinear(rgb.b);
+
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const getContrastRatio = (lumA, lumB) => {
+  const lighter = Math.max(lumA, lumB);
+  const darker = Math.min(lumA, lumB);
+  return (lighter + 0.05) / (darker + 0.05);
+};
+
+const getReadableChipTextColor = (backgroundHex) => {
+  const bgLuminance = getRelativeLuminance(backgroundHex);
+  const lightLuminance = getRelativeLuminance(CHIP_TEXT_LIGHT);
+  const darkLuminance = getRelativeLuminance(CHIP_TEXT_DARK);
+
+  if (
+    bgLuminance == null ||
+    lightLuminance == null ||
+    darkLuminance == null
+  ) {
+    return CHIP_TEXT_DARK;
+  }
+
+  const lightContrast = getContrastRatio(bgLuminance, lightLuminance);
+  const darkContrast = getContrastRatio(bgLuminance, darkLuminance);
+
+  return lightContrast >= darkContrast ? CHIP_TEXT_LIGHT : CHIP_TEXT_DARK;
+};
+
 // ==============================|| REACT TABLE - LIST ||============================== //
 
 function ReactTable({ data, columns, processosTotal, isLoading }) {
@@ -116,7 +199,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
   const [columnVisibility, setColumnVisibility] = useState({});
-  const recordType = "Ciclos";
+  const recordType = "Avaliações";
   const tableRef = useRef(null);
   const [sorting, setSorting] = useState([{ id: "risk", asc: true }]);
   const [rowSelection, setRowSelection] = useState({});
@@ -126,22 +209,28 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [ciclosOptions, setCiclosOptions] = useState([]);
   const [riscosOptions, setRiscosOptions] = useState([]);
+  const [resultInherentOptions, setResultInherentOptions] = useState([]);
+  const [resultResidualOptions, setResultResidualOptions] = useState([]);
+  const [resultPlannedOptions, setResultPlannedOptions] = useState([]);
   const [statusOptions] = useState([
     { label: "Ativo", value: true },
     { label: "Inativo", value: false },
   ]);
   const [assessmentStatusOptions] = useState([
-    { label: "Não iniciada", value: 1 },
-    { label: "Iniciada", value: 2 },
-    { label: "Em análise", value: 3 },
-    { label: "Completa", value: 4 },
-    { label: "Finalizada", value: 5 },
+    { label: "Não Iniciado", value: 1 },
+    { label: "Em Avaliação", value: 2 },
+    { label: "Completa", value: 3 },
+    { label: "Finalizado", value: 4 },
+    { label: "Finalizado", value: 5 },
   ]);
   const [draftFilters, setDraftFilters] = useState({
     ciclo: [],
     risco: [],
     status: [],
     assessmentStatus: [],
+    resultInherent: [],
+    resultResidual: [],
+    resultPlanned: [],
   });
 
   // Abre ou fecha o drawer
@@ -156,8 +245,23 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
       Boolean,
     );
 
+    const inherentResults = [
+      ...new Set(data.map((item) => getRiskResultLabel(item.resultInherent))),
+    ].filter(Boolean);
+
+    const residualResults = [
+      ...new Set(data.map((item) => getRiskResultLabel(item.resultResidual))),
+    ].filter(Boolean);
+
+    const plannedResults = [
+      ...new Set(data.map((item) => getRiskResultLabel(item.resultPlanned))),
+    ].filter(Boolean);
+
     setCiclosOptions(ciclos);
     setRiscosOptions(riscos);
+    setResultInherentOptions(inherentResults);
+    setResultResidualOptions(residualResults);
+    setResultPlannedOptions(plannedResults);
   }, [data]);
 
   // Aplica os filtros selecionados
@@ -183,6 +287,27 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
       newFilters.push({
         type: "Status da avaliação",
         values: draftFilters.assessmentStatus.map((s) => s.value),
+      });
+    }
+
+    if (draftFilters.resultInherent.length > 0) {
+      newFilters.push({
+        type: "Resultado inerente",
+        values: draftFilters.resultInherent,
+      });
+    }
+
+    if (draftFilters.resultResidual.length > 0) {
+      newFilters.push({
+        type: "Resultado residual",
+        values: draftFilters.resultResidual,
+      });
+    }
+
+    if (draftFilters.resultPlanned.length > 0) {
+      newFilters.push({
+        type: "Resultado planejado",
+        values: draftFilters.resultPlanned,
       });
     }
 
@@ -214,6 +339,18 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           updatedDraft.assessmentStatus = updatedDraft.assessmentStatus.filter(
             (opt) => !filterToRemove.values.includes(opt.value),
           );
+        } else if (filterToRemove.type === "Resultado inerente") {
+          updatedDraft.resultInherent = updatedDraft.resultInherent.filter(
+            (value) => !filterToRemove.values.includes(value),
+          );
+        } else if (filterToRemove.type === "Resultado residual") {
+          updatedDraft.resultResidual = updatedDraft.resultResidual.filter(
+            (value) => !filterToRemove.values.includes(value),
+          );
+        } else if (filterToRemove.type === "Resultado planejado") {
+          updatedDraft.resultPlanned = updatedDraft.resultPlanned.filter(
+            (value) => !filterToRemove.values.includes(value),
+          );
         }
 
         return updatedDraft;
@@ -227,7 +364,15 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const handleRemoveAllFilters = () => {
     setSelectedFilters([]);
     setGlobalFilter("");
-    setDraftFilters({ ciclo: [], risco: [], status: [], assessmentStatus: [] });
+    setDraftFilters({
+      ciclo: [],
+      risco: [],
+      status: [],
+      assessmentStatus: [],
+      resultInherent: [],
+      resultResidual: [],
+      resultPlanned: [],
+    });
   };
 
   // Filtra os ciclos com base nos filtros selecionados
@@ -241,6 +386,12 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
         if (filter.type === "Status") return filter.values.includes(item.active);
         if (filter.type === "Status da avaliação")
           return filter.values.includes(item.assessmentStatus);
+        if (filter.type === "Resultado inerente")
+          return filter.values.includes(getRiskResultLabel(item.resultInherent));
+        if (filter.type === "Resultado residual")
+          return filter.values.includes(getRiskResultLabel(item.resultResidual));
+        if (filter.type === "Resultado planejado")
+          return filter.values.includes(getRiskResultLabel(item.resultPlanned));
         return true;
       });
     });
@@ -489,6 +640,24 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Ciclo
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={ciclosOptions}
+                  value={draftFilters.ciclo}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, ciclo: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
                 Risco
               </InputLabel>
               <FormControl fullWidth margin="normal">
@@ -539,6 +708,69 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                     }))
                   }
                   getOptionLabel={(option) => option.label}
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Resultado inerente
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={resultInherentOptions}
+                  value={draftFilters.resultInherent}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      resultInherent: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Resultado residual
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={resultResidualOptions}
+                  value={draftFilters.resultResidual}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      resultResidual: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Resultado planejado
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={resultPlannedOptions}
+                  value={draftFilters.resultPlanned}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      resultPlanned: value,
+                    }))
+                  }
                   renderInput={(params) => <TextField {...params} />}
                 />
               </FormControl>
@@ -1340,22 +1572,41 @@ const ListagemEmpresa = ({ cicloId }) => {
   };
 
   const assessmentStatusMeta = (status) => {
-    if (status == null) return { label: "—", color: "default" };
+    const statusConfig = {
+      1: { label: "Não Iniciado", color: "default" },
+      2: { label: "Em Avaliação", color: "warning" },
+      3: { label: "Completa", color: "info" },
+      4: { label: "Finalizado", color: "success" },
+      5: { label: "Finalizado", color: "success" },
+    };
 
-    switch (Number(status)) {
-      case 1:
-        return { label: "Não iniciada", color: "default" };
-      case 2:
-        return { label: "Iniciada", color: "info" };
-      case 3:
-        return { label: "Em análise", color: "warning" };
-      case 4:
-        return { label: "Completa", color: "success" };
-      case 5:
-        return { label: "Finalizada", color: "success" };
-      default:
-        return { label: `Status ${status}`, color: "default" };
+    return statusConfig[Number(status)] || {
+      label: status || "—",
+      color: "default",
+    };
+  };
+
+  const renderRiskResultChip = (value) => {
+    const parsed = parseRiskResultValue(value);
+
+    if (!parsed?.name) {
+      return <Typography sx={{ fontSize: "13px" }}>—</Typography>;
     }
+
+    return (
+      <Chip
+        label={parsed.name}
+        size="small"
+        sx={{
+          fontWeight: 600,
+          fontSize: "11px",
+          height: "24px",
+          borderRadius: "6px",
+          backgroundColor: parsed.color || "#f3f4f6",
+          color: parsed.color ? getReadableChipTextColor(parsed.color) : "#00000099",
+        }}
+      />
+    );
   };
 
   // Definição das colunas da tabela (baseado no JSON)
@@ -1383,7 +1634,47 @@ const ListagemEmpresa = ({ cicloId }) => {
       },
 
       {
-        header: "Data",
+        header: "Status da avaliação",
+        accessorKey: "assessmentStatus",
+        cell: ({ row }) => {
+          const meta = assessmentStatusMeta(row.original.assessmentStatus);
+
+          return (
+            <Chip
+              label={meta.label}
+              color={meta.color}
+              size="small"
+              sx={{
+                fontWeight: 600,
+                fontSize: "11px",
+                height: "24px",
+                borderRadius: "6px",
+              }}
+            />
+          );
+        },
+      },
+
+      // ======= Resultados (result*) =======
+      {
+        header: "Risco Inerente",
+        accessorKey: "resultInherent",
+        cell: ({ row }) => renderRiskResultChip(row.original.resultInherent),
+      },
+      {
+        header: "Risco Residual",
+        accessorKey: "resultResidual",
+        cell: ({ row }) => renderRiskResultChip(row.original.resultResidual),
+      },
+      {
+        header: "Risco Planejado",
+        accessorKey: "resultPlanned",
+        cell: ({ row }) => renderRiskResultChip(row.original.resultPlanned),
+      },
+
+      
+      {
+        header: "Data de criação",
         accessorKey: "date",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
@@ -1392,7 +1683,7 @@ const ListagemEmpresa = ({ cicloId }) => {
         ),
       },
 
-      {
+       {
         header: "Conclusão",
         accessorKey: "dateOfConclusion",
         cell: ({ row }) => (
@@ -1439,78 +1730,6 @@ const ListagemEmpresa = ({ cicloId }) => {
             }
           />
         ),
-      },
-
-      {
-        header: "Status da avaliação",
-        accessorKey: "assessmentStatus",
-        cell: ({ row }) => {
-          const meta = assessmentStatusMeta(row.original.assessmentStatus);
-
-          return (
-            <Chip
-              label={meta.label}
-              color={meta.color}
-              sx={{
-                backgroundColor: "transparent",
-                color: "#00000099",
-                fontWeight: 600,
-                fontSize: "12px",
-                height: "28px",
-              }}
-            />
-          );
-        },
-      },
-
-      // ======= Substituições (replace*) =======
-      {
-        header: "Risco Inerente",
-        accessorKey: "replaceRiskInerent",
-        cell: ({ row }) => row.original.replaceRiskInerent ?? "—",
-      },
-      {
-        header: "Risco Residual",
-        accessorKey: "replaceRiskResidual",
-        cell: ({ row }) => row.original.replaceRiskResidual ?? "—",
-      },
-      {
-        header: "Risco Planejado",
-        accessorKey: "replaceRiskPlanned",
-        cell: ({ row }) => row.original.replaceRiskPlanned ?? "—",
-      },
-
-      {
-        header: "Prob. Inerente",
-        accessorKey: "replaceProbabilityInherent",
-        cell: ({ row }) => row.original.replaceProbabilityInherent ?? "—",
-      },
-      {
-        header: "Impacto Inerente",
-        accessorKey: "replaceSeverityInherent",
-        cell: ({ row }) => row.original.replaceSeverityInherent ?? "—",
-      },
-
-      {
-        header: "Prob. Residual",
-        accessorKey: "replaceProbabilityResidual",
-        cell: ({ row }) => row.original.replaceProbabilityResidual ?? "—",
-      },
-      {
-        header: "Impacto Residual",
-        accessorKey: "replaceSeverityResidual",
-        cell: ({ row }) => row.original.replaceSeverityResidual ?? "—",
-      },
-
-      {
-        header: "Prob. Planejada",
-        accessorKey: "replaceProbabilityPlanned",
-        cell: ({ row }) => row.original.replaceProbabilityPlanned ?? "—",
-      },
-      {
-        header: "Impacto Planejado",
-        accessorKey: "replaceSeverityPlanned",
-        cell: ({ row }) => row.original.replaceSeverityPlanned ?? "—",
       },
 
       // Ações
