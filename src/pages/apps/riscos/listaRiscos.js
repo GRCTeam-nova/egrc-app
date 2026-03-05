@@ -101,8 +101,9 @@ export const fuzzyFilter = (row, columnId, value) => {
 const defaultVisibility = {
   name: true,
   code: true,
-  category: true,
   responsible: true,
+  type: true,
+  category: true,
   treatment: true,
   process: false,
   controls: false,
@@ -135,7 +136,9 @@ function ReactTable({
   const [columnVisibility, setColumnVisibility] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : defaultVisibility;
+      return saved
+        ? { ...defaultVisibility, ...JSON.parse(saved) }
+        : defaultVisibility;
     } catch (error) {
       console.error("Erro ao carregar visibilidade das colunas", error);
       return defaultVisibility;
@@ -156,6 +159,7 @@ function ReactTable({
   ]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [responsibleOptions, setResponsibleOptions] = useState([]);
+  const [typeOptions, setTypeOptions] = useState([]);
   const [treatmentOptions, setTreatmentOptions] = useState([]);
 
   const [processOptions, setProcessOptions] = useState([]);
@@ -174,6 +178,7 @@ function ReactTable({
     status: ["Ativo"],
     name: [],
     responsible: [],
+    type: [],
     category: [],
     treatment: [],
     process: [],
@@ -211,6 +216,7 @@ function ReactTable({
 
     setCategoryOptions(getUniqueValues("category"));
     setResponsibleOptions(getUniqueValues("responsible"));
+    setTypeOptions(getUniqueValues("type"));
     setTreatmentOptions(getUniqueValues("treatment"));
 
     setProcessOptions(getUniqueValues("process", true));
@@ -237,6 +243,8 @@ function ReactTable({
         type: "Responsável",
         values: draftFilters.responsible,
       });
+    if (draftFilters.type.length > 0)
+      newFilters.push({ type: "Tipo", values: draftFilters.type });
     if (draftFilters.category.length > 0)
       newFilters.push({ type: "Categoria", values: draftFilters.category });
     if (draftFilters.treatment.length > 0)
@@ -303,6 +311,7 @@ function ReactTable({
 
         const mapTypeToKey = {
           "Status": "status",
+          Tipo: "type",
           Responsável: "responsible",
           Categoria: "category",
           Tratamento: "treatment",
@@ -344,6 +353,7 @@ function ReactTable({
     setDraftFilters({
       status: [],
       responsible: [],
+      type: [],
       category: [],
       treatment: [],
       process: [],
@@ -392,6 +402,8 @@ function ReactTable({
         
         if (filterType === "Responsável")
           return filterValues.includes(item.responsible);
+        if (filterType === "Tipo")
+          return filterValues.includes(item.type);
         if (filterType === "Categoria")
           return filterValues.includes(item.category);
         if (filterType === "Tratamento")
@@ -681,6 +693,25 @@ function ReactTable({
                   value={draftFilters.responsible}
                   onChange={(event, value) =>
                     setDraftFilters((prev) => ({ ...prev, responsible: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            {}
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Tipo
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={typeOptions}
+                  value={draftFilters.type}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, type: value }))
                   }
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -1784,6 +1815,13 @@ const ListagemEmpresa = () => {
           <Typography sx={{ fontSize: "13px" }}>
             {row.original.responsible}
           </Typography>
+        ),
+      },
+      {
+        header: "Tipo",
+        accessorKey: "type",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>{row.original.type}</Typography>
         ),
       },
       {

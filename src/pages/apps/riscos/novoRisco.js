@@ -81,6 +81,7 @@ function ColumnsLayoutsCorrigido() {
   const [categorias, setCategorias] = useState([]);
   const [frameworks, setFrameworks] = useState([]);
   const [tratamentos, setTratamentos] = useState([]);
+  const [tiposRisco, setTiposRisco] = useState([]);
   const [diretrizes, setDiretrizes] = useState([]);
   const [fatores, setFatores] = useState([]);
   const [riscoAssociados, setRiscoAssociados] = useState([]);
@@ -116,7 +117,9 @@ function ColumnsLayoutsCorrigido() {
   window.setHasChanges = setHasChanges;
 
   const [formData, setFormData] = useState({
-    empresaInferior: [],
+    riscoSuperior: "",
+    riscoInferior: [],
+    tipoRisco: "",
     diretriz: [],
     fator: [],
     files: [],
@@ -152,6 +155,7 @@ function ColumnsLayoutsCorrigido() {
       const transformedData = response.data.map((item) => ({
         id:
           item.idRisk ||
+          item.idRiskType ||
           item.idLedgerAccount ||
           item.idProcess ||
           item.id_responsible ||
@@ -182,12 +186,30 @@ function ColumnsLayoutsCorrigido() {
     }
   };
 
+  const extractIdsFromArray = (array = [], keys = []) => {
+    if (!Array.isArray(array)) return [];
+
+    return array
+      .map((item) => {
+        if (!item) return null;
+        if (typeof item === "string") return item;
+
+        for (const key of keys) {
+          if (item[key]) return item[key];
+        }
+
+        return item.id || null;
+      })
+      .filter(Boolean);
+  };
+
   useEffect(() => {
     if (!authToken) return;
     fetchData(`${API_URL}categories`, setCategorias);
     fetchData(`${API_URL}action-plans`, setPlanoAcao);
     fetchData(`${API_URL}departments`, setDepartamentos);
     fetchData(`${API_URL}risks`, setRiscoAssociados);
+    fetchData(`${API_URL}risks/types`, setTiposRisco);
     fetchData(`${API_URL}risks/frameworks`, setFrameworks);
     fetchData(`${API_URL}risks/treatments`, setTratamentos);
     fetchData(`${API_URL}risks/strategic-guidelines`, setDiretrizes);
@@ -271,6 +293,32 @@ function ColumnsLayoutsCorrigido() {
             riscoAssociado: Array.isArray(data.riskAssociates)
               ? data.riskAssociates.map((u) => u.idRiskAssociate)
               : [],
+            riscoSuperior:
+              data.idRiskSuperior ||
+              data.riskSuperior?.idRisk ||
+              data.riskSuperior?.id ||
+              "",
+            riscoInferior:
+              extractIdsFromArray(data.idRiskBottoms, [
+                "idRiskBottom",
+                "idRisk",
+                "id",
+              ]).length > 0
+                ? extractIdsFromArray(data.idRiskBottoms, [
+                    "idRiskBottom",
+                    "idRisk",
+                    "id",
+                  ])
+                : extractIdsFromArray(data.riskBottoms, [
+                    "idRiskBottom",
+                    "idRisk",
+                    "id",
+                  ]),
+            tipoRisco:
+              data.idRiskType ||
+              data.riskType?.idRiskType ||
+              data.riskType?.id ||
+              "",
             diretriz: Array.isArray(data.strategicGuidelines)
               ? data.strategicGuidelines.map((u) => u.idStrategicGuideline)
               : [],
@@ -474,14 +522,14 @@ function ColumnsLayoutsCorrigido() {
 
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.riscoAssociado.length === riscoAssociados.length) {
+      if (formData.riscoAssociado.length === opcoesRelacionamentoRisco.length) {
         // Deselect all
         setFormData({ ...formData, riscoAssociado: [] });
       } else {
         // Select all
         setFormData({
           ...formData,
-          riscoAssociado: riscoAssociados.map(
+          riscoAssociado: opcoesRelacionamentoRisco.map(
             (riscoAssociado) => riscoAssociado.id,
           ),
         });
@@ -492,6 +540,52 @@ function ColumnsLayoutsCorrigido() {
         newValue.map((item) => item.id),
       );
     }
+  };
+
+  const handleRiscoSuperiorChange = (event, newValue) => {
+    const riscoSuperiorId = newValue ? newValue.id : "";
+    const possuiConflito =
+      riscoSuperiorId && formData.riscoInferior.includes(riscoSuperiorId);
+
+    if (possuiConflito) {
+      enqueueSnackbar(
+        "O risco superior não pode ser igual a um risco inferior selecionado.",
+        {
+          variant: "warning",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      riscoSuperior: riscoSuperiorId,
+      riscoInferior: riscoSuperiorId
+        ? prev.riscoInferior.filter((id) => id !== riscoSuperiorId)
+        : prev.riscoInferior,
+    }));
+  };
+
+  const handleRiscoInferiorChange = (event, newValue) => {
+    const riscoSuperiorAtual = formData.riscoSuperior;
+    const idsSelecionados = newValue
+      .map((item) => item.id)
+      .filter((id) => id !== riscoSuperiorAtual);
+
+    if (newValue.length !== idsSelecionados.length && riscoSuperiorAtual) {
+      enqueueSnackbar(
+        "O risco inferior não pode ser igual ao risco superior selecionado.",
+        {
+          variant: "warning",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      riscoInferior: idsSelecionados,
+    }));
   };
 
   // NEW
@@ -755,9 +849,25 @@ function ColumnsLayoutsCorrigido() {
     categoria: true,
   });
 
+  const riscoAtualId = riscoDados?.idRisk || dadosApi?.id || null;
+  const opcoesRelacionamentoRisco = riscoAssociados.filter(
+    (risco) => risco.id && risco.id !== riscoAtualId,
+  );
+
+  const getRiskOptionLabel = (option) => {
+    return option?.nome || option?.name || "";
+  };
+
+  const opcoesRiscoSuperior = opcoesRelacionamentoRisco.filter(
+    (risco) => !formData.riscoInferior.includes(risco.id),
+  );
+  const opcoesRiscoInferior = opcoesRelacionamentoRisco.filter(
+    (risco) => risco.id !== formData.riscoSuperior,
+  );
+
   const allSelected =
-    formData.riscoAssociado.length === riscoAssociados.length &&
-    riscoAssociados.length > 0;
+    formData.riscoAssociado.length === opcoesRelacionamentoRisco.length &&
+    opcoesRelacionamentoRisco.length > 0;
   const allSelectedPlanoAcao =
     formData.planoAcao.length === planosAcoes.length && planosAcoes.length > 0;
   const allSelected2 =
@@ -821,6 +931,20 @@ function ColumnsLayoutsCorrigido() {
       return;
     }
 
+    if (
+      formData.riscoSuperior &&
+      formData.riscoInferior.includes(formData.riscoSuperior)
+    ) {
+      enqueueSnackbar(
+        "O risco superior e o risco inferior não podem ter o mesmo registro.",
+        {
+          variant: "error",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -877,6 +1001,11 @@ function ColumnsLayoutsCorrigido() {
           code: codigo,
           name: nome,
           idCategory: formData.categoria || null,
+          idRiskSuperior: formData.riscoSuperior || null,
+          idRiskBottoms: formData.riscoInferior?.length
+            ? formData.riscoInferior
+            : null,
+          idRiskType: formData.tipoRisco || null,
         };
       } else if (requisicao === "Editar") {
         url = `${API_URL}risks`;
@@ -896,6 +1025,11 @@ function ColumnsLayoutsCorrigido() {
             : null,
           idResponsible: formData.responsavel || null,
           active: status,
+          idRiskSuperior: formData.riscoSuperior || null,
+          idRiskBottoms: formData.riscoInferior?.length
+            ? formData.riscoInferior
+            : null,
+          idRiskType: formData.tipoRisco || null,
           idCategory: formData.categoria || null,
           idFrameworks: formData.framework?.length ? formData.framework : null,
           idTreatment: formData.tratamento || null,
@@ -1050,6 +1184,33 @@ function ColumnsLayoutsCorrigido() {
                             ? "Campo obrigatório"
                             : ""
                         }
+                      />
+                    )}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Tipo do risco</InputLabel>
+                  <Autocomplete
+                    options={tiposRisco}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      tiposRisco.find(
+                        (tipoRisco) => tipoRisco.id === formData.tipoRisco,
+                      ) || null
+                    }
+                    onChange={(event, newValue) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        tipoRisco: newValue ? newValue.id : "",
+                      }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Selecione um tipo de risco"
                       />
                     )}
                   />
@@ -1863,6 +2024,69 @@ function ColumnsLayoutsCorrigido() {
                 icon={<LinkIcon color="primary" />}
               >
                 <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Stack spacing={1}>
+                      <InputLabel>Risco superior</InputLabel>
+                      <Autocomplete
+                        options={opcoesRiscoSuperior}
+                        getOptionLabel={getRiskOptionLabel}
+                        value={
+                          opcoesRelacionamentoRisco.find(
+                            (risco) => risco.id === formData.riscoSuperior,
+                          ) || null
+                        }
+                        onChange={handleRiscoSuperiorChange}
+                        isOptionEqualToValue={(option, value) =>
+                          option.id === value.id
+                        }
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Selecione o risco superior"
+                          />
+                        )}
+                      />
+                    </Stack>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Stack spacing={1}>
+                      <InputLabel>Riscos inferiores</InputLabel>
+                      <Autocomplete
+                        multiple
+                        disableCloseOnSelect
+                        options={opcoesRiscoInferior}
+                        getOptionLabel={getRiskOptionLabel}
+                        value={formData.riscoInferior
+                          .map((id) =>
+                            opcoesRelacionamentoRisco.find(
+                              (risco) => risco.id === id,
+                            ),
+                          )
+                          .filter(Boolean)}
+                        onChange={handleRiscoInferiorChange}
+                        isOptionEqualToValue={(option, value) =>
+                          option.id === value.id
+                        }
+                        renderOption={(props, option, { selected }) => (
+                          <li {...props}>
+                            <Grid container alignItems="center">
+                              <Grid item>
+                                <Checkbox checked={selected} />
+                              </Grid>
+                              <Grid item xs>
+                                {getRiskOptionLabel(option)}
+                              </Grid>
+                            </Grid>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField {...params} />
+                        )}
+                      />
+                    </Stack>
+                  </Grid>
+
                   <Grid item xs={12}>
                     <Stack spacing={1}>
                       <InputLabel>Risco Associado</InputLabel>
@@ -1871,17 +2095,17 @@ function ColumnsLayoutsCorrigido() {
                         disableCloseOnSelect
                         options={[
                           { id: "all", nome: "Selecionar todos" },
-                          ...riscoAssociados.filter((risco) => {
-                            const formatarNome = (nome) =>
-                              nome.replace(/\s+/g, "").toLowerCase();
-                            return (
-                              formatarNome(risco.nome) !== formatarNome(nome)
-                            );
-                          }),
+                          ...opcoesRelacionamentoRisco,
                         ]}
-                        getOptionLabel={(option) => option.nome}
+                        getOptionLabel={(option) =>
+                          option.id === "all"
+                            ? option.nome
+                            : getRiskOptionLabel(option)
+                        }
                         value={formData.riscoAssociado
-                          .map((id) => riscoAssociados.find((r) => r.id === id))
+                          .map((id) =>
+                            opcoesRelacionamentoRisco.find((r) => r.id === id),
+                          )
                           .filter(Boolean)}
                         onChange={handleSelectAll}
                         isOptionEqualToValue={(option, value) =>
@@ -1898,7 +2122,9 @@ function ColumnsLayoutsCorrigido() {
                                 />
                               </Grid>
                               <Grid item xs>
-                                {option.nome}
+                                {option.id === "all"
+                                  ? option.nome
+                                  : getRiskOptionLabel(option)}
                               </Grid>
                             </Grid>
                           </li>
