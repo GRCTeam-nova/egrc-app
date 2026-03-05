@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
-import { Fragment, useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useNavigate } from "react-router";
@@ -28,7 +28,6 @@ import {
   TableHead,
   TableRow,
   Typography,
-  useMediaQuery,
 } from "@mui/material";
 
 import {
@@ -59,7 +58,6 @@ import {
   SelectColumnVisibility,
 } from "../../../components/third-party/react-table";
 
-import { PlusOutlined } from "@ant-design/icons";
 
 // Funções auxiliares
 const getCicloFromName = (name) => {
@@ -72,6 +70,40 @@ const getRiscoFromName = (name) => {
   if (!name) return "-";
   const parts = name.split(" - ");
   return parts.length > 1 ? parts.slice(1).join(" - ") : "-";
+};
+
+const quizStatusConfig = {
+  1: { label: "Não iniciada", color: "default" },
+  2: { label: "Iniciado", color: "info" },
+  3: { label: "Concluida", color: "success" },
+};
+
+const getQuizStatusConfig = (statusValue) => {
+  const numericStatus = Number(statusValue);
+  return quizStatusConfig[numericStatus] || { label: "—", color: "default" };
+};
+
+const openQuestionarioFromRow = (navigation, rowOriginal, canEdit) => {
+  const dadosApi = {
+    ...rowOriginal,
+    idAssessment: rowOriginal.idAssessment,
+  };
+
+  sessionStorage.setItem("fromListaQuestionariosMain", "1");
+  sessionStorage.setItem(
+    "fromListaQuestionariosMainIdQuiz",
+    String(rowOriginal.idQuiz || ""),
+  );
+
+  navigation(`/questionarios/criar?from=listaQuestionariosMain`, {
+    state: {
+      indoPara: "NovoQuestionario",
+      fromListaQuestionariosMain: true,
+      dadosApi,
+      readOnly: !canEdit,
+      mode: canEdit ? "editar" : "consultar",
+    },
+  });
 };
 
 // Função de filtro global
@@ -95,8 +127,8 @@ export const fuzzyFilter = (row, columnId, value) => {
 const defaultVisibility = {
   ciclo: true,
   risco: true,
-  code: true,
   respondent: true,
+  status: true,
   actions: true,
 };
 
@@ -108,7 +140,6 @@ function ReactTable({
 }) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
-  const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
   const STORAGE_KEY = "egrc_table_visibility_questionarios";
 
   const [columnVisibility, setColumnVisibility] = useState(() => {
@@ -126,17 +157,16 @@ function ReactTable({
 
   const recordType = "Questionários";
   const tableRef = useRef(null);
-  const [sorting, setSorting] = useState([{ id: "code", asc: true }]);
+  const [sorting, setSorting] = useState([{ id: "ciclo", asc: true }]);
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
-  const navigation = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   
   // -- ESTADOS PARA OPÇÕES DOS FILTROS --
   const [cicloOptions, setCicloOptions] = useState([]);
   const [riscoOptions, setRiscoOptions] = useState([]);
   const [respondentOptions, setRespondentOptions] = useState([]);
-  const [codeOptions, setCodeOptions] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
 
   // -- FILTROS APLICADOS --
   const [selectedFilters, setSelectedFilters] = useState([]);
@@ -146,7 +176,7 @@ function ReactTable({
     ciclo: [],
     risco: [],
     respondent: [],
-    code: []
+    status: [],
   });
 
   // Estado para controlar se o filtro inicial já foi aplicado
@@ -161,7 +191,7 @@ function ReactTable({
     const uniqueCiclos = new Set();
     const uniqueRiscos = new Set();
     const uniqueRespondents = new Set();
-    const uniqueCodes = new Set();
+    const uniqueStatusIds = new Set();
 
     data.forEach(item => {
         const c = getCicloFromName(item.name);
@@ -171,13 +201,18 @@ function ReactTable({
         if (r && r !== "-") uniqueRiscos.add(r);
 
         if (item.respondent) uniqueRespondents.add(item.respondent);
-        if (item.code) uniqueCodes.add(item.code);
+        const statusId = Number(item.statusQuiz ?? item.status);
+        if (!Number.isNaN(statusId)) uniqueStatusIds.add(statusId);
     });
 
     setCicloOptions([...uniqueCiclos].sort());
     setRiscoOptions([...uniqueRiscos].sort());
     setRespondentOptions([...uniqueRespondents].sort());
-    setCodeOptions([...uniqueCodes].sort());
+    setStatusOptions(
+      [...uniqueStatusIds]
+        .sort((a, b) => a - b)
+        .map((statusId) => getQuizStatusConfig(statusId).label),
+    );
 
     // --- LÓGICA DO FILTRO INICIAL (DEFAULT) ---
     if (!initialFilterApplied) {
@@ -221,8 +256,8 @@ function ReactTable({
     if (draftFilters.respondent.length > 0) {
       newFilters.push({ type: "Respondente", values: draftFilters.respondent });
     }
-    if (draftFilters.code.length > 0) {
-      newFilters.push({ type: "Código", values: draftFilters.code });
+    if (draftFilters.status.length > 0) {
+      newFilters.push({ type: "Status", values: draftFilters.status });
     }
 
     setSelectedFilters(newFilters);
@@ -239,7 +274,7 @@ function ReactTable({
             "Ciclo": "ciclo",
             "Risco": "risco",
             "Respondente": "respondent",
-            "Código": "code"
+            "Status": "status",
         };
 
         const key = typeToKey[filterToRemove.type];
@@ -262,7 +297,7 @@ function ReactTable({
       ciclo: [],
       risco: [],
       respondent: [],
-      code: []
+      status: [],
     });
   };
 
@@ -290,9 +325,9 @@ function ReactTable({
         if (filterType === "Respondente") {
             return filterValues.includes(item.respondent);
         }
-
-        if (filterType === "Código") {
-            return filterValues.includes(item.code);
+        if (filterType === "Status") {
+            const itemStatusLabel = getQuizStatusConfig(item.statusQuiz ?? item.status).label;
+            return filterValues.includes(itemStatusLabel);
         }
 
         return true;
@@ -321,14 +356,6 @@ function ReactTable({
     return table.getAllLeafColumns().filter((c) => !["actions"].includes(c.id));
   };
 
-  const verticalDividerStyle = {
-    width: "0.5px",
-    height: "37px",
-    backgroundColor: "#98B3C3",
-    opacity: "0.75",
-    flexShrink: "0",
-    marginLeft: "7px",
-  };
 
   useEffect(() => {
     const markInstance = new Mark(tableRef.current);
@@ -396,30 +423,6 @@ function ReactTable({
             Filtros
           </Button>
         </Stack>
-
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          alignItems="center"
-          sx={{ width: { xs: "100%", sm: "auto" } }}
-        >
-          <div style={verticalDividerStyle}></div>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Box sx={{ display: "flex", alignItems: "center", ml: 0.75 }}>
-              <Button
-                variant="contained"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigation(`/questionarios/criar`);
-                }}
-                startIcon={<PlusOutlined />}
-                style={{ borderRadius: "20px", height: "32px" }}
-              >
-                Novo
-              </Button>
-            </Box>
-          </Stack>
-        </Stack>
       </Stack>
 
       <Box mb={2}>
@@ -465,9 +468,9 @@ function ReactTable({
         anchor="right"
         open={drawerOpen}
         onClose={toggleDrawer}
-        PaperProps={{ sx: { width: 400 } }}
+        PaperProps={{ sx: { width: 670 } }}
       >
-        <Box sx={{ width: 380, p: 3 }}>
+        <Box sx={{ width: 650, p: 3 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
             <Box component="h2" sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}>
               Filtros
@@ -530,17 +533,17 @@ function ReactTable({
               </FormControl>
             </Grid>
 
-            {/* Filtro Código */}
+            {/* Filtro Status */}
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Código</InputLabel>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>Status</InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
                   disableCloseOnSelect
-                  options={codeOptions}
-                  value={draftFilters.code}
+                  options={statusOptions}
+                  value={draftFilters.status}
                   onChange={(event, value) =>
-                    setDraftFilters((prev) => ({ ...prev, code: value }))
+                    setDraftFilters((prev) => ({ ...prev, status: value }))
                   }
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -647,24 +650,21 @@ ReactTable.propTypes = {
   isLoading: PropTypes.bool,
 };
 
-function ActionCell({ row, refreshData }) {
+function ActionCell({ row }) {
   const navigation = useNavigate();
   const [anchorEl, setAnchorEl] = useState(null);
 
   // Obtem o usuário logado para verificar permissão
   const currentUserId = localStorage.getItem("id_user");
   const isOwner = row.original.idRespondent === currentUserId;
+  const statusQuiz = Number(row.original.statusQuiz ?? row.original.status);
+  const canEdit = isOwner && statusQuiz < 3;
 
   const handleClick = (event) => setAnchorEl(event.currentTarget);
   const handleClose = () => setAnchorEl(null);
 
   const open = Boolean(anchorEl);
   const id = open ? "simple-popover" : undefined;
-
-  // Se não for o dono, não mostra nada (ou pode mostrar um ícone desativado/cadeado se preferir)
-  if (!isOwner) {
-    return <Box sx={{ width: 40, height: 40 }} />;
-  }
 
   return (
     <Stack direction="row" alignItems="center" justifyContent="center">
@@ -681,15 +681,12 @@ function ActionCell({ row, refreshData }) {
         <Stack>
           <Button
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/questionarios/editar`, { // Ajuste rota
-                state: { dadosApi },
-              });
+              openQuestionarioFromRow(navigation, row.original, canEdit);
               handleClose();
             }}
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            Editar
+            {canEdit ? "Editar" : "Consultar"}
           </Button>
         </Stack>
       </Popover>
@@ -724,11 +721,26 @@ const ListagemQuestionarios = () => {
         id: "ciclo",
         header: "Ciclo",
         accessorFn: (row) => getCicloFromName(row.name),
-        cell: ({ getValue }) => (
-          <Typography sx={{ fontSize: "13px", fontWeight: 600, color: theme.palette.primary.main }}>
-            {getValue()}
-          </Typography>
-        ),
+        cell: ({ row, getValue }) => {
+          const currentUserId = localStorage.getItem("id_user");
+          const isOwner = row.original.idRespondent === currentUserId;
+          const statusQuiz = Number(row.original.statusQuiz ?? row.original.status);
+          const canEdit = isOwner && statusQuiz < 3;
+
+          return (
+            <Typography
+              sx={{
+                fontSize: "13px",
+                fontWeight: 600,
+                color: theme.palette.primary.main,
+                cursor: "pointer",
+              }}
+              onClick={() => openQuestionarioFromRow(navigation, row.original, canEdit)}
+            >
+              {getValue()}
+            </Typography>
+          );
+        },
       },
       // 2. Coluna Risco
       {
@@ -739,15 +751,7 @@ const ListagemQuestionarios = () => {
           <Typography sx={{ fontSize: "13px" }}>{getValue()}</Typography>
         ),
       },
-      // 3. Código
-      {
-        header: "Código",
-        accessorKey: "code",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
-        ),
-      },
-      // 4. Respondente
+      // 3. Respondente
       {
         header: "Respondente",
         accessorKey: "respondent",
@@ -756,6 +760,27 @@ const ListagemQuestionarios = () => {
             {row.original.respondent || "—"}
           </Typography>
         ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessorFn: (row) => getQuizStatusConfig(row.statusQuiz ?? row.status).label,
+        cell: ({ row }) => {
+          const currentStatus = getQuizStatusConfig(row.original.statusQuiz ?? row.original.status);
+          return (
+            <Chip
+              label={currentStatus.label}
+              color={currentStatus.color}
+              size="small"
+              sx={{
+                fontWeight: 600,
+                fontSize: "11px",
+                height: "24px",
+                borderRadius: "6px",
+              }}
+            />
+          );
+        },
       },
       {
         id: "actions",

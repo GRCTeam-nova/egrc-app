@@ -38,6 +38,13 @@ function ColumnsLayouts() {
   // --- NOVA LÓGICA DE DETECÇÃO DE DADOS ---
   // Tenta pegar do state (navegação interna) OU da URL (link de email)
   const queryParams = new URLSearchParams(location.search);
+  const fromListaQuestionariosMainQuery =
+    queryParams.get("from") === "listaQuestionariosMain";
+  const fromListaQuestionariosMainSession =
+    sessionStorage.getItem("fromListaQuestionariosMain") === "1";
+  const fromListaQuestionariosMainSessionIdQuiz = sessionStorage.getItem(
+    "fromListaQuestionariosMainIdQuiz",
+  );
   
   // Monta um objeto dadosApi baseado na URL se não vier do state
   const dadosApiUrl = queryParams.get("idAssessment") ? {
@@ -53,6 +60,17 @@ function ColumnsLayouts() {
   // Ajuste do ReadOnly e Mode
   const readOnlyFromState = location.state?.readOnly;
   const mode = location.state?.mode;
+  const idQuizOrigem = String(location.state?.dadosApi?.idQuiz || dadosApi?.idQuiz || "");
+  const isSessionFromListaQuestionariosMain =
+    fromListaQuestionariosMainSession &&
+    (!fromListaQuestionariosMainSessionIdQuiz ||
+      !idQuizOrigem ||
+      fromListaQuestionariosMainSessionIdQuiz === idQuizOrigem);
+  const veioDaListaQuestionariosMain = Boolean(
+    location.state?.fromListaQuestionariosMain ||
+      fromListaQuestionariosMainQuery ||
+      isSessionFromListaQuestionariosMain,
+  );
   const isReadOnly = Boolean(readOnlyFromState) || mode === "consultar";
   const [controles, setControle] = useState([]);
   const [diretrizes, setDiretriz] = useState([]);
@@ -525,14 +543,15 @@ function ColumnsLayouts() {
     }
   };
 
-  const voltarParaCadastroMenu = () => {
-    navigate(-1);
-    window.scrollTo(0, 0);
+  const clearOrigemListaQuestionariosMain = () => {
+    sessionStorage.removeItem("fromListaQuestionariosMain");
+    sessionStorage.removeItem("fromListaQuestionariosMainIdQuiz");
   };
 
-  const continuarEdicao = () => {
-    setRequisicao("Editar");
-    setSuccessDialogOpen(false);
+  const voltarParaCadastroMenu = () => {
+    clearOrigemListaQuestionariosMain();
+    navigate(-1);
+    window.scrollTo(0, 0);
   };
 
   const voltarParaListagem = () => {
@@ -576,6 +595,32 @@ function ColumnsLayouts() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
   const idQuiz = dadosApi?.idQuiz || normativaDados?.idQuiz;
+  const idAssessmentPai = dadosApi?.idAssessment || normativaDados?.idAssessment;
+
+  const irParaListaQuestionariosMain = () => {
+    setSuccessDialogOpen(false);
+    clearOrigemListaQuestionariosMain();
+    navigate("/questionarios/lista");
+  };
+
+  const irParaConsultarAvaliacao = () => {
+    if (!idAssessmentPai) {
+      enqueueSnackbar("Avaliação pai não encontrada para este questionário.", {
+        variant: "warning",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+      return;
+    }
+
+    setSuccessDialogOpen(false);
+    clearOrigemListaQuestionariosMain();
+    navigate("/avaliacoes/criar", {
+      state: {
+        indoPara: "NovaAvaliacao",
+        dadosApi: { idAssessment: idAssessmentPai },
+      },
+    });
+  };
 
   const tratarSubmit = async () => {
     if (isReadOnly) {
@@ -645,17 +690,29 @@ function ColumnsLayouts() {
         variant: "success",
       });
 
-      await axios.put(`${process.env.REACT_APP_API_URL}quiz`, payloadUpdate, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      enqueueSnackbar("Questionário ativado com sucesso!", {
-        variant: "success",
-      });
+      try {
+        await axios.put(`${process.env.REACT_APP_API_URL}quiz`, payloadUpdate, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        enqueueSnackbar("Questionário ativado com sucesso!", {
+          variant: "success",
+        });
+      } catch (updateError) {
+        
+      }
 
+      if (veioDaListaQuestionariosMain) {
+        setSuccessDialogOpen(true);
+        return;
+      }
+
+      clearOrigemListaQuestionariosMain();
       navigate(-1);
     } catch (error) {
       console.error(error);
-      navigate(-1);
+      enqueueSnackbar("Não foi possível atualizar o questionário.", {
+        variant: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -1397,6 +1454,21 @@ function ColumnsLayouts() {
                 marginTop: 5,
               }}
             >
+              {idAssessmentPai && (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  style={{
+                    height: "32px",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                  onClick={irParaConsultarAvaliacao}
+                >
+                  Consultar avaliação
+                </Button>
+              )}
               {formData.status === 3 || isReadOnly ? (
                 <Button
                   variant="contained"
@@ -1432,7 +1504,7 @@ function ColumnsLayouts() {
           </Grid>
           <Dialog
             open={successDialogOpen}
-            onClose={voltarParaListagem}
+            onClose={() => setSuccessDialogOpen(false)}
             sx={{
               "& .MuiDialog-paper": {
                 padding: "24px",
@@ -1451,7 +1523,7 @@ function ColumnsLayouts() {
             <DialogTitle
               sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
             >
-              Plano criado com sucesso!
+              Questionário atualizado!
             </DialogTitle>
 
             {}
@@ -1459,8 +1531,8 @@ function ColumnsLayouts() {
               <DialogContentText
                 sx={{ fontSize: "16px", color: "#555", px: 2 }}
               >
-                O plano de ação foi cadastrado com sucesso. Você pode voltar
-                para a listagem ou adicionar mais informações a esse plano.
+                Escolha o próximo destino:
+                ir para a avaliação ou voltar para a lista de questionários.
               </DialogContentText>
             </DialogContent>
 
@@ -1469,7 +1541,7 @@ function ColumnsLayouts() {
               sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
             >
               <Button
-                onClick={voltarParaListagem}
+                onClick={irParaListaQuestionariosMain}
                 variant="outlined"
                 sx={{
                   borderColor: "#007bff",
@@ -1480,10 +1552,10 @@ function ColumnsLayouts() {
                   },
                 }}
               >
-                Voltar para a listagem
+                Ir para lista
               </Button>
               <Button
-                onClick={continuarEdicao}
+                onClick={irParaConsultarAvaliacao}
                 variant="contained"
                 sx={{
                   backgroundColor: "#007bff",
@@ -1494,7 +1566,7 @@ function ColumnsLayouts() {
                 }}
                 autoFocus
               >
-                Adicionar mais informações
+                Ir para avaliação
               </Button>
             </DialogActions>
           </Dialog>
