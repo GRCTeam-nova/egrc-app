@@ -5,6 +5,9 @@ import {
   Box,
   TextField,
   Autocomplete,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Grid,
   Switch,
   Stack,
@@ -22,6 +25,7 @@ import {
   CardContent,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoIcon from "@mui/icons-material/Info";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import SecurityIcon from "@mui/icons-material/Security";
@@ -32,12 +36,13 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import LoadingOverlay from "../configuracoes/LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { useGetAvaliacoesByRisco } from "../../../api/riscoAvaliacoes";
 import DrawerIncidente from "../configuracoes/novoIncidenteDrawerRiscos";
 import DrawerDepartamento from "../configuracoes/novoDepartamentoDrawerRiscos";
 import DrawerProcesso from "../configuracoes/novoProcessoDrawerRiscos";
@@ -45,6 +50,8 @@ import DrawerControle from "../configuracoes/novoControleDrawerRiscos";
 import DrawerCategoria from "../configuracoes/novaCategoriaDrawerRiscos";
 import FileUploader from "../configuracoes/FileUploader";
 import DrawerPlanos from "../configuracoes/novoPlanoDrawerRisco";
+import ListaRiscoAvaliacoes from "./listaRiscoAvaliacoes";
+import ResumoUltimaAvaliacaoRisco from "./ResumoUltimaAvaliacaoRisco";
 import { API_URL } from "../../../config";
 
 // Componente para seções organizadas
@@ -850,6 +857,48 @@ function ColumnsLayoutsCorrigido() {
   });
 
   const riscoAtualId = riscoDados?.idRisk || dadosApi?.id || null;
+  const [assessmentListParams] = useState({ refreshCount: 0 });
+  const {
+    acoesJudiciais: avaliacoesRisco = [],
+    isLoading: isLoadingAvaliacoesRisco,
+  } = useGetAvaliacoesByRisco(assessmentListParams, riscoAtualId);
+
+  const isEmptyAssessmentConclusionDate = (value) =>
+    !value || (typeof value === "string" && value.startsWith("0001-01-01"));
+
+  const getAssessmentTimestamp = (value) => {
+    if (isEmptyAssessmentConclusionDate(value)) return 0;
+
+    const timestamp = new Date(value).getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  };
+
+  const isAssessmentActive = (assessment) => assessment?.active !== false;
+
+  const ultimaAvaliacaoConcluida = useMemo(() => {
+    if (!Array.isArray(avaliacoesRisco) || avaliacoesRisco.length === 0) {
+      return null;
+    }
+
+    return [...avaliacoesRisco]
+      .filter(
+        (avaliacao) =>
+          isAssessmentActive(avaliacao) &&
+          (!isEmptyAssessmentConclusionDate(avaliacao.dateOfConclusion) ||
+            [4, 5].includes(Number(avaliacao.assessmentStatus))),
+      )
+      .sort((avaliacaoA, avaliacaoB) => {
+        const conclusionDiff =
+          getAssessmentTimestamp(avaliacaoB.dateOfConclusion) -
+          getAssessmentTimestamp(avaliacaoA.dateOfConclusion);
+
+        if (conclusionDiff !== 0) return conclusionDiff;
+
+        return getAssessmentTimestamp(avaliacaoB.date) -
+          getAssessmentTimestamp(avaliacaoA.date);
+      })[0];
+  }, [avaliacoesRisco]);
+
   const opcoesRelacionamentoRisco = riscoAssociados.filter(
     (risco) => risco.id && risco.id !== riscoAtualId,
   );
@@ -1101,6 +1150,11 @@ function ColumnsLayoutsCorrigido() {
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Box sx={{ width: "100%", marginTop: 2 }}>
+          {requisicao === "Editar" && ultimaAvaliacaoConcluida && (
+            <ResumoUltimaAvaliacaoRisco
+              assessment={ultimaAvaliacaoConcluida}
+            />
+          )}
           {/* Seção 1: Informações Básicas */}
           <SectionCard
             title="Informações Básicas"
@@ -1299,6 +1353,7 @@ function ColumnsLayoutsCorrigido() {
 
           {requisicao === "Editar" && (
             <>
+
               {/* Seção 2: Análise de Risco */}
               <SectionCard
                 title="Análise de Risco"
@@ -2177,7 +2232,24 @@ function ColumnsLayoutsCorrigido() {
           )}
 
           {/* Botões de ação */}
-          <Paper sx={{ p: 3, mt: 3, backgroundColor: "grey.50" }}>
+          {requisicao === "Editar" && riscoAtualId && (
+            <Box sx={{ mt: 2, mb: 3 }}>
+              <Accordion>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="h6">Avaliações</Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 0 }}>
+                  <ListaRiscoAvaliacoes
+                    riskId={riscoAtualId}
+                    assessmentsData={avaliacoesRisco}
+                    assessmentsLoading={isLoadingAvaliacoesRisco}
+                  />
+                </AccordionDetails>
+              </Accordion>
+            </Box>
+          )}
+
+          <Paper sx={{ p: 1, mt: 3, boxShadow: 'none' }}>
             <Stack direction="row" spacing={2} justifyContent="flex-start">
               <Button
                 variant="contained"
