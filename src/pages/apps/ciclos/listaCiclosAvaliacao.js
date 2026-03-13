@@ -64,7 +64,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import Mark from "mark.js";
 import {
   faXmark,
-  faBan,
   faTrash,
   faExclamation,
 } from "@fortawesome/free-solid-svg-icons";
@@ -76,8 +75,6 @@ import {
   RowSelection,
   TablePagination,
 } from "../../../components/third-party/react-table";
-import axios from "axios";
-import { useToken } from "../../../api/TokenContext";
 
 // assets
 import { PlusOutlined } from "@ant-design/icons";
@@ -954,10 +951,7 @@ ReactTable.propTypes = {
 
 function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
-  const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [status, setStatus] = useState(row.original.active);
-  const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openErrorDialog, setOpenErrorDialog] = useState(false);
 
@@ -969,77 +963,9 @@ function ActionCell({ row, refreshData }) {
     setAnchorEl(null);
   };
 
-  const handleDialogOpen = () => {
-    setOpenDialog(true);
-  };
-
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    handleClose();
-  };
-
   const handleDeleteDialogClose = () => {
     setOpenDeleteDialog(false);
     handleClose();
-  };
-
-  const toggleStatus = async () => {
-    const idAssessment = row.original.idAssessment;
-    const newStatus = status === true ? "Inativo" : "Ativo";
-
-    try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}assessments/${idAssessment}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const dadosEndpoint = getResponse.data;
-
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = {
-        ...dadosEndpoint,
-        active: newStatus === "Ativo",
-      };
-
-      // Enviar os dados atualizados via PUT
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}assessments`,
-        dadosAtualizados,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Avaliação de risco ${newStatus.toLowerCase()}.`;
-
-      enqueueSnackbar(message, {
-        variant: "success",
-        autoHideDuration: 3000,
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        },
-      });
-
-      refreshData();
-    } catch (error) {
-      console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, {
-        variant: "error",
-      });
-    }
-
-    handleDialogClose();
   };
 
   const handleDelete = async () => {
@@ -1127,143 +1053,8 @@ function ActionCell({ row, refreshData }) {
           >
             Editar
           </Button>
-
-          <Button
-            onClick={() => {
-              if (row.original.active === true) handleDialogOpen();
-              else toggleStatus();
-            }}
-            style={{ color: "#707070", fontWeight: 400 }}
-          >
-            {row.original.active === true ? "Inativar" : "Ativar"}
-          </Button>
         </Stack>
       </Popover>
-      <Dialog
-        open={openDialog}
-        onClose={handleDialogClose}
-        sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            background: "#ED5565",
-            width: "auto",
-            height: "42px",
-            borderRadius: "4px 4px 0px 0px",
-            display: "flex",
-            alignItems: "center",
-            padding: "10px",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              aria-label="delete"
-              sx={{
-                fontSize: "16px",
-                marginRight: "2px",
-                color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
-              }}
-            >
-              <FontAwesomeIcon icon={faBan} />
-            </IconButton>
-
-            <Typography
-              variant="body1"
-              sx={{
-                fontFamily: '"Open Sans", Helvetica, sans-serif',
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
-                color: "rgba(255, 255, 255, 1)",
-                flexGrow: 1,
-              }}
-            >
-              Inativar
-            </Typography>
-          </div>
-          <IconButton
-            aria-label="close"
-            onClick={handleDialogClose}
-            sx={{
-              color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
-            }}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Tem certeza que deseja inativar essa avaliação?
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            Ao inativar, essa avaliação não aparecerá mais no cadastro manual.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={toggleStatus}
-            color="primary"
-            autoFocus
-            style={{
-              marginTop: "-55px",
-              width: "162px",
-              height: "32px",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              background: "#ED5565",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              textTransform: "none",
-            }}
-          >
-            Sim, inativar
-          </Button>
-          <Button
-            onClick={handleDialogClose}
-            style={{
-              marginTop: "-55px",
-              padding: "8px 16px",
-              width: "91px",
-              height: "32px",
-              borderRadius: "4px",
-              border: "1px solid rgba(0, 0, 0, 0.40)",
-              background: "#FFF",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
-            }}
-          >
-            Cancelar
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Dialog
         open={openDeleteDialog}
         onClose={handleDeleteDialogClose}
@@ -1567,7 +1358,6 @@ const ListagemEmpresa = ({ cicloId }) => {
     if (Number.isNaN(d.getTime())) return "—";
     return new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
-      timeStyle: "short",
     }).format(d);
   };
 
