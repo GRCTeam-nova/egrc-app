@@ -2087,7 +2087,7 @@ function ColumnsLayoutsCorrigido() {
                     </Stack>
                   </Grid>
 
-                  <Grid item xs={12}>
+                  {/* <Grid item xs={12}>
                     <Stack spacing={1}>
                       <InputLabel>Risco Associado</InputLabel>
                       <Autocomplete
@@ -2132,7 +2132,7 @@ function ColumnsLayoutsCorrigido() {
                         renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
-                  </Grid>
+                  </Grid> */}
 
                   {requisicao === "Editar" && (
                     <Grid item xs={12} md={12}>

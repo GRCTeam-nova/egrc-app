@@ -22,6 +22,7 @@ const FileUploader = ({
   idContainer, // id do registro quando houver
   onFilesChange, // callback para enviar os arquivos para o componente pai
   onFileDelete,
+  disabled = false,
   buttonLabel = "Arraste e solte os arquivos ou clique para selecionar",
 }) => {
   const { enqueueSnackbar } = useSnackbar();
@@ -54,6 +55,7 @@ const FileUploader = ({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
+    disabled,
   });
 
   const handleDelete = (index) => {
@@ -123,9 +125,12 @@ const FileUploader = ({
           border: "2px dashed #1C5297",
           backgroundColor: isDragActive ? "#e3f2fd" : "#f5f5f5",
           borderRadius: 2,
-          cursor: "pointer",
+          cursor: disabled ? "default" : "pointer",
           transition: "all 0.3s ease",
-          "&:hover": { backgroundColor: "#e3f2fd", borderColor: "#1976d2" },
+          "&:hover": disabled
+            ? {}
+            : { backgroundColor: "#e3f2fd", borderColor: "#1976d2" },
+          opacity: disabled ? 0.7 : 1,
         }}
       >
         <Box sx={{ mb: 1 }}>
@@ -155,7 +160,11 @@ const FileUploader = ({
                     >
                       <CloudDownloadIcon sx={{ color: "#0d47a1" }} />
                     </IconButton>
-                    <IconButton edge="end" onClick={() => handleDelete(index)}>
+                    <IconButton
+                      edge="end"
+                      onClick={() => handleDelete(index)}
+                      disabled={disabled}
+                    >
                       <DeleteIcon color="error" />
                     </IconButton>
                   </>
