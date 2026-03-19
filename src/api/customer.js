@@ -1,12 +1,15 @@
 import useSWR, { mutate } from 'swr';
 import { useMemo } from 'react';
 
-// utils
-import { fetcher } from '../utils/axios';
-
 const initialState = {
   modal: false
 };
+
+const initialCustomerState = {
+  customers: []
+};
+
+const getCustomersLocal = async () => initialCustomerState;
 
 export const endpoints = {
   key: 'api/customer',
@@ -18,7 +21,7 @@ export const endpoints = {
 };
 
 export function useGetCustomer() {
-  const { data, isLoading, error, isValidating } = useSWR(endpoints.key + endpoints.list, fetcher, {
+  const { data, isLoading, error, isValidating } = useSWR(endpoints.key + endpoints.list, getCustomersLocal, {
     revalidateIfStale: false,
     revalidateOnFocus: false,
     revalidateOnReconnect: false
@@ -42,9 +45,10 @@ export async function insertCustomer(newCustomer) {
   // to update local state based on key
   mutate(
     endpoints.key + endpoints.list,
-    (currentCustomer) => {
-      newCustomer.id = currentCustomer.customers.length + 1;
-      const addedCustomer = [...currentCustomer.customers, newCustomer];
+    (currentCustomer = initialCustomerState) => {
+      const customers = currentCustomer.customers || [];
+      newCustomer.id = customers.length + 1;
+      const addedCustomer = [...customers, newCustomer];
 
       return {
         ...currentCustomer,
@@ -64,8 +68,9 @@ export async function updateCustomer(customerId, updatedCustomer) {
   // to update local state based on key
   mutate(
     endpoints.key + endpoints.list,
-    (currentCustomer) => {
-      const newCustomer = currentCustomer.customers.map((customer) =>
+    (currentCustomer = initialCustomerState) => {
+      const customers = currentCustomer.customers || [];
+      const newCustomer = customers.map((customer) =>
         customer.id === customerId ? { ...customer, ...updatedCustomer } : customer
       );
 
@@ -87,8 +92,9 @@ export async function deleteCustomer(customerId) {
   // to update local state based on key
   mutate(
     endpoints.key + endpoints.list,
-    (currentCustomer) => {
-      const nonDeletedCustomer = currentCustomer.customers.filter((customer) => customer.id !== customerId);
+    (currentCustomer = initialCustomerState) => {
+      const customers = currentCustomer.customers || [];
+      const nonDeletedCustomer = customers.filter((customer) => customer.id !== customerId);
 
       return {
         ...currentCustomer,

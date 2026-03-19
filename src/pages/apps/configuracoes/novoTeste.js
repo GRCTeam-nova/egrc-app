@@ -89,6 +89,13 @@ function ColumnsLayouts() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
+  const idUsuarioLogado = localStorage.getItem("id_user");
+  const responsavelPadrao = idUsuarioLogado
+    ? isNaN(Number(idUsuarioLogado))
+      ? idUsuarioLogado
+      : Number(idUsuarioLogado)
+    : "";
+
   const [formData, setFormData] = useState({
     empresaInferior: [],
     ativo: [],
@@ -112,7 +119,7 @@ function ColumnsLayouts() {
     conclusaoTeste: "",
     frequencia: "",
     projeto: "",
-    responsaveisTeste: "",
+    responsaveisTeste: responsavelPadrao,
     execucao: "",
     classificacao: "",
     tiposControle: "",
@@ -181,20 +188,20 @@ function ColumnsLayouts() {
   useEffect(() => {
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/projects`,
-      setProjetos
+      setProjetos,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/projects/types`,
-      setTipoProjetos
+      setTipoProjetos,
     );
     fetchData(`https://api.egrc.homologacao.com.br/api/v1/ipe`, setIpes);
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/controls`,
-      setControles
+      setControles,
     );
     fetchData(
       `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
-      setResponsavelTeste
+      setResponsavelTeste,
     );
     const frequencias = [
       { id: 1, nome: "Várias vezes ao dia" },
@@ -223,14 +230,16 @@ function ColumnsLayouts() {
         // 1) Busca dados do teste existente
         const resTest = await axios.get(
           `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         const data = resTest.data;
         setRequisicao("Editar");
         setControleDados(data);
         setMensagemFeedback("editado");
         setNome(data.name || "");
-        window.dispatchEvent(new CustomEvent('updateBreadcrumbName', { detail: data.name }));
+        window.dispatchEvent(
+          new CustomEvent("updateBreadcrumbName", { detail: data.name }),
+        );
         setDescricaoTeste(data.description || "");
         setRiscoAssociados(data.controlRisks || "");
         setAssertions(data.controlAssertions || "");
@@ -244,12 +253,12 @@ function ColumnsLayouts() {
         setDescricaoControle(data.description || "");
         setDescricaoConclusao(data.descriptionTestCompletion || "");
         setDataConclusao(
-          data.completionDate ? parseISO(data.completionDate) : null
+          data.completionDate ? parseISO(data.completionDate) : null,
         );
         setDataPrevistaConclusao(
           data.expectedCompletionDate
             ? parseISO(data.expectedCompletionDate)
-            : null
+            : null,
         );
         setFormData((prev) => ({
           ...prev,
@@ -263,7 +272,7 @@ function ColumnsLayouts() {
         // 2) Busca fases do teste e calcula status principal
         const resPhases = await axios.get(
           `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}/phases`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         const mainStatus = computeMainStatus(resPhases.data);
         setFormData((prev) => ({ ...prev, status: mainStatus }));
@@ -291,7 +300,7 @@ function ColumnsLayouts() {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         const dadosProjeto = response.data;
@@ -304,7 +313,10 @@ function ColumnsLayouts() {
           }));
         }
       } catch (error) {
-        console.error("Erro ao buscar detalhes do projeto para preencher o tipo:", error);
+        console.error(
+          "Erro ao buscar detalhes do projeto para preencher o tipo:",
+          error,
+        );
       }
     };
 
@@ -335,7 +347,7 @@ function ColumnsLayouts() {
     // Atualiza os departamentos inferiores removendo os que conflitam
     const inferioresAtualizadas = formData.compensaControle.filter((id) => {
       const compensaControle = compensaControles.find(
-        (departamento) => departamento.id === id
+        (departamento) => departamento.id === id,
       );
       if (!compensaControle) return false;
       return formatarNome(compensaControle.nome) !== nomeDigitado;
@@ -350,7 +362,7 @@ function ColumnsLayouts() {
     // **Novo bloco: Atualiza os departamentos laterais**
     const lateraisAtualizadas = formData.compensadoControle.filter((id) => {
       const compensadoControle = compensadoControles.find(
-        (departamento) => departamento.id === id
+        (departamento) => departamento.id === id,
       );
       if (!compensadoControle) return false;
       return formatarNome(compensadoControle.nome) !== nomeDigitado;
@@ -397,9 +409,9 @@ function ColumnsLayouts() {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
-        
+
         const dadosProjeto = response.data;
 
         // 3. Define o Tipo de Projeto automaticamente baseado no retorno (idProjectType)
@@ -411,7 +423,9 @@ function ColumnsLayouts() {
         }
       } catch (error) {
         console.error("Erro ao buscar detalhes do projeto:", error);
-        enqueueSnackbar("Erro ao buscar o tipo do projeto.", { variant: "error" });
+        enqueueSnackbar("Erro ao buscar o tipo do projeto.", {
+          variant: "error",
+        });
       }
     }
   };
@@ -431,7 +445,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "elemento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -451,7 +465,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "elementoContabil",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -468,7 +482,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "ipe",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -507,40 +521,45 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-const tratarSubmit = async () => {
-  let url = "";
-  let method = "";
-  let payload = {};
+  const tratarSubmit = async () => {
+    let url = "";
+    let method = "";
+    let payload = {};
 
-  // Validação dos campos obrigatórios
-  const missingRequired = [];
-  if (!formData.projeto) missingRequired.push("Projeto");
-  if (!formData.controle) missingRequired.push("Controle");
-  if (!dataPrevistaConclusao) missingRequired.push("Data Prevista de Conclusão");
-  // NOVO: Validação do responsável
-  if (!formData.responsaveisTeste) missingRequired.push("Responsável pelo teste");
+    // Validação dos campos obrigatórios
+    const missingRequired = [];
+    if (!formData.projeto) missingRequired.push("Projeto");
+    if (!formData.controle) missingRequired.push("Controle");
+    if (!dataPrevistaConclusao)
+      missingRequired.push("Data Prevista de Conclusão");
+    // NOVO: Validação do responsável
+    if (!formData.responsaveisTeste)
+      missingRequired.push("Responsável pelo teste");
 
-  if (missingRequired.length > 0) {
-    enqueueSnackbar(
-      `Os campos ${missingRequired.join(", ")} são obrigatórios!`,
-      { variant: "error", anchorOrigin: { vertical: "top", horizontal: "right" } }
-    );
-    return;
-  }
+    if (missingRequired.length > 0) {
+      enqueueSnackbar(
+        `Os campos ${missingRequired.join(", ")} são obrigatórios!`,
+        {
+          variant: "error",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
 
-  try {
-    setLoading(true);
-    if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
-      method = "POST";
-      payload = {
-        description: descricaoTeste,
-        expectedCompletionDate: dataPrevistaConclusao,
-        idProject: formData.projeto,
-        idControl: formData.controle,
-        idResponsible: formData.responsaveisTeste, // NOVO: Incluído no Criar
-      };
-    } else if (requisicao === "Editar") {
+    try {
+      setLoading(true);
+      if (requisicao === "Criar") {
+        url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
+        method = "POST";
+        payload = {
+          description: descricaoTeste,
+          expectedCompletionDate: dataPrevistaConclusao,
+          idProject: formData.projeto,
+          idControl: formData.controle,
+          idResponsible: formData.responsaveisTeste, // NOVO: Incluído no Criar
+        };
+      } else if (requisicao === "Editar") {
         url = "https://api.egrc.homologacao.com.br/api/v1/projects/tests";
         method = "PUT";
         payload = {
@@ -620,7 +639,7 @@ const tratarSubmit = async () => {
                   null
                 }
                 // ALTERAÇÃO AQUI: Chama a função criada acima
-                onChange={handleChangeProjeto} 
+                onChange={handleChangeProjeto}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -641,7 +660,7 @@ const tratarSubmit = async () => {
                 getOptionLabel={(option) => option.nome}
                 value={
                   controles.find(
-                    (controle) => controle.id === formData.controle
+                    (controle) => controle.id === formData.controle,
                   ) || null
                 }
                 onChange={(event, newValue) => {
@@ -688,31 +707,34 @@ const tratarSubmit = async () => {
           </Grid>
 
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-  <Stack spacing={1}>
-    <InputLabel>Responsável pelo teste *</InputLabel>
-    <Autocomplete
-      options={responsaveisTestes}
-      getOptionLabel={(option) => option.nome || ""}
-      value={
-        responsaveisTestes.find(
-          (resp) => resp.id === formData.responsaveisTeste
-        ) || null
-      }
-      onChange={(event, newValue) => {
-        setFormData((prev) => ({
-          ...prev,
-          responsaveisTeste: newValue ? newValue.id : "",
-        }));
-      }}
-      renderInput={(params) => (
-        <TextField 
-          {...params} 
-          error={!formData.responsaveisTeste && formValidation.processo === false} // Feedback de erro
-        />
-      )}
-    />
-  </Stack>
-</Grid>
+            <Stack spacing={1}>
+              <InputLabel>Responsável pelo teste *</InputLabel>
+              <Autocomplete
+                options={responsaveisTestes}
+                getOptionLabel={(option) => option.nome || ""}
+                value={
+                  responsaveisTestes.find(
+                    (resp) => resp.id === formData.responsaveisTeste,
+                  ) || null
+                }
+                onChange={(event, newValue) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    responsaveisTeste: newValue ? newValue.id : "",
+                  }));
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    error={
+                      !formData.responsaveisTeste &&
+                      formValidation.processo === false
+                    } // Feedback de erro
+                  />
+                )}
+              />
+            </Stack>
+          </Grid>
 
           {requisicao === "Editar" && (
             <>
@@ -761,7 +783,7 @@ const tratarSubmit = async () => {
                     value={
                       conclusaoTestes.find(
                         (conclusaoTeste) =>
-                          conclusaoTeste.id === formData.conclusaoTeste
+                          conclusaoTeste.id === formData.conclusaoTeste,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -799,10 +821,11 @@ const tratarSubmit = async () => {
                     getOptionLabel={(option) => option.nome}
                     value={
                       tipoProjetos.find(
-                        (tipoProjeto) => tipoProjeto.id === formData.tipoProjeto
+                        (tipoProjeto) =>
+                          tipoProjeto.id === formData.tipoProjeto,
                       ) || null
                     }
-                    // O onChange pode ser mantido ou removido, pois está disabled, 
+                    // O onChange pode ser mantido ou removido, pois está disabled,
                     // mas é bom manter caso precise reabilitar no futuro.
                     onChange={(event, newValue) => {
                       setFormData((prev) => ({
@@ -828,7 +851,6 @@ const tratarSubmit = async () => {
                   />
                 </Stack>
               </Grid>
-
 
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <Accordion
@@ -1081,8 +1103,8 @@ const tratarSubmit = async () => {
                               (id) =>
                                 elementosContabil.find(
                                   (elementoContabil) =>
-                                    elementoContabil.id === id
-                                ) || id
+                                    elementoContabil.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllElementosContabil}
                             isOptionEqualToValue={(option, value) =>
@@ -1112,7 +1134,7 @@ const tratarSubmit = async () => {
                                 error={
                                   (formData.elementoContabil.length === 0 ||
                                     formData.elementoContabil.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.elementoContabil === false
                                 }
@@ -1134,7 +1156,7 @@ const tratarSubmit = async () => {
                             ]}
                             getOptionLabel={(option) => option.nome}
                             value={formData.ipe.map(
-                              (id) => ipes.find((ipe) => ipe.id === id) || id
+                              (id) => ipes.find((ipe) => ipe.id === id) || id,
                             )}
                             onChange={handleSelectAllIpes}
                             isOptionEqualToValue={(option, value) =>
@@ -1229,8 +1251,8 @@ const tratarSubmit = async () => {
                             value={formData.elemento.map(
                               (id) =>
                                 elementos.find(
-                                  (elemento) => elemento.id === id
-                                ) || id
+                                  (elemento) => elemento.id === id,
+                                ) || id,
                             )}
                             onChange={handleSelectAllElementos}
                             isOptionEqualToValue={(option, value) =>
@@ -1260,7 +1282,7 @@ const tratarSubmit = async () => {
                                 error={
                                   (formData.elemento.length === 0 ||
                                     formData.elemento.every(
-                                      (val) => val === 0
+                                      (val) => val === 0,
                                     )) &&
                                   formValidation.elemento === false
                                 }

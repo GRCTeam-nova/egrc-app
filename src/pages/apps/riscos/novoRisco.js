@@ -5,6 +5,9 @@ import {
   Box,
   TextField,
   Autocomplete,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Grid,
   Switch,
   Stack,
@@ -22,6 +25,7 @@ import {
   CardContent,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import InfoIcon from "@mui/icons-material/Info";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import SecurityIcon from "@mui/icons-material/Security";
@@ -32,12 +36,13 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import LoadingOverlay from "../configuracoes/LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { useGetAvaliacoesByRisco } from "../../../api/riscoAvaliacoes";
 import DrawerIncidente from "../configuracoes/novoIncidenteDrawerRiscos";
 import DrawerDepartamento from "../configuracoes/novoDepartamentoDrawerRiscos";
 import DrawerProcesso from "../configuracoes/novoProcessoDrawerRiscos";
@@ -45,6 +50,8 @@ import DrawerControle from "../configuracoes/novoControleDrawerRiscos";
 import DrawerCategoria from "../configuracoes/novaCategoriaDrawerRiscos";
 import FileUploader from "../configuracoes/FileUploader";
 import DrawerPlanos from "../configuracoes/novoPlanoDrawerRisco";
+import ListaRiscoAvaliacoes from "./listaRiscoAvaliacoes";
+import ResumoUltimaAvaliacaoRisco from "./ResumoUltimaAvaliacaoRisco";
 import { API_URL } from "../../../config";
 
 // Componente para seções organizadas
@@ -81,6 +88,7 @@ function ColumnsLayoutsCorrigido() {
   const [categorias, setCategorias] = useState([]);
   const [frameworks, setFrameworks] = useState([]);
   const [tratamentos, setTratamentos] = useState([]);
+  const [tiposRisco, setTiposRisco] = useState([]);
   const [diretrizes, setDiretrizes] = useState([]);
   const [fatores, setFatores] = useState([]);
   const [riscoAssociados, setRiscoAssociados] = useState([]);
@@ -104,11 +112,21 @@ function ColumnsLayoutsCorrigido() {
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
   const [riscoDados, setRiscoDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  // --- NOVOS ESTADOS PARA O FILTRO DE PROCESSOS ---
+  const [departamentosFiltrados, setDepartamentosFiltrados] = useState([]);
+  const [controlesFiltrados, setControlesFiltrados] = useState([]);
+  const [departamentoOrigemMap, setDepartamentoOrigemMap] = useState({});
+  const [controleOrigemMap, setControleOrigemMap] = useState({});
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+  const [pendingProcessos, setPendingProcessos] = useState([]);
+  // ------------------------------------------------
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
   const [formData, setFormData] = useState({
-    empresaInferior: [],
+    riscoSuperior: "",
+    riscoInferior: [],
+    tipoRisco: "",
     diretriz: [],
     fator: [],
     files: [],
@@ -144,6 +162,7 @@ function ColumnsLayoutsCorrigido() {
       const transformedData = response.data.map((item) => ({
         id:
           item.idRisk ||
+          item.idRiskType ||
           item.idLedgerAccount ||
           item.idProcess ||
           item.id_responsible ||
@@ -174,12 +193,30 @@ function ColumnsLayoutsCorrigido() {
     }
   };
 
+  const extractIdsFromArray = (array = [], keys = []) => {
+    if (!Array.isArray(array)) return [];
+
+    return array
+      .map((item) => {
+        if (!item) return null;
+        if (typeof item === "string") return item;
+
+        for (const key of keys) {
+          if (item[key]) return item[key];
+        }
+
+        return item.id || null;
+      })
+      .filter(Boolean);
+  };
+
   useEffect(() => {
     if (!authToken) return;
     fetchData(`${API_URL}categories`, setCategorias);
     fetchData(`${API_URL}action-plans`, setPlanoAcao);
     fetchData(`${API_URL}departments`, setDepartamentos);
     fetchData(`${API_URL}risks`, setRiscoAssociados);
+    fetchData(`${API_URL}risks/types`, setTiposRisco);
     fetchData(`${API_URL}risks/frameworks`, setFrameworks);
     fetchData(`${API_URL}risks/treatments`, setTratamentos);
     fetchData(`${API_URL}risks/strategic-guidelines`, setDiretrizes);
@@ -263,6 +300,32 @@ function ColumnsLayoutsCorrigido() {
             riscoAssociado: Array.isArray(data.riskAssociates)
               ? data.riskAssociates.map((u) => u.idRiskAssociate)
               : [],
+            riscoSuperior:
+              data.idRiskSuperior ||
+              data.riskSuperior?.idRisk ||
+              data.riskSuperior?.id ||
+              "",
+            riscoInferior:
+              extractIdsFromArray(data.idRiskBottoms, [
+                "idRiskBottom",
+                "idRisk",
+                "id",
+              ]).length > 0
+                ? extractIdsFromArray(data.idRiskBottoms, [
+                    "idRiskBottom",
+                    "idRisk",
+                    "id",
+                  ])
+                : extractIdsFromArray(data.riskBottoms, [
+                    "idRiskBottom",
+                    "idRisk",
+                    "id",
+                  ]),
+            tipoRisco:
+              data.idRiskType ||
+              data.riskType?.idRiskType ||
+              data.riskType?.id ||
+              "",
             diretriz: Array.isArray(data.strategicGuidelines)
               ? data.strategicGuidelines.map((u) => u.idStrategicGuideline)
               : [],
@@ -357,6 +420,83 @@ function ColumnsLayoutsCorrigido() {
     }
   };
 
+  // Efeito para buscar e filtrar Departamentos e Controles baseado no Processo
+  useEffect(() => {
+    const atualizarFiltrosPorProcesso = async () => {
+      // CENÁRIO 1: Nenhum processo selecionado -> Mostra tudo
+      if (formData.processo.length === 0) {
+        setDepartamentosFiltrados(departamentos);
+        setControlesFiltrados(controles);
+        setDepartamentoOrigemMap({});
+        setControleOrigemMap({});
+        return;
+      }
+
+      // CENÁRIO 2: Processos selecionados -> Busca na API os departamentos e controles atrelados
+      const novoMapaDep = {};
+      const novoMapaCtrl = {};
+      const idsDepPermitidos = new Set();
+      const idsCtrlPermitidos = new Set();
+
+      const promises = formData.processo.map((procId) =>
+        axios.get(
+          `https://api.egrc.homologacao.com.br/api/v1/processes/${procId}`,
+          {
+            headers: { Authorization: `Bearer ${authToken}` },
+          },
+        ),
+      );
+
+      try {
+        const results = await Promise.all(promises);
+
+        results.forEach((response) => {
+          const dadosProc = response.data;
+          const nomeProc = dadosProc.name;
+
+          // Extraindo departamentos
+          const deps = dadosProc.departments || [];
+          deps.forEach((dep) => {
+            const idDep = dep.idDepartment;
+            idsDepPermitidos.add(idDep);
+            if (!novoMapaDep[idDep]) novoMapaDep[idDep] = [];
+            if (!novoMapaDep[idDep].includes(nomeProc))
+              novoMapaDep[idDep].push(nomeProc);
+          });
+
+          // Extraindo controles
+          const ctrls = dadosProc.controls || [];
+          ctrls.forEach((ctrl) => {
+            const idCtrl = ctrl.idControl;
+            idsCtrlPermitidos.add(idCtrl);
+            if (!novoMapaCtrl[idCtrl]) novoMapaCtrl[idCtrl] = [];
+            if (!novoMapaCtrl[idCtrl].includes(nomeProc))
+              novoMapaCtrl[idCtrl].push(nomeProc);
+          });
+        });
+
+        // Filtra as listas globais baseadas nos IDs que a API retornou
+        setDepartamentosFiltrados(
+          departamentos.filter((d) => idsDepPermitidos.has(d.id)),
+        );
+        setControlesFiltrados(
+          controles.filter((c) => idsCtrlPermitidos.has(c.id)),
+        );
+        setDepartamentoOrigemMap(novoMapaDep);
+        setControleOrigemMap(novoMapaCtrl);
+      } catch (error) {
+        console.error("Erro ao buscar detalhes dos processos:", error);
+        enqueueSnackbar("Erro ao carregar dependências dos processos.", {
+          variant: "error",
+        });
+      }
+    };
+
+    if (departamentos.length > 0 || controles.length > 0) {
+      atualizarFiltrosPorProcesso();
+    }
+  }, [formData.processo, departamentos, controles, authToken]);
+
   const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
 
   useEffect(() => {
@@ -389,14 +529,14 @@ function ColumnsLayoutsCorrigido() {
 
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.riscoAssociado.length === riscoAssociados.length) {
+      if (formData.riscoAssociado.length === opcoesRelacionamentoRisco.length) {
         // Deselect all
         setFormData({ ...formData, riscoAssociado: [] });
       } else {
         // Select all
         setFormData({
           ...formData,
-          riscoAssociado: riscoAssociados.map(
+          riscoAssociado: opcoesRelacionamentoRisco.map(
             (riscoAssociado) => riscoAssociado.id,
           ),
         });
@@ -407,6 +547,52 @@ function ColumnsLayoutsCorrigido() {
         newValue.map((item) => item.id),
       );
     }
+  };
+
+  const handleRiscoSuperiorChange = (event, newValue) => {
+    const riscoSuperiorId = newValue ? newValue.id : "";
+    const possuiConflito =
+      riscoSuperiorId && formData.riscoInferior.includes(riscoSuperiorId);
+
+    if (possuiConflito) {
+      enqueueSnackbar(
+        "O risco superior não pode ser igual a um risco inferior selecionado.",
+        {
+          variant: "warning",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      riscoSuperior: riscoSuperiorId,
+      riscoInferior: riscoSuperiorId
+        ? prev.riscoInferior.filter((id) => id !== riscoSuperiorId)
+        : prev.riscoInferior,
+    }));
+  };
+
+  const handleRiscoInferiorChange = (event, newValue) => {
+    const riscoSuperiorAtual = formData.riscoSuperior;
+    const idsSelecionados = newValue
+      .map((item) => item.id)
+      .filter((id) => id !== riscoSuperiorAtual);
+
+    if (newValue.length !== idsSelecionados.length && riscoSuperiorAtual) {
+      enqueueSnackbar(
+        "O risco inferior não pode ser igual ao risco superior selecionado.",
+        {
+          variant: "warning",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      riscoInferior: idsSelecionados,
+    }));
   };
 
   // NEW
@@ -621,24 +807,42 @@ function ColumnsLayoutsCorrigido() {
     }
   };
 
-  const handleSelectAll2 = (event, newValue) => {
+  const handleSelectAllProcessos = (event, newValue) => {
+    let novosProcessosIds = [];
+
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
+        novosProcessosIds = [];
       } else {
-        // Select all
-        setFormData({
-          ...formData,
-          processo: processos.map((processo) => processo.id),
-        });
+        novosProcessosIds = processos.map((p) => p.id);
       }
     } else {
-      tratarMudancaInputGeral(
-        "processo",
-        newValue.map((item) => item.id),
-      );
+      novosProcessosIds = newValue.map((item) => item.id);
     }
+
+    // INTERCEPTAÇÃO: Se escolheu um novo processo e já havia dep/ctrl selecionado, avisa!
+    if (
+      formData.processo.length === 0 &&
+      novosProcessosIds.length > 0 &&
+      (formData.departamento.length > 0 || formData.controle.length > 0)
+    ) {
+      setPendingProcessos(novosProcessosIds);
+      setWarningDialogOpen(true);
+      return;
+    }
+
+    tratarMudancaInputGeral("processo", novosProcessosIds);
+  };
+
+  const confirmarMudancaDeProcesso = () => {
+    setFormData((prev) => ({
+      ...prev,
+      processo: pendingProcessos,
+      departamento: [], // Limpa dependentes
+      controle: [], // Limpa dependentes
+    }));
+    setWarningDialogOpen(false);
+    setPendingProcessos([]);
   };
 
   const voltarParaCadastroMenu = () => {
@@ -652,9 +856,67 @@ function ColumnsLayoutsCorrigido() {
     categoria: true,
   });
 
+  const riscoAtualId = riscoDados?.idRisk || dadosApi?.id || null;
+  const [assessmentListParams] = useState({ refreshCount: 0 });
+  const {
+    acoesJudiciais: avaliacoesRisco = [],
+    isLoading: isLoadingAvaliacoesRisco,
+  } = useGetAvaliacoesByRisco(assessmentListParams, riscoAtualId);
+
+  const isEmptyAssessmentConclusionDate = (value) =>
+    !value || (typeof value === "string" && value.startsWith("0001-01-01"));
+
+  const getAssessmentTimestamp = (value) => {
+    if (isEmptyAssessmentConclusionDate(value)) return 0;
+
+    const timestamp = new Date(value).getTime();
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  };
+
+  const isAssessmentActive = (assessment) => assessment?.active !== false;
+
+  const ultimaAvaliacaoConcluida = useMemo(() => {
+    if (!Array.isArray(avaliacoesRisco) || avaliacoesRisco.length === 0) {
+      return null;
+    }
+
+    return [...avaliacoesRisco]
+      .filter(
+        (avaliacao) =>
+          isAssessmentActive(avaliacao) &&
+          (!isEmptyAssessmentConclusionDate(avaliacao.dateOfConclusion) ||
+            [4, 5].includes(Number(avaliacao.assessmentStatus))),
+      )
+      .sort((avaliacaoA, avaliacaoB) => {
+        const conclusionDiff =
+          getAssessmentTimestamp(avaliacaoB.dateOfConclusion) -
+          getAssessmentTimestamp(avaliacaoA.dateOfConclusion);
+
+        if (conclusionDiff !== 0) return conclusionDiff;
+
+        return getAssessmentTimestamp(avaliacaoB.date) -
+          getAssessmentTimestamp(avaliacaoA.date);
+      })[0];
+  }, [avaliacoesRisco]);
+
+  const opcoesRelacionamentoRisco = riscoAssociados.filter(
+    (risco) => risco.id && risco.id !== riscoAtualId,
+  );
+
+  const getRiskOptionLabel = (option) => {
+    return option?.nome || option?.name || "";
+  };
+
+  const opcoesRiscoSuperior = opcoesRelacionamentoRisco.filter(
+    (risco) => !formData.riscoInferior.includes(risco.id),
+  );
+  const opcoesRiscoInferior = opcoesRelacionamentoRisco.filter(
+    (risco) => risco.id !== formData.riscoSuperior,
+  );
+
   const allSelected =
-    formData.riscoAssociado.length === riscoAssociados.length &&
-    riscoAssociados.length > 0;
+    formData.riscoAssociado.length === opcoesRelacionamentoRisco.length &&
+    opcoesRelacionamentoRisco.length > 0;
   const allSelectedPlanoAcao =
     formData.planoAcao.length === planosAcoes.length && planosAcoes.length > 0;
   const allSelected2 =
@@ -718,6 +980,20 @@ function ColumnsLayoutsCorrigido() {
       return;
     }
 
+    if (
+      formData.riscoSuperior &&
+      formData.riscoInferior.includes(formData.riscoSuperior)
+    ) {
+      enqueueSnackbar(
+        "O risco superior e o risco inferior não podem ter o mesmo registro.",
+        {
+          variant: "error",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -774,6 +1050,11 @@ function ColumnsLayoutsCorrigido() {
           code: codigo,
           name: nome,
           idCategory: formData.categoria || null,
+          idRiskSuperior: formData.riscoSuperior || null,
+          idRiskBottoms: formData.riscoInferior?.length
+            ? formData.riscoInferior
+            : null,
+          idRiskType: formData.tipoRisco || null,
         };
       } else if (requisicao === "Editar") {
         url = `${API_URL}risks`;
@@ -793,6 +1074,11 @@ function ColumnsLayoutsCorrigido() {
             : null,
           idResponsible: formData.responsavel || null,
           active: status,
+          idRiskSuperior: formData.riscoSuperior || null,
+          idRiskBottoms: formData.riscoInferior?.length
+            ? formData.riscoInferior
+            : null,
+          idRiskType: formData.tipoRisco || null,
           idCategory: formData.categoria || null,
           idFrameworks: formData.framework?.length ? formData.framework : null,
           idTreatment: formData.tratamento || null,
@@ -864,6 +1150,11 @@ function ColumnsLayoutsCorrigido() {
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Box sx={{ width: "100%", marginTop: 2 }}>
+          {requisicao === "Editar" && ultimaAvaliacaoConcluida && (
+            <ResumoUltimaAvaliacaoRisco
+              assessment={ultimaAvaliacaoConcluida}
+            />
+          )}
           {/* Seção 1: Informações Básicas */}
           <SectionCard
             title="Informações Básicas"
@@ -953,6 +1244,32 @@ function ColumnsLayoutsCorrigido() {
                 </Stack>
               </Grid>
 
+              <Grid item xs={12} md={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Tipo do risco</InputLabel>
+                  <Autocomplete
+                    options={tiposRisco}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      tiposRisco.find(
+                        (tipoRisco) => tipoRisco.id === formData.tipoRisco,
+                      ) || null
+                    }
+                    onChange={(event, newValue) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        tipoRisco: newValue ? newValue.id : "",
+                      }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Selecione um tipo de risco"
+                      />
+                    )}
+                  />
+                </Stack>
+              </Grid>
 
               {requisicao === "Editar" && (
                 <Grid item xs={12} md={6}>
@@ -1036,6 +1353,7 @@ function ColumnsLayoutsCorrigido() {
 
           {requisicao === "Editar" && (
             <>
+
               {/* Seção 2: Análise de Risco */}
               <SectionCard
                 title="Análise de Risco"
@@ -1385,10 +1703,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[
-                          { id: "all", nome: "Selecionar todos" },
-                          ...controles,
-                        ]}
+                        options={
+                          controlesFiltrados.length > 0
+                            ? [
+                                { id: "all", nome: "Selecionar todos" },
+                                ...controlesFiltrados,
+                              ]
+                            : []
+                        }
+                        noOptionsText="Nenhum controle encontrado"
                         getOptionLabel={(option) => option.nome}
                         value={formData.controle.map(
                           (id) =>
@@ -1399,24 +1722,42 @@ function ColumnsLayoutsCorrigido() {
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
                         }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all"
-                                      ? allSelectedControles
-                                      : selected
-                                  }
-                                />
+                        renderOption={(props, option, { selected }) => {
+                          const origens = controleOrigemMap[option.id]
+                            ? controleOrigemMap[option.id].join(", ")
+                            : "";
+                          return (
+                            <li {...props}>
+                              <Grid container alignItems="center">
+                                <Grid item>
+                                  <Checkbox
+                                    checked={
+                                      option.id === "all"
+                                        ? allSelectedControles
+                                        : selected
+                                    }
+                                  />
+                                </Grid>
+                                <Grid item xs>
+                                  <Typography variant="body1">
+                                    {option.nome}
+                                  </Typography>
+                                  {option.id !== "all" && origens && (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "text.secondary",
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      Processo(s): {origens}
+                                    </Typography>
+                                  )}
+                                </Grid>
                               </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
+                            </li>
+                          );
+                        }}
                         renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
@@ -1626,7 +1967,7 @@ function ColumnsLayoutsCorrigido() {
                             processos.find((processo) => processo.id === id) ||
                             id,
                         )}
-                        onChange={handleSelectAll2}
+                        onChange={handleSelectAllProcessos}
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
                         }
@@ -1669,10 +2010,15 @@ function ColumnsLayoutsCorrigido() {
                       <Autocomplete
                         multiple
                         disableCloseOnSelect
-                        options={[
-                          { id: "all", nome: "Selecionar todos" },
-                          ...departamentos,
-                        ]}
+                        options={
+                          departamentosFiltrados.length > 0
+                            ? [
+                                { id: "all", nome: "Selecionar todos" },
+                                ...departamentosFiltrados,
+                              ]
+                            : []
+                        }
+                        noOptionsText="Nenhum departamento encontrado"
                         getOptionLabel={(option) => option.nome}
                         value={formData.departamento.map(
                           (id) =>
@@ -1684,24 +2030,42 @@ function ColumnsLayoutsCorrigido() {
                         isOptionEqualToValue={(option, value) =>
                           option.id === value.id
                         }
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}>
-                            <Grid container alignItems="center">
-                              <Grid item>
-                                <Checkbox
-                                  checked={
-                                    option.id === "all"
-                                      ? allSelectedDepartamentos
-                                      : selected
-                                  }
-                                />
+                        renderOption={(props, option, { selected }) => {
+                          const origens = departamentoOrigemMap[option.id]
+                            ? departamentoOrigemMap[option.id].join(", ")
+                            : "";
+                          return (
+                            <li {...props}>
+                              <Grid container alignItems="center">
+                                <Grid item>
+                                  <Checkbox
+                                    checked={
+                                      option.id === "all"
+                                        ? allSelectedDepartamentos
+                                        : selected
+                                    }
+                                  />
+                                </Grid>
+                                <Grid item xs>
+                                  <Typography variant="body1">
+                                    {option.nome}
+                                  </Typography>
+                                  {option.id !== "all" && origens && (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "text.secondary",
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      Processo(s): {origens}
+                                    </Typography>
+                                  )}
+                                </Grid>
                               </Grid>
-                              <Grid item xs>
-                                {option.nome}
-                              </Grid>
-                            </Grid>
-                          </li>
-                        )}
+                            </li>
+                          );
+                        }}
                         renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
@@ -1715,7 +2079,70 @@ function ColumnsLayoutsCorrigido() {
                 icon={<LinkIcon color="primary" />}
               >
                 <Grid container spacing={3}>
-                  <Grid item xs={12}>
+                  <Grid item xs={12} md={6}>
+                    <Stack spacing={1}>
+                      <InputLabel>Risco superior</InputLabel>
+                      <Autocomplete
+                        options={opcoesRiscoSuperior}
+                        getOptionLabel={getRiskOptionLabel}
+                        value={
+                          opcoesRelacionamentoRisco.find(
+                            (risco) => risco.id === formData.riscoSuperior,
+                          ) || null
+                        }
+                        onChange={handleRiscoSuperiorChange}
+                        isOptionEqualToValue={(option, value) =>
+                          option.id === value.id
+                        }
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Selecione o risco superior"
+                          />
+                        )}
+                      />
+                    </Stack>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Stack spacing={1}>
+                      <InputLabel>Riscos inferiores</InputLabel>
+                      <Autocomplete
+                        multiple
+                        disableCloseOnSelect
+                        options={opcoesRiscoInferior}
+                        getOptionLabel={getRiskOptionLabel}
+                        value={formData.riscoInferior
+                          .map((id) =>
+                            opcoesRelacionamentoRisco.find(
+                              (risco) => risco.id === id,
+                            ),
+                          )
+                          .filter(Boolean)}
+                        onChange={handleRiscoInferiorChange}
+                        isOptionEqualToValue={(option, value) =>
+                          option.id === value.id
+                        }
+                        renderOption={(props, option, { selected }) => (
+                          <li {...props}>
+                            <Grid container alignItems="center">
+                              <Grid item>
+                                <Checkbox checked={selected} />
+                              </Grid>
+                              <Grid item xs>
+                                {getRiskOptionLabel(option)}
+                              </Grid>
+                            </Grid>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField {...params} />
+                        )}
+                      />
+                    </Stack>
+                  </Grid>
+
+                  {/* <Grid item xs={12}>
                     <Stack spacing={1}>
                       <InputLabel>Risco Associado</InputLabel>
                       <Autocomplete
@@ -1723,17 +2150,17 @@ function ColumnsLayoutsCorrigido() {
                         disableCloseOnSelect
                         options={[
                           { id: "all", nome: "Selecionar todos" },
-                          ...riscoAssociados.filter((risco) => {
-                            const formatarNome = (nome) =>
-                              nome.replace(/\s+/g, "").toLowerCase();
-                            return (
-                              formatarNome(risco.nome) !== formatarNome(nome)
-                            );
-                          }),
+                          ...opcoesRelacionamentoRisco,
                         ]}
-                        getOptionLabel={(option) => option.nome}
+                        getOptionLabel={(option) =>
+                          option.id === "all"
+                            ? option.nome
+                            : getRiskOptionLabel(option)
+                        }
                         value={formData.riscoAssociado
-                          .map((id) => riscoAssociados.find((r) => r.id === id))
+                          .map((id) =>
+                            opcoesRelacionamentoRisco.find((r) => r.id === id),
+                          )
                           .filter(Boolean)}
                         onChange={handleSelectAll}
                         isOptionEqualToValue={(option, value) =>
@@ -1750,7 +2177,9 @@ function ColumnsLayoutsCorrigido() {
                                 />
                               </Grid>
                               <Grid item xs>
-                                {option.nome}
+                                {option.id === "all"
+                                  ? option.nome
+                                  : getRiskOptionLabel(option)}
                               </Grid>
                             </Grid>
                           </li>
@@ -1758,37 +2187,32 @@ function ColumnsLayoutsCorrigido() {
                         renderInput={(params) => <TextField {...params} />}
                       />
                     </Stack>
-                  </Grid>
+                  </Grid> */}
 
-                  
-              {requisicao === "Editar" && (
-                <Grid item xs={12} md={12}>
-                  <Stack spacing={1}>
-                    <InputLabel>Outras categorias</InputLabel>
+                  {requisicao === "Editar" && (
+                    <Grid item xs={12} md={12}>
+                      <Stack spacing={1}>
+                        <InputLabel>Outras categorias</InputLabel>
 
-                    <Autocomplete
-                      multiple
-                      disableCloseOnSelect
-                      options={categorias}
-                      getOptionLabel={(option) => option.nome}
-                      value={formData.idCategories
-                        .map((id) => categorias.find((c) => c.id === id))
-                        .filter(Boolean)}
-                      onChange={(event, newValue) => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          idCategories: newValue.map((c) => c.id),
-                        }));
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
+                        <Autocomplete
+                          multiple
+                          disableCloseOnSelect
+                          options={categorias}
+                          getOptionLabel={(option) => option.nome}
+                          value={formData.idCategories
+                            .map((id) => categorias.find((c) => c.id === id))
+                            .filter(Boolean)}
+                          onChange={(event, newValue) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              idCategories: newValue.map((c) => c.id),
+                            }));
+                          }}
+                          renderInput={(params) => <TextField {...params} />}
                         />
-                      )}
-                    />
-                  </Stack>
-                </Grid>
-              )}
+                      </Stack>
+                    </Grid>
+                  )}
 
                   <Grid item xs={12}>
                     <Stack spacing={1}>
@@ -1808,7 +2232,24 @@ function ColumnsLayoutsCorrigido() {
           )}
 
           {/* Botões de ação */}
-          <Paper sx={{ p: 3, mt: 3, backgroundColor: "grey.50" }}>
+          {requisicao === "Editar" && riscoAtualId && (
+            <Box sx={{ mt: 2, mb: 3 }}>
+              <Accordion>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="h6">Avaliações</Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 0 }}>
+                  <ListaRiscoAvaliacoes
+                    riskId={riscoAtualId}
+                    assessmentsData={avaliacoesRisco}
+                    assessmentsLoading={isLoadingAvaliacoesRisco}
+                  />
+                </AccordionDetails>
+              </Accordion>
+            </Box>
+          )}
+
+          <Paper sx={{ p: 1, mt: 3, boxShadow: 'none' }}>
             <Stack direction="row" spacing={2} justifyContent="flex-start">
               <Button
                 variant="contained"
@@ -1893,6 +2334,44 @@ function ColumnsLayoutsCorrigido() {
               }}
             >
               Continuar Editando
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Dialog de Aviso de Filtro */}
+        <Dialog
+          open={warningDialogOpen}
+          onClose={() => setWarningDialogOpen(false)}
+        >
+          <DialogTitle sx={{ fontWeight: 600 }}>
+            {"Alteração de filtro de Processos"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Ao selecionar um Processo, as listas de Departamentos e Controles
+              serão filtradas para exibir apenas aqueles pertencentes ao
+              Processo escolhido.
+              <br />
+              <br />
+              <strong>
+                Os Departamentos e Controles selecionados anteriormente serão
+                removidos.
+              </strong>
+              <br />
+              <br />
+              Deseja continuar?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setWarningDialogOpen(false)} color="primary">
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarMudancaDeProcesso}
+              color="error"
+              variant="contained"
+              autoFocus
+            >
+              Limpar Seleções
             </Button>
           </DialogActions>
         </Dialog>

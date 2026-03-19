@@ -38,7 +38,6 @@ import { useToken } from "../../../api/TokenContext";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
-
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
@@ -62,14 +61,24 @@ function ColumnsLayouts() {
   const [hasChanges, setHasChanges] = useState(false);
   const [cnpjError, setCnpjError] = useState(false);
   const [cnpjTouched, setCnpjTouched] = useState(false);
-  
+
   // Novos estados para os campos adicionados
   const [linhasNegocio, setLinhasNegocio] = useState([]);
   const [orgaosReguladores, setOrgaosReguladores] = useState([]);
   const [classificacoes, setClassificacoes] = useState([]);
   const [naturezasJuridicas, setNaturezasJuridicas] = useState([]);
   const [regimesTributacao, setRegimesTributacao] = useState([]);
-  
+
+  // --- NOVOS ESTADOS PARA FILTRO BIDIRECIONAL (Processo <-> Conta) ---
+  const [filtroAtivo, setFiltroAtivo] = useState(null); // 'processo' ou 'conta'
+  const [processosFiltrados, setProcessosFiltrados] = useState([]);
+  const [contasFiltradas, setContasFiltradas] = useState([]);
+  const [processoOrigemMap, setProcessoOrigemMap] = useState({});
+  const [contaOrigemMap, setContaOrigemMap] = useState({});
+  const [warningDialogOpen, setWarningDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // Guarda o que deve ser feito ao confirmar
+  // -------------------------------------------------------------------
+
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
@@ -100,7 +109,7 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -116,26 +125,34 @@ function ColumnsLayouts() {
           localStorage.setItem("idCompany", dadosApi.idCompany);
 
           // Atualiza os demais campos, incluindo os arquivos já cadastrados (se houver)
-          setFormData((prev) => ({
-            ...prev,
-            empresaInferior: Array.isArray(data.companyBottoms)
-              ? data.companyBottoms.map((u) => u.idCompanyBottom)
-              : [],
-            empresaSuperior: data.idCompanySuperior || null,
-            responsavel: data.idResponsible || null,
-            conta: data.idLedgerAccounts || null,
-            processo: data.idProcesses || null,
-            files: data.files || [],
-            dataInicioOperacao: data.startDate
-              ? new Date(data.startDate)
-              : null,
-            // Novos campos - assumindo que virão na resposta da API
-            linhaNegocio: data.idBusinessLine || "",
-            orgaoRegulador: data.idRegulatories || [],
-            classificacao: data.idClassification || "",
-            naturezaJuridica: data.idLegalNature || "",
-            regimeTributacao: data.idTaxRegime || "",
-          }));
+          setFormData((prev) => {
+            const idProcs = data.idProcesses || [];
+            const idContas = data.idLedgerAccounts || [];
+
+            // Define quem assume o filtro na edição
+            if (idProcs.length > 0) setFiltroAtivo("processo");
+            else if (idContas.length > 0) setFiltroAtivo("conta");
+
+            return {
+              ...prev,
+              empresaInferior: Array.isArray(data.companyBottoms)
+                ? data.companyBottoms.map((u) => u.idCompanyBottom)
+                : [],
+              empresaSuperior: data.idCompanySuperior || null,
+              responsavel: data.idResponsible || null,
+              processo: idProcs,
+              conta: idContas,
+              files: data.files || [],
+              dataInicioOperacao: data.startDate
+                ? new Date(data.startDate)
+                : null,
+              linhaNegocio: data.idBusinessLine || "",
+              orgaoRegulador: data.idRegulatories || [],
+              classificacao: data.idClassification || "",
+              naturezaJuridica: data.idLegalNature || "",
+              regimeTributacao: data.idTaxRegime || "",
+            };
+          });
 
           setEmpresaDados(data);
         } catch (err) {
@@ -155,55 +172,49 @@ function ColumnsLayouts() {
   useEffect(() => {
     fetchData(
       `${process.env.REACT_APP_API_URL}companies`,
-      setEmprasasInferiores
+      setEmprasasInferiores,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}companies`,
-      setEmpresasSuperiores
+      setEmpresasSuperiores,
     );
 
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
-      setResponsavel
+      setResponsavel,
     );
-    
+
     // Buscar dados dos novos campos
     fetchData(
       `${process.env.REACT_APP_API_URL}companies/business-lines`,
-      setLinhasNegocio
+      setLinhasNegocio,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}companies/regulatories`,
-      setOrgaosReguladores
+      setOrgaosReguladores,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}companies/classifications`,
-      setClassificacoes
+      setClassificacoes,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}companies/legal-nature`,
-      setNaturezasJuridicas
+      setNaturezasJuridicas,
     );
     fetchData(
       `${process.env.REACT_APP_API_URL}companies/tax-regime`,
-      setRegimesTributacao
+      setRegimesTributacao,
     );
-    
+
     window.scrollTo(0, 0);
   }, []);
 
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
   }, [updateProcessos]);
 
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}ledger-accounts`,
-      setContas
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}ledger-accounts`, setContas);
   }, [updateContas]);
 
   const handleProcessCreated = (newProcesso) => {
@@ -313,7 +324,7 @@ function ColumnsLayouts() {
 
     // Verifica se a empresa superior selecionada conflita com o nome digitado (ignorando espaços)
     const superiorSelecionada = empresasSuperiores.find(
-      (empresa) => empresa.id === formData.empresaSuperior
+      (empresa) => empresa.id === formData.empresaSuperior,
     );
     if (
       superiorSelecionada &&
@@ -328,7 +339,7 @@ function ColumnsLayouts() {
     // Atualiza a lista de empresas inferiores removendo aquelas cujo nome conflita
     const inferioresAtualizadas = formData.empresaInferior.filter((id) => {
       const empresaInferior = empresasInferiores.find(
-        (empresa) => empresa.id === id
+        (empresa) => empresa.id === id,
       );
       if (!empresaInferior) return false;
       return formatarNome(empresaInferior.nome) !== nomeDigitado;
@@ -369,7 +380,13 @@ function ColumnsLayouts() {
   };
 
   const tratarMudancaInputGeral = (field, value) => {
-    if (field === "empresaSuperior" || field === "linhaNegocio" || field === "classificacao" || field === "naturezaJuridica" || field === "regimeTributacao") {
+    if (
+      field === "empresaSuperior" ||
+      field === "linhaNegocio" ||
+      field === "classificacao" ||
+      field === "naturezaJuridica" ||
+      field === "regimeTributacao"
+    ) {
       // Guarde apenas o ID do item selecionado
       setFormData({ ...formData, [field]: value ? value.id : null });
     } else {
@@ -378,13 +395,111 @@ function ColumnsLayouts() {
     }
   };
 
+  // Efeito principal do Filtro Bidirecional
+  // Efeito principal do Filtro Bidirecional
+  useEffect(() => {
+    const atualizarFiltrosBidirecionais = async () => {
+      if (filtroAtivo === "processo" && formData.processo.length > 0) {
+        // PROCESSO É O PAI: Filtra Contas
+        const novoMapaConta = {};
+        const idsContaPermitidos = new Set();
+
+        const promises = formData.processo.map((id) =>
+          axios.get(`${process.env.REACT_APP_API_URL}processes/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        );
+        try {
+          const results = await Promise.all(promises);
+          results.forEach((res) => {
+            const nomeProc = res.data.name;
+            // AJUSTE: Usando idLedgerAccounts conforme retorno da API
+            const ledgers = res.data.idLedgerAccounts || [];
+
+            ledgers.forEach((l) => {
+              // Lida com o retorno, seja um array de objetos ou array direto de IDs
+              const idConta =
+                typeof l === "object" ? l.idLedgerAccount || l.id : l;
+
+              if (idConta) {
+                idsContaPermitidos.add(idConta);
+                if (!novoMapaConta[idConta]) novoMapaConta[idConta] = [];
+                if (!novoMapaConta[idConta].includes(nomeProc))
+                  novoMapaConta[idConta].push(nomeProc);
+              }
+            });
+          });
+          setContasFiltradas(
+            contas.filter((c) => idsContaPermitidos.has(c.id)),
+          );
+          setContaOrigemMap(novoMapaConta);
+        } catch (e) {
+          console.error("Erro ao buscar dependências de contas:", e);
+        }
+      } else if (filtroAtivo === "conta" && formData.conta.length > 0) {
+        // CONTA É O PAI: Filtra Processos
+        const novoMapaProc = {};
+        const idsProcPermitidos = new Set();
+
+        const promises = formData.conta.map((id) =>
+          axios.get(`${process.env.REACT_APP_API_URL}ledger-accounts/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        );
+        try {
+          const results = await Promise.all(promises);
+          results.forEach((res) => {
+            const nomeConta = res.data.name;
+            // AJUSTE: Usando idProcesses conforme retorno da API
+            const procs = res.data.idProcesses || [];
+
+            procs.forEach((p) => {
+              // Lida com o retorno, seja um array de objetos ou array direto de IDs
+              const idProc = typeof p === "object" ? p.idProcess || p.id : p;
+
+              if (idProc) {
+                idsProcPermitidos.add(idProc);
+                if (!novoMapaProc[idProc]) novoMapaProc[idProc] = [];
+                if (!novoMapaProc[idProc].includes(nomeConta))
+                  novoMapaProc[idProc].push(nomeConta);
+              }
+            });
+          });
+          setProcessosFiltrados(
+            processos.filter((p) => idsProcPermitidos.has(p.id)),
+          );
+          setProcessoOrigemMap(novoMapaProc);
+        } catch (e) {
+          console.error("Erro ao buscar dependências de processos:", e);
+        }
+      } else {
+        // NENHUM ATIVO: Mostra tudo normal
+        setProcessosFiltrados(processos);
+        setContasFiltradas(contas);
+        setProcessoOrigemMap({});
+        setContaOrigemMap({});
+      }
+    };
+
+    if (processos.length > 0 || contas.length > 0) {
+      atualizarFiltrosBidirecionais();
+    }
+  }, [
+    formData.processo,
+    formData.conta,
+    filtroAtivo,
+    processos,
+    contas,
+    token,
+  ]);
+
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       // Usa o mesmo filtro aplicado nas opções do Autocomplete
       const filteredInferiores = empresasInferiores.filter(
         (empresa) =>
           empresa.id !== formData.empresaSuperior &&
-          formatarNome(empresa.nome) !== formatarNome(nomeEmpresa)
+          formatarNome(empresa.nome) !== formatarNome(nomeEmpresa),
       );
       if (formData.empresaInferior.length === filteredInferiores.length) {
         // Deselect all
@@ -394,53 +509,98 @@ function ColumnsLayouts() {
         setFormData({
           ...formData,
           empresaInferior: filteredInferiores.map(
-            (empresaInferior) => empresaInferior.id
+            (empresaInferior) => empresaInferior.id,
           ),
         });
       }
     } else {
       tratarMudancaInputGeral(
         "empresaInferior",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
 
   const handleSelectAll2 = (event, newValue) => {
+    // Processos
+    let novosIds = [];
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          processo: processos.map((processo) => processo.id),
-        });
-      }
+      if (formData.processo.length === processosFiltrados.length) novosIds = [];
+      else novosIds = processosFiltrados.map((p) => p.id);
     } else {
-      tratarMudancaInputGeral(
-        "processo",
-        newValue.map((item) => item.id)
-      );
+      novosIds = newValue.map((item) => item.id);
+    }
+
+    if (filtroAtivo === "conta") {
+      tratarMudancaInputGeral("processo", novosIds);
+      if (novosIds.length === 0 && formData.conta.length === 0)
+        setFiltroAtivo(null);
+    } else {
+      if (
+        formData.processo.length === 0 &&
+        novosIds.length > 0 &&
+        formData.conta.length > 0
+      ) {
+        setPendingAction({ type: "processo", ids: novosIds });
+        setWarningDialogOpen(true);
+        return;
+      }
+      tratarMudancaInputGeral("processo", novosIds);
+      if (novosIds.length > 0) setFiltroAtivo("processo");
+      else if (formData.conta.length > 0) setFiltroAtivo("conta");
+      else setFiltroAtivo(null);
     }
   };
 
   const handleSelectAllConta = (event, newValue) => {
+    // Contas
+    let novosIds = [];
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.conta.length === contas.length) {
-        // Deselect all
-        setFormData({ ...formData, conta: [] });
-      } else {
-        // Select all
-        setFormData({ ...formData, conta: contas.map((conta) => conta.id) });
-      }
+      if (formData.conta.length === contasFiltradas.length) novosIds = [];
+      else novosIds = contasFiltradas.map((c) => c.id);
     } else {
-      tratarMudancaInputGeral(
-        "conta",
-        newValue.map((item) => item.id)
-      );
+      novosIds = newValue.map((item) => item.id);
     }
+
+    if (filtroAtivo === "processo") {
+      tratarMudancaInputGeral("conta", novosIds);
+      if (novosIds.length === 0 && formData.processo.length === 0)
+        setFiltroAtivo(null);
+    } else {
+      if (
+        formData.conta.length === 0 &&
+        novosIds.length > 0 &&
+        formData.processo.length > 0
+      ) {
+        setPendingAction({ type: "conta", ids: novosIds });
+        setWarningDialogOpen(true);
+        return;
+      }
+      tratarMudancaInputGeral("conta", novosIds);
+      if (novosIds.length > 0) setFiltroAtivo("conta");
+      else if (formData.processo.length > 0) setFiltroAtivo("processo");
+      else setFiltroAtivo(null);
+    }
+  };
+
+  const confirmarMudancaFiltro = () => {
+    if (pendingAction.type === "processo") {
+      setFormData((prev) => ({
+        ...prev,
+        processo: pendingAction.ids,
+        conta: [],
+      }));
+      setFiltroAtivo("processo");
+    } else if (pendingAction.type === "conta") {
+      setFormData((prev) => ({
+        ...prev,
+        conta: pendingAction.ids,
+        processo: [],
+      }));
+      setFiltroAtivo("conta");
+    }
+    setWarningDialogOpen(false);
+    setPendingAction(null);
   };
 
   // Função para lidar com seleção múltipla de órgãos reguladores
@@ -459,7 +619,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "orgaoRegulador",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -478,13 +638,16 @@ function ColumnsLayouts() {
   const allSelected =
     formData.empresaInferior.length === empresasInferiores.length &&
     empresasInferiores.length > 0;
-  const allSelectedContas =
-    formData.conta.length === contas.length && contas.length > 0;
-  const allSelected2 =
-    formData.processo.length === processos.length && processos.length > 0;
   const allSelectedOrgaoRegulador =
     formData.orgaoRegulador.length === orgaosReguladores.length &&
     orgaosReguladores.length > 0;
+
+  const allSelected2 =
+    formData.processo.length === processosFiltrados.length &&
+    processosFiltrados.length > 0;
+  const allSelectedContas =
+    formData.conta.length === contasFiltradas.length &&
+    contasFiltradas.length > 0;
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
@@ -523,7 +686,7 @@ function ColumnsLayouts() {
       // Separe os arquivos novos dos já existentes:
       const newFiles = formData.files.filter((file) => file instanceof File);
       const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File)
+        (file) => !(file instanceof File),
       );
 
       // Realiza upload dos novos arquivos, se houver
@@ -534,7 +697,7 @@ function ColumnsLayouts() {
         // Em edição, já temos o id da empresa; em criação, envia string vazia
         formDataUpload.append(
           "IdContainer",
-          requisicao === "Editar" ? empresaDados?.idCompany : ""
+          requisicao === "Editar" ? empresaDados?.idCompany : "",
         );
         newFiles.forEach((file) => {
           formDataUpload.append("Files", file, file.name);
@@ -548,7 +711,7 @@ function ColumnsLayouts() {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
         uploadFilesResult = uploadResponse.data; // Supõe-se que seja um objeto do tipo { files: [...] }
       }
@@ -584,11 +747,15 @@ function ColumnsLayouts() {
           idProcess: formData.processo,
           idLedgerAccounts: formData.conta,
           // Novos campos
-          idBusinessLine: formData.linhaNegocio === "" ? null : formData.linhaNegocio,
+          idBusinessLine:
+            formData.linhaNegocio === "" ? null : formData.linhaNegocio,
           idRegulatories: formData.orgaoRegulador,
-          idClassification: formData.classificacao === "" ? null : formData.classificacao,
-          idLegalNature: formData.naturezaJuridica === "" ? null : formData.naturezaJuridica,
-          idTaxRegime: formData.regimeTributacao === "" ? null : formData.regimeTributacao,
+          idClassification:
+            formData.classificacao === "" ? null : formData.classificacao,
+          idLegalNature:
+            formData.naturezaJuridica === "" ? null : formData.naturezaJuridica,
+          idTaxRegime:
+            formData.regimeTributacao === "" ? null : formData.regimeTributacao,
         };
       } else if (requisicao === "Editar") {
         url = `${process.env.REACT_APP_API_URL}companies`;
@@ -610,11 +777,15 @@ function ColumnsLayouts() {
           idLedgerAccounts: formData.conta,
           files: finalFilesPayload,
           // Novos campos
-          idBusinessLine: formData.linhaNegocio === "" ? null : formData.linhaNegocio,
+          idBusinessLine:
+            formData.linhaNegocio === "" ? null : formData.linhaNegocio,
           idRegulatories: formData.orgaoRegulador,
-          idClassification: formData.classificacao === "" ? null : formData.classificacao,
-          idLegalNature: formData.naturezaJuridica === "" ? null : formData.naturezaJuridica,
-          idTaxRegime: formData.regimeTributacao === "" ? null : formData.regimeTributacao,
+          idClassification:
+            formData.classificacao === "" ? null : formData.classificacao,
+          idLegalNature:
+            formData.naturezaJuridica === "" ? null : formData.naturezaJuridica,
+          idTaxRegime:
+            formData.regimeTributacao === "" ? null : formData.regimeTributacao,
         };
       }
 
@@ -702,7 +873,11 @@ function ColumnsLayouts() {
             </Stack>
           </Grid>
 
-          <Grid item xs={requisicao !== 'Editar' ? 6 : 3} sx={{ paddingBottom: 5 }}>
+          <Grid
+            item
+            xs={requisicao !== "Editar" ? 6 : 3}
+            sx={{ paddingBottom: 5 }}
+          >
             <Stack spacing={1}>
               <InputLabel>CNPJ *</InputLabel>
               <TextField
@@ -750,26 +925,24 @@ function ColumnsLayouts() {
               </Grid>
 
               {/* Linha de Negócio */}
-          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-            <Stack spacing={1}>
-              <InputLabel>Linha de Negócio</InputLabel>
-              <Autocomplete
-                options={linhasNegocio}
-                getOptionLabel={(option) => option.nome}
-                value={
-                  linhasNegocio.find(
-                    (linha) => linha.id === formData.linhaNegocio
-                  ) || null
-                }
-                onChange={(event, newValue) => {
-                  tratarMudancaInputGeral("linhaNegocio", newValue);
-                }}
-                renderInput={(params) => (
-                  <TextField {...params} />
-                )}
-              />
-            </Stack>
-          </Grid>
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Linha de Negócio</InputLabel>
+                  <Autocomplete
+                    options={linhasNegocio}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      linhasNegocio.find(
+                        (linha) => linha.id === formData.linhaNegocio,
+                      ) || null
+                    }
+                    onChange={(event, newValue) => {
+                      tratarMudancaInputGeral("linhaNegocio", newValue);
+                    }}
+                    renderInput={(params) => <TextField {...params} />}
+                  />
+                </Stack>
+              </Grid>
 
               {/* Órgão Regulador */}
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
@@ -785,7 +958,8 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={formData.orgaoRegulador.map(
                       (id) =>
-                        orgaosReguladores.find((orgao) => orgao.id === id) || id
+                        orgaosReguladores.find((orgao) => orgao.id === id) ||
+                        id,
                     )}
                     onChange={handleSelectAllOrgaoRegulador}
                     isOptionEqualToValue={(option, value) =>
@@ -809,9 +983,7 @@ function ColumnsLayouts() {
                         </Grid>
                       </li>
                     )}
-                    renderInput={(params) => (
-                      <TextField {...params} />
-                    )}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -825,15 +997,14 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={
                       classificacoes.find(
-                        (classificacao) => classificacao.id === formData.classificacao
+                        (classificacao) =>
+                          classificacao.id === formData.classificacao,
                       ) || null
                     }
                     onChange={(event, newValue) => {
                       tratarMudancaInputGeral("classificacao", newValue);
                     }}
-                    renderInput={(params) => (
-                      <TextField {...params} />
-                    )}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -847,15 +1018,13 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={
                       naturezasJuridicas.find(
-                        (natureza) => natureza.id === formData.naturezaJuridica
+                        (natureza) => natureza.id === formData.naturezaJuridica,
                       ) || null
                     }
                     onChange={(event, newValue) => {
                       tratarMudancaInputGeral("naturezaJuridica", newValue);
                     }}
-                    renderInput={(params) => (
-                      <TextField {...params} />
-                    )}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -869,15 +1038,13 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={
                       regimesTributacao.find(
-                        (regime) => regime.id === formData.regimeTributacao
+                        (regime) => regime.id === formData.regimeTributacao,
                       ) || null
                     }
                     onChange={(event, newValue) => {
                       tratarMudancaInputGeral("regimeTributacao", newValue);
                     }}
-                    renderInput={(params) => (
-                      <TextField {...params} />
-                    )}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -889,19 +1056,20 @@ function ColumnsLayouts() {
                     options={empresasSuperiores.filter(
                       (empresa) =>
                         !formData.empresaInferior.includes(empresa.id) &&
-                        formatarNome(empresa.nome) !== formatarNome(nomeEmpresa)
+                        formatarNome(empresa.nome) !==
+                          formatarNome(nomeEmpresa),
                     )}
                     getOptionLabel={(option) => option.nome}
                     value={
                       empresasSuperiores.find(
-                        (empresa) => empresa.id === formData.empresaSuperior
+                        (empresa) => empresa.id === formData.empresaSuperior,
                       ) || null
                     }
                     onChange={(event, newValue) => {
                       setFormData((prev) => {
                         // Remove a empresa selecionada dos inferiores, caso exista
                         const inferiorAtualizado = prev.empresaInferior.filter(
-                          (id) => (newValue ? id !== newValue.id : true)
+                          (id) => (newValue ? id !== newValue.id : true),
                         );
                         return {
                           ...prev,
@@ -935,15 +1103,15 @@ function ColumnsLayouts() {
                         (empresa) =>
                           empresa.id !== formData.empresaSuperior &&
                           formatarNome(empresa.nome) !==
-                            formatarNome(nomeEmpresa)
+                            formatarNome(nomeEmpresa),
                       ),
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.empresaInferior.map(
                       (id) =>
                         empresasInferiores.find(
-                          (empresa) => empresa.id === id
-                        ) || id
+                          (empresa) => empresa.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAll}
                     isOptionEqualToValue={(option, value) =>
@@ -971,7 +1139,7 @@ function ColumnsLayouts() {
                         error={
                           (formData.empresaInferior.length === 0 ||
                             formData.empresaInferior.every(
-                              (val) => val === 0
+                              (val) => val === 0,
                             )) &&
                           formValidation.empresaInferior === false
                         }
@@ -997,35 +1165,61 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...processos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processo.map(
-                      (id) =>
-                        processos.find((processo) => processo.id === id) || id
-                    )}
-                    onChange={handleSelectAll2}
+                    options={
+                      processosFiltrados.length > 0
+                        ? [
+                            { id: "all", nome: "Selecionar todas" },
+                            ...processosFiltrados,
+                          ]
+                        : []
+                    }
+                    // Adicione também a propriedade abaixo de options:
+                    noOptionsText="Nenhum processo encontrado"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.processo
+                      .map((id) =>
+                        processos.find((processo) => processo.id === id),
+                      )
+                      .filter(Boolean)}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all" ? allSelected2 : selected
-                              }
-                            />
+                    onChange={handleSelectAll2}
+                    renderOption={(props, option, { selected }) => {
+                      const origens = processoOrigemMap[option.id]
+                        ? processoOrigemMap[option.id].join(", ")
+                        : "";
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox
+                                checked={
+                                  option.id === "all" ? allSelected2 : selected
+                                }
+                              />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">
+                                {option.nome}
+                              </Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography
+                                  variant="caption"
+                                  display="block"
+                                  sx={{
+                                    color: "text.secondary",
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  Conta(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -1056,36 +1250,60 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...contas,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.conta.map(
-                      (id) => contas.find((conta) => conta.id === id) || id
-                    )}
-                    onChange={handleSelectAllConta}
+                    options={
+                      contasFiltradas.length > 0
+                        ? [
+                            { id: "all", nome: "Selecionar todas" },
+                            ...contasFiltradas,
+                          ]
+                        : []
+                    }
+                    noOptionsText="Nenhuma conta encontrada"
+                    getOptionLabel={(option) => option.nome || ""}
+                    value={formData.conta
+                      .map((id) => contas.find((conta) => conta.id === id))
+                      .filter(Boolean)}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedContas
-                                  : selected
-                              }
-                            />
+                    onChange={handleSelectAllConta}
+                    renderOption={(props, option, { selected }) => {
+                      const origens = contaOrigemMap[option.id]
+                        ? contaOrigemMap[option.id].join(", ")
+                        : "";
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox
+                                checked={
+                                  option.id === "all"
+                                    ? allSelectedContas
+                                    : selected
+                                }
+                              />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">
+                                {option.nome}
+                              </Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography
+                                  variant="caption"
+                                  display="block"
+                                  sx={{
+                                    color: "text.secondary",
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  Processo(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -1108,7 +1326,8 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={
                       responsaveis.find(
-                        (responsavel) => responsavel.id === formData.responsavel
+                        (responsavel) =>
+                          responsavel.id === formData.responsavel,
                       ) || null
                     }
                     onChange={(event, newValue) => {
@@ -1187,7 +1406,7 @@ function ColumnsLayouts() {
                 onClick={tratarSubmit}
                 sx={{ minWidth: 120 }}
               >
-                {requisicao === 'Editar' ? 'Atualizar' : requisicao}
+                {requisicao === "Editar" ? "Atualizar" : requisicao}
               </Button>
             </Stack>
           </Grid>
@@ -1229,9 +1448,7 @@ function ColumnsLayouts() {
 
           {/* Conteúdo */}
           <DialogContent sx={{ textAlign: "center", paddingTop: 0 }}>
-            <DialogContentText
-              sx={{ fontSize: "16px", color: "#555", px: 2 }}
-            >
+            <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>
               A empresa foi cadastrada com sucesso. Você pode voltar para a
               listagem ou adicionar mais informações a essa empresa.
             </DialogContentText>
@@ -1271,10 +1488,50 @@ function ColumnsLayouts() {
             </Button>
           </DialogActions>
         </Dialog>
+        {/* Dialog de Aviso de Filtro Bidirecional */}
+        <Dialog
+          open={warningDialogOpen}
+          onClose={() => setWarningDialogOpen(false)}
+        >
+          <DialogTitle sx={{ fontWeight: 600 }}>
+            {"Alteração de filtro"}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Ao iniciar a seleção de{" "}
+              {pendingAction?.type === "processo" ? "Processos" : "Contas"}, a
+              lista de{" "}
+              {pendingAction?.type === "processo" ? "Contas" : "Processos"} será
+              filtrada para exibir apenas correspondências válidas.
+              <br />
+              <br />
+              <strong>
+                Os itens de{" "}
+                {pendingAction?.type === "processo" ? "Conta" : "Processo"}{" "}
+                selecionados anteriormente serão removidos.
+              </strong>
+              <br />
+              <br />
+              Deseja continuar?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setWarningDialogOpen(false)} color="primary">
+              Cancelar
+            </Button>
+            <Button
+              onClick={confirmarMudancaFiltro}
+              color="error"
+              variant="contained"
+              autoFocus
+            >
+              Limpar Seleções
+            </Button>
+          </DialogActions>
+        </Dialog>
       </LocalizationProvider>
     </>
   );
 }
 
 export default ColumnsLayouts;
-

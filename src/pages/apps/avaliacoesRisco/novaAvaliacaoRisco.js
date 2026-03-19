@@ -83,6 +83,23 @@ function ColumnsLayouts() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
+  const uniqueQuestionariosApi = useMemo(() => {
+    if (!questionariosApi || !questionariosApi.length) return [];
+
+    const map = new Map();
+    questionariosApi.forEach((item) => {
+      const current = map.get(item.idRespondent);
+      const currentStatus = Number(current?.statusQuiz || current?.status || 0);
+      const itemStatus = Number(item.statusQuiz || item.status || 0);
+
+      if (!current || itemStatus > currentStatus) {
+        map.set(item.idRespondent, item);
+      }
+    });
+
+    return Array.from(map.values());
+  }, [questionariosApi]);
+
   const [formData, setFormData] = useState({
     sobrepor: "",
     tipoNorma: "",
@@ -272,6 +289,7 @@ function ColumnsLayouts() {
   }, []);
 
   useEffect(() => {
+    console.log(dadosApi)
     if (dadosApi && dadosApi.idAssessment) {
       setLoading(true);
       const fetchAssessmentDados = async () => {
@@ -691,9 +709,10 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    if (!questionariosApi || questionariosApi.length === 0) return;
+    // Usando a lista limpa agora
+    if (!uniqueQuestionariosApi || uniqueQuestionariosApi.length === 0) return;
 
-    const questionariosAtivos = questionariosApi.filter(
+    const questionariosAtivos = uniqueQuestionariosApi.filter(
       (q) => q.active !== false,
     );
 
@@ -710,7 +729,7 @@ function ColumnsLayouts() {
       console.log("Auto-completando avaliação...");
       autoAtualizarParaCompleta();
     }
-  }, [questionariosApi, formData.status, isResponsibleAv]);
+  }, [uniqueQuestionariosApi, formData.status, isResponsibleAv]); // Dependência atualizada
 
   const handleSelectAllEmpresas = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
@@ -911,12 +930,82 @@ function ColumnsLayouts() {
     voltarParaCadastroMenu();
   };
 
+  const validarCampos = () => {
+    const missingFields = [];
+
+    // Validações padrões existentes
+    if (!formData.ciclo) {
+      setFormValidation((prev) => ({ ...prev, ciclo: false }));
+      missingFields.push("Ciclo");
+    }
+    if (!formData.risco) {
+      setFormValidation((prev) => ({ ...prev, risco: false }));
+      missingFields.push("Risco");
+    }
+    if (!formData.respondente || formData.respondente.length === 0) {
+      setFormValidation((prev) => ({ ...prev, respondente: false }));
+      missingFields.push("Respondente");
+    }
+    if (!formData.responsavelAv) {
+      setFormValidation((prev) => ({ ...prev, responsavelAv: false }));
+      missingFields.push("Responsável");
+    }
+
+    // NOVA VALIDAÇÃO: Bloqueia se 'Sobrepor' estiver ativo e faltar dados
+    if (sobrepor) {
+      const nivelNum = Number(nivelAv) || 1; // Garante que temos um número válido
+
+      if (!formData.idProbabilityInherent || !formData.idSeverityInherent) {
+        missingFields.push("Probabilidade/Impacto Inerente");
+      }
+      // Nível 2 exige Residual
+      if (
+        nivelNum >= 2 &&
+        (!formData.idProbabilityResidual || !formData.idSeverityResidual)
+      ) {
+        missingFields.push("Probabilidade/Impacto Residual");
+      }
+      // Nível 3 exige Planejado
+      if (
+        nivelNum >= 3 &&
+        (!formData.idProbabilityPlanned || !formData.idSeverityPlanned)
+      ) {
+        missingFields.push("Probabilidade/Impacto Planejado");
+      }
+      if (!comentario || comentario.trim() === "") {
+        missingFields.push("Justificativa");
+      }
+    }
+
+    if (missingFields.length > 0) {
+      // Formata a mensagem lindamente com vírgulas e "e" no final (Ex: Ciclo, Risco e Justificativa)
+      const fieldsMessage = missingFields
+        .join(", ")
+        .replace(/,([^,]*)$/, " e$1");
+      const singularOrPlural =
+        missingFields.length > 1
+          ? "são obrigatórios e devem ser preenchidos!"
+          : "é obrigatório e deve ser preenchido!";
+
+      enqueueSnackbar(`O(s) campo(s) ${fieldsMessage} ${singularOrPlural}`, {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleAtualizarClick = () => {
+    // Trava o fluxo aqui se a validação falhar
+    if (!validarCampos()) return;
+
     if (sobrepor) {
       setConfirmSobreporOpen(true);
       return;
     }
-    tratarSubmit();
+    tratarSubmit(true); // Passa 'true' para sinalizar que já validamos
   };
 
   const handleConfirmSobrepor = () => {
@@ -983,14 +1072,14 @@ function ColumnsLayouts() {
     return { buttonTitle: title, isTester: isResp };
   }, [idUser, formData.status, formData.responsavelAv]);
 
-  const hasQuestionarioConcluido = (questionariosApi ?? []).some((q) => {
+  const hasQuestionarioConcluido = (uniqueQuestionariosApi ?? []).some((q) => {
     const status = Number(q?.statusQuiz ?? q?.status);
     const active = q?.active !== false;
     return active && status >= 3;
   });
 
   console.log("DEBUG FINALIZAR", {
-    totalApi: questionariosApi?.map((q) => ({
+    totalApiLimpo: uniqueQuestionariosApi?.map((q) => ({
       id: q.idQuiz,
       statusQuiz: q.statusQuiz,
       active: q.active,
@@ -1007,6 +1096,62 @@ function ColumnsLayouts() {
     (statusAtual === 2 || statusAtual === 3 || statusAtual === 4) &&
     hasQuestionarioConcluido &&
     sobrepor === false;
+
+  const getRiskResultByCoords = useCallback(
+    (coords) => {
+      if (!coords || !heatmapDataAv?.heatMapQuadrants) return null;
+
+      const [rStr, cStr] = String(coords).split(":");
+      const r = Number.parseInt(rStr, 10);
+      const c = Number.parseInt(cStr, 10);
+
+      if (Number.isNaN(r) || Number.isNaN(c)) return null;
+
+      const candidates = [`${r - 1}:${c - 1}`, `${r}:${c}`];
+      let quadrant = null;
+
+      for (const coordinate of candidates) {
+        quadrant = heatmapDataAv.heatMapQuadrants.find(
+          (item) => item.coordinate === coordinate,
+        );
+        if (quadrant) break;
+      }
+
+      if (!quadrant) return null;
+
+      const range = heatmapDataAv?.heatMapRanges?.find(
+        (item) => quadrant.value >= item.start && quadrant.value <= item.end,
+      );
+
+      const rangeName =
+        range?.name && range.name.trim() !== ""
+          ? range.name
+          : `Nivel ${quadrant.value}`;
+
+      return {
+        name: rangeName,
+        color: range?.color || "#e0e0e0",
+      };
+    },
+    [heatmapDataAv],
+  );
+
+  const formatRiskResultString = useCallback(
+    (coords) => {
+      const riskResult = getRiskResultByCoords(coords);
+      return riskResult ? `${riskResult.name} - ${riskResult.color}` : null;
+    },
+    [getRiskResultByCoords],
+  );
+
+  const buildFinalizationResultPayload = useCallback(
+    (coords) => ({
+      resultInherent: formatRiskResultString(coords?.inherent),
+      resultResidual: formatRiskResultString(coords?.residual),
+      resultPlanned: formatRiskResultString(coords?.planned),
+    }),
+    [formatRiskResultString],
+  );
 
   const handleStart = async () => {
     let url = "";
@@ -1132,6 +1277,7 @@ function ColumnsLayouts() {
         const resImp = findImp(formData.idSeverityResidual);
         const plnProb = findProb(formData.idProbabilityPlanned);
         const plnImp = findImp(formData.idSeverityPlanned);
+        const finalizationResults = buildFinalizationResultPayload(finalCoords);
 
         payload = {
           idAssessment: normativaDados?.idAssessment,
@@ -1171,6 +1317,7 @@ function ColumnsLayouts() {
           justificationInerent: formData.justificationInerent,
           justificationResidual: formData.justificationResidual,
           justificationPlanned: formData.justificationPlanned,
+          ...finalizationResults,
         };
       }
 
@@ -1428,7 +1575,11 @@ function ColumnsLayouts() {
     }
   };
 
-  const tratarSubmit = async () => {
+  const tratarSubmit = async (alreadyValidated = false) => {
+    // Se não veio do botão Atualizar (já validado), validamos agora
+    if (!alreadyValidated && !validarCampos()) {
+      return;
+    }
     let url = "";
     let method = "";
     let payload = {};
@@ -1488,6 +1639,11 @@ function ColumnsLayouts() {
       const resImp = findImp(formData.idSeverityResidual);
       const plnProb = findProb(formData.idProbabilityPlanned);
       const plnImp = findImp(formData.idSeverityPlanned);
+      const assessmentStatus = sobrepor ? 4 : formData.status;
+      const finalizationResults =
+        assessmentStatus === 4
+          ? buildFinalizationResultPayload(finalCoords)
+          : {};
 
       payload = {
         idAssessment: normativaDados?.idAssessment,
@@ -1495,7 +1651,7 @@ function ColumnsLayouts() {
         idCycle: formData.ciclo,
         idRespondents: formData.respondente,
         idResponsible: formData.responsavelAv,
-        assessmentStatus: sobrepor ? 4 : formData.status,
+        assessmentStatus,
         active: status,
         replaceUser: sobrepor
           ? responsaveisAv.find((r) => r.id === formData.responsavelAv)?.nome ||
@@ -1525,6 +1681,7 @@ function ColumnsLayouts() {
         justificationInerent: formData.justificationInerent,
         justificationResidual: formData.justificationResidual,
         justificationPlanned: formData.justificationPlanned,
+        ...finalizationResults,
       };
     }
 
@@ -1577,17 +1734,21 @@ function ColumnsLayouts() {
     }
   };
 
-const finalCoords = useMemo(() => {
+  const finalCoords = useMemo(() => {
     // Chave única baseada no ID da avaliação para não misturar dados
-    const cacheKey = dadosApi?.idAssessment ? `risk_coords_cache_${dadosApi.idAssessment}` : null;
+    const cacheKey = dadosApi?.idAssessment
+      ? `risk_coords_cache_${dadosApi.idAssessment}`
+      : null;
 
     // 1. LEITURA SÍNCRONA (Anti-Flash): Tenta pegar do cache imediatamente
     let cached = null;
     if (cacheKey) {
-        try {
-            const raw = localStorage.getItem(cacheKey);
-            if (raw) cached = JSON.parse(raw);
-        } catch (e) { console.error(e); }
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) cached = JSON.parse(raw);
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     // 2. Dados atuais do React State
@@ -1596,7 +1757,8 @@ const finalCoords = useMemo(() => {
     let planned = formData.justificationPlanned;
 
     // Helper de validação
-    const isInvalid = (val) => !val || val === "" || val === "null" || val === "undefined";
+    const isInvalid = (val) =>
+      !val || val === "" || val === "null" || val === "undefined";
 
     // 3. LÓGICA DE PREENCHIMENTO (Prioridade: State > Cache > AvgCoords)
     // Se o State for inválido, tenta o Cache. Se o Cache falhar, tenta o AvgCoords.
@@ -1606,18 +1768,18 @@ const finalCoords = useMemo(() => {
 
     // Se estiver no modo "Sobrepor", damos preferência ao que o usuário está digitando/salvou
     if (sobrepor) {
-        inherent = formData.justificationInerent || avgCoords.inherent;
-        residual = formData.justificationResidual || avgCoords.residual;
-        planned = formData.justificationPlanned || avgCoords.planned;
+      inherent = formData.justificationInerent || avgCoords.inherent;
+      residual = formData.justificationResidual || avgCoords.residual;
+      planned = formData.justificationPlanned || avgCoords.planned;
     }
 
     // 4. GRAVAÇÃO FORÇADA (Side-Effect intencional dentro do Memo para garantir persistência imediata)
     if (cacheKey && (inherent || residual || planned)) {
-        const newData = JSON.stringify({ inherent, residual, planned });
-        // Só grava se mudou para evitar loop infinito
-        if (localStorage.getItem(cacheKey) !== newData) {
-            localStorage.setItem(cacheKey, newData);
-        }
+      const newData = JSON.stringify({ inherent, residual, planned });
+      // Só grava se mudou para evitar loop infinito
+      if (localStorage.getItem(cacheKey) !== newData) {
+        localStorage.setItem(cacheKey, newData);
+      }
     }
 
     return { inherent, residual, planned };
@@ -1631,14 +1793,14 @@ const finalCoords = useMemo(() => {
           {/* --- INSERÇÃO DO NOVO COMPONENTE --- */}
           {isFinalizada && (
             <Grid item xs={12} sx={{ mb: 2 }}>
-               <ResultadosAvaliacao
-                  heatmapData={heatmapDataAv}
-                  nivel={nivelAv}
-                  inherentCoords={finalCoords.inherent}
-                  residualCoords={finalCoords.residual}
-                  plannedCoords={finalCoords.planned}
-               />
-               <Divider sx={{ my: 3 }} />
+              <ResultadosAvaliacao
+                heatmapData={heatmapDataAv}
+                nivel={nivelAv}
+                inherentCoords={finalCoords.inherent}
+                residualCoords={finalCoords.residual}
+                plannedCoords={finalCoords.planned}
+              />
+              <Divider sx={{ my: 3 }} />
             </Grid>
           )}
           {/* --- FIM DA INSERÇÃO --- */}

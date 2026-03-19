@@ -990,11 +990,29 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
   const theme = useTheme();
   const idUser = localStorage.getItem("id_user");
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const { acoesJudiciais: lists, isLoading } = useGetEmpresa(
+const { acoesJudiciais: lists, isLoading } = useGetEmpresa(
     formData,
     normativaDados,
   );
-  const processosTotal = lists ? lists.length : 0;
+
+  // NOVO BLOCO: Filtra duplicados priorizando o statusQuiz maior (ex: 3)
+  const uniqueLists = useMemo(() => {
+    if (!lists || !lists.length) return [];
+    
+    const map = new Map();
+    lists.forEach((item) => {
+      const current = map.get(item.idRespondent);
+      // Se não existe no map ou se o item atual tem um status maior, nós o salvamos
+      if (!current || Number(item.statusQuiz) > Number(current.statusQuiz)) {
+        map.set(item.idRespondent, item);
+      }
+    });
+    
+    return Array.from(map.values());
+  }, [lists]);
+
+  // Altere a contagem total para usar a nova lista deduplicada
+  const processosTotal = uniqueLists ? uniqueLists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -1003,8 +1021,8 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
   const [selectedAcionista, setSelectedAcionista] = useState(null);
 
   useEffect(() => {
-    if (!isLoading && Array.isArray(lists)) {
-      const filtered = lists.filter(
+    if (!isLoading && Array.isArray(uniqueLists)) { // Substituir lists por uniqueLists
+      const filtered = uniqueLists.filter(
         (item) =>
           (item.coordinateInerent && item.coordinateInerent.trim() !== "") ||
           (item.coordinatePlanned && item.coordinatePlanned.trim() !== "") ||
@@ -1012,7 +1030,7 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
       );
       onFilledQuestionarios?.(filtered);
     }
-  }, [lists, isLoading, onFilledQuestionarios]);
+  }, [uniqueLists, isLoading, onFilledQuestionarios]); // Substituir na dependência também
 
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
@@ -1193,10 +1211,10 @@ const ListagemAcionistas = ({ normativaDados, onFilledQuestionarios }) => {
         </div>
       ) : (
         <Box my={4}>
-          {lists && (
+          {uniqueLists && (
             <ReactTable
               {...{
-                data: lists,
+                data: uniqueLists, // Aqui nós injetamos a lista limpa
                 columns,
                 processosTotal,
                 onFormDataChange: handleFormDataChange,

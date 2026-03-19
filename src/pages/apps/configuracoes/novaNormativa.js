@@ -1,2007 +1,913 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-import * as React from "react";
 import {
-  Button,
-  Box,
-  TextField,
-  Switch,
-  Typography,
-  Autocomplete,
-  Grid,
-  Stack,
-  Checkbox,
-  InputLabel,
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Alert,
+  Autocomplete,
+  Box,
+  Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Grid,
+  InputLabel,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { useState, useEffect, useMemo } from "react";
-import LoadingOverlay from "./LoadingOverlay";
-import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
+import ptBR from "date-fns/locale/pt-BR";
+import { API_URL } from "config";
 import { useToken } from "../../../api/TokenContext";
+import useAuth from "../../../hooks/useAuth";
+import LoadingOverlay from "./LoadingOverlay";
 import DrawerEmpresa from "./novaEmpresaDrawerNormativos";
 import DrawerDepartamento from "./novoDepartamentoDrawerNormativas";
 import DrawerProcesso from "./novoProcessoDrawerNormativa";
 import FileUploader from "./FileUploader";
 import DrawerPlanos from "./novoPlanoDrawerNormativa";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ListagemTrecho from "./listaTrecho";
 
-// ==============================|| LAYOUTS - COLUMNS ||============================== //
+const FILE_CONTAINER_FOLDER = 6;
+
+const STATUS = {
+  ELABORACAO: 1,
+  EM_APROVACAO: 2,
+  VERSAO_FINAL: 3,
+  REVOGADO: 4,
+  EM_ALTERACAO: 5,
+};
+
+const STATUS_OPTIONS = [
+  { id: STATUS.ELABORACAO, nome: "Elaboração" },
+  { id: STATUS.EM_APROVACAO, nome: "Em aprovação" },
+  { id: STATUS.VERSAO_FINAL, nome: "Versão final" },
+  { id: STATUS.REVOGADO, nome: "Revogado" },
+  { id: STATUS.EM_ALTERACAO, nome: "Em alteração" },
+];
+
+const REVISION_STATUS_OPTIONS = [
+  { id: 1, nome: "Revisada" },
+  { id: 2, nome: "Próxima da revisão" },
+  { id: 3, nome: "Em atraso" },
+];
+
+const FREQUENCY_OPTIONS = [
+  { id: 1, nome: "Semestral" },
+  { id: 2, nome: "Anual" },
+  { id: 3, nome: "Bienal" },
+];
+
+const RISK_OPTIONS = [
+  { id: 1, nome: "Alto" },
+  { id: 2, nome: "Médio" },
+  { id: 3, nome: "Baixo" },
+  { id: "na", nome: "Não aplicável" },
+];
+
+const INITIAL_FORM_DATA = {
+  idNormative: "",
+  code: "",
+  name: "",
+  ambiente: "",
+  responsavel: "",
+  revisor: "",
+  statusNorma: "",
+  ativo: true,
+  tipoNorma: "",
+  regulador: "",
+  riscoNorma: null,
+  periodicidadeRevisao: "",
+  statuRevisao: "",
+  normaOrigem: [],
+  normaDestino: [],
+  empresa: [],
+  departamento: [],
+  processo: [],
+  planoAcao: [],
+  aprovador: [],
+  dataCadastro: new Date(),
+  dataPublicacao: null,
+  vigenciaInicial: null,
+  ultimaRevisao: null,
+  dataRevogacao: null,
+  motivoRevogacao: "",
+  description: "",
+  note: "",
+  descriptionReviewer: "",
+  files: [],
+};
+
+const INITIAL_DRAFT_COMMENTS = {
+  description: "",
+  note: "",
+  descriptionReviewer: "",
+};
+
+const INITIAL_FIELD_ERROR_MESSAGES = {
+  code: "",
+};
+
+function normalizeText(value) {
+  return (value || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function toDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toIso(value) {
+  const date = toDate(value);
+  return date ? date.toISOString() : null;
+}
+
+function getEntityId(item) {
+  return (
+    item?.id ||
+    item?.idNormative ||
+    item?.idDepartment ||
+    item?.idProcess ||
+    item?.idCompany ||
+    item?.idCollaborator ||
+    item?.idNormativeType ||
+    item?.idRegulatory ||
+    item?.idActionPlan ||
+    item?.idEnvironment ||
+    item?.idReviewer ||
+    item?.idReviwer ||
+    item?.idResponsible
+  );
+}
+
+function mapOption(item) {
+  return {
+    id: getEntityId(item),
+    nome: item?.nome || item?.name || item?.description || "",
+    ...item,
+  };
+}
+
+function toIdArray(value, fallback = []) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return fallback;
+}
+
+function resolveRiskValue(value) {
+  const numericValue = Number(value);
+  return [1, 2, 3].includes(numericValue) ? numericValue : null;
+}
+
+function appendCommentHistory(currentValue, newValue, userName) {
+  const trimmedValue = (newValue || "").trim();
+  if (!trimmedValue) return currentValue || "";
+
+  const entry = `[${userName}]: ${trimmedValue} - ${new Date().toLocaleString(
+    "pt-BR",
+  )}`;
+
+  return currentValue ? `${currentValue}\n\n${entry}` : entry;
+}
+
+function calculateRevisionFields(lastRevision, frequencyRevision) {
+  const revisionDate = toDate(lastRevision);
+  const normalizedFrequency = Number(frequencyRevision);
+  const daysByFrequency = { 1: 180, 2: 360, 3: 720 };
+  const revisionDays = daysByFrequency[normalizedFrequency];
+
+  if (!revisionDate || !revisionDays) {
+    return {
+      limitDate: null,
+      days: "",
+      status: "",
+    };
+  }
+
+  const limitDate = new Date(revisionDate);
+  limitDate.setDate(limitDate.getDate() + revisionDays);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  limitDate.setHours(0, 0, 0, 0);
+
+  const diffMs = limitDate.getTime() - today.getTime();
+  const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (days < 0) {
+    return { limitDate, days, status: 3 };
+  }
+
+  if (days <= 30) {
+    return { limitDate, days, status: 2 };
+  }
+
+  return { limitDate, days, status: 1 };
+}
+
+function extractApiNotifications(error) {
+  return Array.isArray(error?.response?.data?.notifications)
+    ? error.response.data.notifications
+    : [];
+}
+
+function getApiNotificationMessages(error) {
+  const messages = extractApiNotifications(error)
+    .map((notification) => notification?.message?.trim())
+    .filter(Boolean);
+
+  if (messages.length > 0) {
+    return messages;
+  }
+
+  const fallbackMessage = error?.response?.data?.message?.trim();
+  return fallbackMessage ? [fallbackMessage] : [];
+}
+
+function resolveNotificationField(notification) {
+  const normalizedCode = normalizeText(notification?.code);
+  const normalizedMessage = normalizeText(notification?.message);
+
+  if (normalizedCode === "code" || normalizedMessage.includes("codigo")) {
+    return "code";
+  }
+
+  return "";
+}
+
+function extractFileList(source) {
+  if (!source) return [];
+
+  if (Array.isArray(source.files)) {
+    return source.files;
+  }
+
+  if (Array.isArray(source.normativeDocuments)) {
+    return source.normativeDocuments
+      .map((document) => ({
+        name: document.name || document.description || "Documento",
+        path: document.file,
+      }))
+      .filter((document) => document.path);
+  }
+
+  return [];
+}
+
+function extractFilePaths(files) {
+  return (files || [])
+    .map((file) => {
+      if (typeof file === "string") return file;
+      if (file?.path) return file.path;
+      if (file?.file) return file.file;
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function mapNormativeToForm(record) {
+  if (!record) return { ...INITIAL_FORM_DATA };
+
+  return {
+    idNormative: record.idNormative || record.id || "",
+    code: record.code || "",
+    name: record.name || "",
+    ambiente:
+      record.idEnvironment ||
+      record.environment?.idEnvironment ||
+      record.environment?.id ||
+      "",
+    responsavel:
+      record.idResponsible ||
+      record.responsible?.idCollaborator ||
+      record.responsible?.id ||
+      "",
+    revisor:
+      record.idReviwer ||
+      record.idReviewer ||
+      record.reviwer?.idCollaborator ||
+      record.reviwer?.id ||
+      "",
+    statusNorma: record.normativeStatus || "",
+    ativo: typeof record.active === "boolean" ? record.active : true,
+    tipoNorma:
+      record.idNormativeType || record.normativeType?.idNormativeType || "",
+    regulador: record.idRegulatory || record.regulatory?.idRegulatory || "",
+    riscoNorma: resolveRiskValue(record.normativeRisk),
+    periodicidadeRevisao: record.frequencyRevision || "",
+    statuRevisao: record.normativeRevisionStatus || "",
+    normaOrigem: Array.isArray(record.idOrigins)
+      ? record.idOrigins.filter(Boolean)
+      : toIdArray(
+          record.normativeOrigins?.map(
+            (origin) =>
+              origin.idNormativeOrigin || origin.idNormative || origin.id,
+          ),
+        ),
+    normaDestino: Array.isArray(record.idDestinies)
+      ? record.idDestinies.filter(Boolean)
+      : toIdArray(
+          record.normativeDestinies?.map(
+            (destiny) =>
+              destiny.idNormativeDestiny || destiny.idNormative || destiny.id,
+          ),
+        ),
+    empresa: Array.isArray(record.idCompanies)
+      ? record.idCompanies.filter(Boolean)
+      : toIdArray(
+          record.normativeCompanies?.map(
+            (company) => company.idCompany || company.company?.idCompany,
+          ),
+        ),
+    departamento: Array.isArray(record.idDepartments)
+      ? record.idDepartments.filter(Boolean)
+      : toIdArray(
+          record.normativeDepartments?.map(
+            (department) =>
+              department.idDepartment || department.department?.idDepartment,
+          ),
+        ),
+    processo: Array.isArray(record.idProcesses)
+      ? record.idProcesses.filter(Boolean)
+      : Array.isArray(record.idProcess)
+        ? record.idProcess.filter(Boolean)
+        : toIdArray(
+            record.normativeProcess?.map(
+              (process) => process.idProcess || process.process?.idProcess,
+            ),
+          ),
+    planoAcao: Array.isArray(record.idActionPlans)
+      ? record.idActionPlans.filter(Boolean)
+      : toIdArray(
+          record.normativeActionPlans?.map(
+            (plan) => plan.idActionPlan || plan.actionPlan?.idActionPlan,
+          ),
+        ),
+    aprovador: Array.isArray(record.idApprovers)
+      ? record.idApprovers.filter(Boolean)
+      : toIdArray(
+          record.normativeApprovers?.map(
+            (approver) =>
+              approver.idApprover || approver.approver?.idCollaborator,
+          ),
+        ),
+    dataCadastro: toDate(record.registerDate) || new Date(),
+    dataPublicacao: toDate(record.publishDate),
+    vigenciaInicial: toDate(record.initialVigency),
+    ultimaRevisao: toDate(record.lastRevision),
+    dataRevogacao: toDate(record.revocationDate),
+    motivoRevogacao: record.revocationReason || "",
+    description: record.description || "",
+    note: record.note || "",
+    descriptionReviewer: record.descriptionReviewer || record.conclusion || "",
+    files: extractFileList(record),
+  };
+}
+
+function getEnvironmentKind(environmentId, environments) {
+  const environment = environments.find(
+    (item) => String(item.id) === String(environmentId),
+  );
+
+  const normalizedName = normalizeText(environment?.nome || environment?.name);
+
+  if (normalizedName.includes("extern")) return "external";
+  if (normalizedName.includes("intern")) return "internal";
+  return "";
+}
+
+function buildSelectedValues(ids, options) {
+  return ids.map(
+    (id) =>
+      options.find((option) => String(option.id) === String(id)) || {
+        id,
+        nome: String(id),
+      },
+  );
+}
+
+function CommentCard({
+  title,
+  placeholder,
+  draftValue,
+  historyValue,
+  onDraftChange,
+  onSave,
+  disabled,
+  loading,
+}) {
+  return (
+    <Stack
+      spacing={2}
+      sx={{
+        backgroundColor: "#f9f9f9",
+        padding: 3,
+        borderRadius: 2,
+        border: "1px solid #eee",
+      }}
+    >
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <InputLabel sx={{ m: 0, fontWeight: "bold" }}>{title}</InputLabel>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={onSave}
+          disabled={disabled || loading || !draftValue.trim()}
+          sx={{ fontWeight: 600, textTransform: "none" }}
+        >
+          Salvar comentário
+        </Button>
+      </Stack>
+
+      <TextField
+        fullWidth
+        multiline
+        rows={3}
+        value={draftValue}
+        onChange={(event) => onDraftChange(event.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        sx={{ backgroundColor: "#fff" }}
+      />
+
+      {historyValue ? (
+        <>
+          <InputLabel sx={{ fontWeight: "bold", mt: 1 }}>
+            Histórico de comentários
+          </InputLabel>
+          <TextField
+            fullWidth
+            multiline
+            minRows={3}
+            maxRows={8}
+            value={historyValue}
+            InputProps={{ readOnly: true }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                backgroundColor: "#f0f7ff",
+              },
+              "& .MuiInputBase-input": {
+                color: "#0d0d0d !important",
+                WebkitTextFillColor: "#0d0d0d !important",
+              },
+            }}
+          />
+        </>
+      ) : null}
+    </Stack>
+  );
+}
+
 function ColumnsLayouts() {
   const { token } = useToken();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { dadosApi } = location.state || {};
-  const idNormativoAtual = dadosApi?.idNormative;
-  const [normaDestinos, setNormaDestino] = useState([]);
-  const [empresas, setEmpresa] = useState([]);
-  const [reload, setReload] = useState(false);
-  const [normaOrigens, setNormaOrigem] = useState([]);
-  const [hasStartedByTester, setHasStartedByTester] = useState(false);
-  const [planosAcoes, setPlanoAcao] = useState([]);
-  const [departamentos, setDepartamentos] = useState([]);
-  const [processos, setProcessos] = useState([]);
-  // ... seus outros estados
-  const [descricao, setDescricao] = useState(""); // Mantém o histórico vindo do banco
-  const [novoComentario, setNovoComentario] = useState(""); // Novo estado para o input atual
-  // ...
-  const [conclusaoRevisao, setConclusaoRevisao] = useState("");
+  const idNormativeFromRoute = dadosApi?.idNormative || "";
   const idUser = localStorage.getItem("id_user");
-  const userName = localStorage.getItem("username");
-  const [motivoRevogacao, setMotivoRevogacao] = useState("");
-  const [diasDaRevisao, setDiasDaRevisao] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [nome, setNome] = useState("");
-  const [responsaveis, setResponsavel] = useState([]);
-  const [aprovadores, setAprovador] = useState([]);
-  // logo após seus useState existentes:
-  const [tempRevDate, setTempRevDate] = useState(null);
-  const [confirmRevogOpen, setConfirmRevogOpen] = useState(false);
-  const [showJustificativaField, setShowJustificativaField] = useState(false);
+  const userName = localStorage.getItem("username") || "Usuário";
 
-  const [ativo, setAtivo] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [requisicao, setRequisicao] = useState("Criar");
-  const [mensagemFeedback, setMensagemFeedback] = useState("cadastrada");
-  const [normativaDados, setNormativaDados] = useState(null);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [statusNormas] = useState([
-    { id: 1, nome: "Elaboração" },
-    { id: 2, nome: "Em aprovação" },
-    { id: 3, nome: "Versão Final" },
-    { id: 4, nome: "Em aprovação" },
-    { id: 6, nome: "Revogado" },
-  ]);
-  const [deletedFiles, setDeletedFiles] = useState([]);
-  const [ambientes] = useState([
-    { id: 1, nome: "Interno" },
-    { id: 2, nome: "Externo" },
-  ]);
+  const [ambientes, setAmbientes] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
+  const [normaOrigens, setNormaOrigens] = useState([]);
+  const [normaDestinos, setNormaDestinos] = useState([]);
+  const [planosAcoes, setPlanosAcoes] = useState([]);
+  const [processos, setProcessos] = useState([]);
+  const [responsaveis, setResponsaveis] = useState([]);
+  const [aprovadores, setAprovadores] = useState([]);
   const [reguladores, setReguladores] = useState([]);
   const [tipoNormas, setTipoNormas] = useState([]);
-  const [riscoNormas] = useState([
-    { id: 1, nome: "Alto" },
-    { id: 2, nome: "Médio" },
-    { id: 3, nome: "Baixo" },
-    { id: 4, nome: "Não aplicado" },
-  ]);
-  const [statusRevisao] = useState([
-    { id: 1, nome: "Revisada" },
-    { id: 2, nome: "Próxima da revisão" },
-    { id: 3, nome: "Em atraso" },
-  ]);
-  const [periodicidadeRevisoes] = useState([
-    { id: 1, nome: "Semestral" },
-    { id: 2, nome: "Anual" },
-    { id: 3, nome: "Bienal" },
-  ]);
-  window.hasChanges = hasChanges;
-  window.setHasChanges = setHasChanges;
 
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  const [draftComments, setDraftComments] = useState(INITIAL_DRAFT_COMMENTS);
+  const [normativaDados, setNormativaDados] = useState(null);
+  const [deletedFiles, setDeletedFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [fieldErrorMessages, setFieldErrorMessages] = useState(
+    INITIAL_FIELD_ERROR_MESSAGES,
+  );
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [confirmRevisorOpen, setConfirmRevisorOpen] = useState(false);
+  const [confirmRevogOpen, setConfirmRevogOpen] = useState(false);
   const [tempResponsavelId, setTempResponsavelId] = useState(null);
-
-  const [formData, setFormData] = useState({
-    statusNorma: "",
-    tipoNorma: "",
-    riscoNorma: "",
-    statuRevisao: "",
-    periodicidadeRevisao: "",
-    empresaInferior: [],
-    normaDestino: [],
-    empresa: [],
-    controle: [],
-    kri: [],
-    impacto: [],
-    plano: [],
-    causa: [],
-    ameaca: [],
-    normativa: [],
-    planoAcao: [],
-    files: [],
-    departamento: [],
-    regulador: "",
-    processo: [],
-    normaOrigem: [],
-    conta: [],
-    responsavel: "",
-    revisor: "",
-    aprovador: [],
-    dataPublicacao: null,
-    dataCadastro: new Date(),
-    vigenciaInicial: null,
-    ultimaRevisao: null,
-    dataLimiteRevisao: null,
-    dataRevogacao: null,
+  const [tempRevDate, setTempRevDate] = useState(null);
+  const [showJustificativaField, setShowJustificativaField] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [formValidation, setFormValidation] = useState({
+    code: true,
+    name: true,
+    ambiente: true,
+    revisor: true,
+    responsavel: true,
+    statusNorma: true,
+    ultimaRevisao: true,
   });
 
-  const fetchData = async (url, setState) => {
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  const requisicao = formData.idNormative ? "Editar" : "Criar";
+  const feedbackLabel = requisicao === "Criar" ? "cadastrada" : "editada";
 
-      // Transformando os dados para alterar idRisk, idLedgerAccount e idProcess -> id, e name -> nome
-      const transformedData = response.data.map((item) => ({
-        id:
-          item.idRisk ||
-          item.idLedgerAccount ||
-          item.idProcess ||
-          item.id_responsible ||
-          item.idCategory ||
-          item.idRisk ||
-          item.idFramework ||
-          item.idTreatment ||
-          item.idStrategicGuideline ||
-          item.idFactor ||
-          item.idIncident ||
-          item.idCause ||
-          item.idImpact ||
-          item.idNormative ||
-          item.idActionPlan ||
-          item.idCompany ||
-          item.idDepartment ||
-          item.idCollaborator ||
-          item.idNormativeType ||
-          item.idKri ||
-          item.idRegulatory ||
-          item.idControl ||
-          item.idThreat,
-        nome: item.name,
-        ...item, // Mantém os outros campos intactos
+  useEffect(() => {
+    window.hasChanges = hasChanges;
+    return () => {
+      window.hasChanges = false;
+    };
+  }, [hasChanges]);
+
+  const withDirty = (updater) => {
+    setHasChanges(true);
+    setFormData((previous) =>
+      typeof updater === "function"
+        ? updater(previous)
+        : { ...previous, ...updater },
+    );
+  };
+
+  const clearFieldError = (field) => {
+    setFieldErrorMessages((previous) =>
+      previous[field]
+        ? { ...previous, [field]: INITIAL_FIELD_ERROR_MESSAGES[field] || "" }
+        : previous,
+    );
+
+    setFormValidation((previous) =>
+      previous[field] ? previous : { ...previous, [field]: true },
+    );
+  };
+
+  const applyApiValidationFeedback = (error) => {
+    const notifications = extractApiNotifications(error);
+
+    if (notifications.length === 0) return;
+
+    const validationUpdates = {};
+    const messageUpdates = {};
+
+    notifications.forEach((notification) => {
+      const field = resolveNotificationField(notification);
+      if (!field) return;
+
+      validationUpdates[field] = false;
+      messageUpdates[field] = notification.message || "";
+    });
+
+    if (Object.keys(validationUpdates).length > 0) {
+      setFormValidation((previous) => ({
+        ...previous,
+        ...validationUpdates,
       }));
-
-      setState(transformedData);
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/departments`,
-      setDepartamentos,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives/types`,
-      setTipoNormas,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives/regulatories`,
-      setReguladores,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
-      setNormaOrigem,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/normatives`,
-      setNormaDestino,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/companies`,
-      setEmpresa,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/processes`,
-      setProcessos,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/action-plans`,
-      setPlanoAcao,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
-      setResponsavel,
-    );
-    fetchData(
-      `https://api.egrc.homologacao.com.br/api/v1/collaborators/responsibles`,
-      setAprovador,
-    );
-    window.scrollTo(0, 0);
-  }, []);
-
-  // Em caso de edição
-  useEffect(() => {
-    if (dadosApi) {
-      setLoading(true);
-      const fetchEmpresaDados = async () => {
-        try {
-          const response = await fetch(
-            `https://api.egrc.homologacao.com.br/api/v1/normatives/${dadosApi.idNormative}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-
-          if (!response.ok) {
-            throw new Error("Erro ao buscar os dados da normativa");
-          }
-
-          const data = await response.json();
-          setReload(false);
-
-          setRequisicao("Editar");
-          setMensagemFeedback("editada");
-          setNormativaDados(data);
-
-          // Atualiza os campos simples
-          setNome(data.name);
-          setCodigo(data.code);
-          setDescricao(data.description);
-          // Observe que o endpoint retorna "conclusion" e não "treatmentDescription"
-          setConclusaoRevisao(data.conclusion);
-          setDiasDaRevisao(data.daysRevision);
-          setMotivoRevogacao(data.revocationReason);
-          setAtivo(data.active);
-
-          const risco = data.normativeRisk;
-          let periodicidade = null;
-          if (risco === 1 || risco === 2 || risco === 3) {
-            periodicidade = risco;
-          }
-
-          // Atualiza os campos de data e outros campos do formData
-          setFormData((prev) => ({
-            ...prev,
-            dataCadastro: data.registerDate
-              ? new Date(data.registerDate)
-              : prev.dataCadastro,
-            dataPublicacao: data.publishDate
-              ? new Date(data.publishDate)
-              : null,
-            vigenciaInicial: data.initialVigency
-              ? new Date(data.initialVigency)
-              : null,
-            ultimaRevisao: data.lastRevision
-              ? new Date(data.lastRevision)
-              : null,
-            dataLimiteRevisao: data.limitDateRevision
-              ? new Date(data.limitDateRevision)
-              : null,
-            dataRevogacao: data.revocationDate
-              ? new Date(data.revocationDate)
-              : null,
-            periodicidadeRevisao: periodicidade,
-            statusNorma: data.normativeStatus ?? 1,
-            riscoNorma: risco,
-            tipoNorma: data.idNormativeType,
-            regulador: data.idRegulatory,
-            responsavel: data.idResponsible,
-            revisor: data.idReviewer,
-            normaOrigem: data.idOrigins,
-            normaDestino: data.idDestinies,
-            planoAcao: data.idActionPlans,
-            aprovador: data.idApprovers,
-            empresa: data.idCompanies,
-            departamento: data.idDepartments,
-            processo: data.idProcess,
-            files: data.files || [],
-          }));
-        } catch (err) {
-          console.error("Erro ao buscar os dados:", err.message);
-          setLoading(false);
-        } finally {
-          setLoading(false);
-          console.log("Requisição finalizada");
-        }
-      };
-
-      if (dadosApi.idNormative) {
-        fetchEmpresaDados();
-      }
-    }
-  }, [dadosApi, token, reload]);
-
-  // Função para gerar a string final do comentário
-  const getDescricaoAtualizada = () => {
-    // Se não escreveu nada novo, retorna a descrição original
-    if (!novoComentario || !novoComentario.trim()) {
-      return descricao;
     }
 
-    const dataHora = new Date().toLocaleString("pt-BR");
-    // Formato: [Usuario]: Comentario - dd/mm/aaaa hh:mm:ss
-    const entradaLog = `[${userName}]: ${novoComentario} - ${dataHora}`;
-
-    // Se já existia descrição, pula duas linhas e adiciona a nova. Se não, é a primeira.
-    return descricao ? `${descricao}\n\n${entradaLog}` : entradaLog;
-  };
-
-  // 1) Sempre que mudar últimaRevisão ou periodicidade, recalcula diasDaRevisao e dataLimiteRevisao
-  useEffect(() => {
-    const { ultimaRevisao, periodicidadeRevisao } = formData;
-
-    if (!ultimaRevisao || !periodicidadeRevisao) {
-      setFormData((prev) => ({
-        ...prev,
-        dataLimiteRevisao: null,
+    if (Object.keys(messageUpdates).length > 0) {
+      setFieldErrorMessages((previous) => ({
+        ...previous,
+        ...messageUpdates,
       }));
-      setDiasDaRevisao("");
-      return;
-    }
-
-    // Mapeia periodicidade para dias
-    const diasMap = { 1: 180, 2: 360, 3: 720 };
-    const periodoEmDias = diasMap[periodicidadeRevisao] || 0;
-
-    // Calcula data limite
-    const limite = new Date(ultimaRevisao);
-    limite.setDate(limite.getDate() + periodoEmDias);
-    setFormData((prev) => ({
-      ...prev,
-      dataLimiteRevisao: limite,
-    }));
-
-    // Calcula diferença em dias
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    limite.setHours(0, 0, 0, 0);
-    const diffMs = limite.getTime() - hoje.getTime();
-    const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    setDiasDaRevisao(diffDias);
-  }, [formData.ultimaRevisao, formData.periodicidadeRevisao]);
-
-  // Guarda a data nova e abre o diálogo
-  const handleOpenConfirmRevog = (newDate) => {
-    if (newDate) {
-      setTempRevDate(newDate);
-      // Verifica se a justificativa está vazia para decidir se mostra o campo
-      setShowJustificativaField(
-        !motivoRevogacao || motivoRevogacao.trim() === "",
-      );
-      setConfirmRevogOpen(true);
-    } else {
-      // Se usuário limpar a data, só atualiza sem confirmação
-      setFormData((prev) => ({ ...prev, dataRevogacao: null }));
     }
   };
 
-  useEffect(() => {
-    // Só no modo Criar
-    if (requisicao !== "Criar") return;
+  const loadOptions = useCallback(async () => {
+    const endpoints = [
+      { url: `${API_URL}actives/environments`, setter: setAmbientes },
+      { url: `${API_URL}departments`, setter: setDepartamentos },
+      { url: `${API_URL}normatives/types`, setter: setTipoNormas },
+      { url: `${API_URL}normatives/regulatories`, setter: setReguladores },
+      { url: `${API_URL}normatives`, setter: setNormaOrigens },
+      { url: `${API_URL}normatives`, setter: setNormaDestinos },
+      { url: `${API_URL}companies`, setter: setEmpresas },
+      { url: `${API_URL}processes`, setter: setProcessos },
+      { url: `${API_URL}action-plans`, setter: setPlanosAcoes },
+      {
+        url: `${API_URL}collaborators/responsibles`,
+        setter: setResponsaveis,
+      },
+      {
+        url: `${API_URL}collaborators/responsibles`,
+        setter: setAprovadores,
+      },
+    ];
 
-    // Precisa ter id do usuário
-    if (!idUser) return;
+    await Promise.all(
+      endpoints.map(async ({ url, setter }) => {
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-    // Não sobrescreve se já tiver algo selecionado
-    if (formData.revisor) return;
+        setter((response.data || []).map(mapOption));
+      }),
+    );
+  }, [token]);
 
-    // Espera carregar as opções
-    if (!Array.isArray(responsaveis) || responsaveis.length === 0) return;
-
-    // Só seta se o usuário existir na lista de responsáveis
-    const exists = responsaveis.some((r) => String(r.id) === String(idUser));
-    if (!exists) return;
-
-    setFormData((prev) => ({
-      ...prev,
-      revisor: idUser,
-    }));
-  }, [requisicao, idUser, responsaveis, formData.revisor]);
-
-  // Função para salvar APENAS o comentário, ignorando outras alterações na tela
-  const handleSalvarComentarioRapido = async () => {
-    if (!novoComentario || !novoComentario.trim()) {
-      enqueueSnackbar("Escreva um comentário antes de salvar.", {
-        variant: "warning",
-      });
-      return;
-    }
+  const loadNormative = useCallback(async (idNormative) => {
+    if (!idNormative) return;
 
     setLoading(true);
+
     try {
-      // 1. Gera o texto final (Histórico + Novo Comentário)
-      const novaDescricaoCompleta = getDescricaoAtualizada();
-
-      // 2. Prepara o Payload usando 'normativaDados' (dados do banco)
-      // e NÃO o 'formData' (dados da tela), para não salvar alterações pendentes acidentalmente.
-      const payload = {
-        idNormative: normativaDados.idNormative,
-        code: normativaDados.code,
-        name: normativaDados.name,
-        description: novaDescricaoCompleta, // <-- Único campo alterado
-        registerDate: normativaDados.registerDate,
-        publishDate: normativaDados.publishDate,
-        initialVigency: normativaDados.initialVigency,
-        lastRevision: normativaDados.lastRevision,
-        idReviewer: normativaDados.idReviewer,
-        conclusion: normativaDados.conclusion,
-        frequencyRevision: normativaDados.frequencyRevision,
-        limitDateRevision: normativaDados.limitDateRevision,
-        // daysRevision: normativaDados.daysRevision,
-        revocationDate: normativaDados.revocationDate,
-        revocationReason: normativaDados.revocationReason,
-        normativeStatus: normativaDados.normativeStatus,
-        normativeRisk: normativaDados.normativeRisk,
-        active: normativaDados.active,
-        idNormativeType: normativaDados.idNormativeType,
-        idRegulatory: normativaDados.idRegulatory,
-        idResponsible: normativaDados.idResponsible,
-        idOrigins: normativaDados.idOrigins,
-        idDestinies: normativaDados.idDestinies,
-        idActionPlans: normativaDados.idActionPlans,
-        idApprovers: normativaDados.idApprovers,
-        idCompanies: normativaDados.idCompanies,
-        idDepartments: normativaDados.idDepartments,
-        idProcesses: normativaDados.idProcess, // Note: confirme se a API retorna idProcess ou idProcesses no GET
-
-        // Tratamento simples de arquivos para manter o que já existe sem upload novo
-        files: normativaDados.files
-          ? normativaDados.files.map((f) =>
-              typeof f === "string" ? f : f.path,
-            )
-          : [],
-      };
-
-      const url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-
-      const response = await fetch(url, {
-        method: "PUT",
+      const response = await axios.get(`${API_URL}normatives/${idNormative}`, {
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error("Erro ao salvar comentário.");
-      }
-
-      // 3. Atualiza os estados locais para refletir o salvamento
-      setDescricao(novaDescricaoCompleta); // Atualiza o histórico visual
-      setNovoComentario(""); // Limpa o campo de novo comentário
-
-      // Atualiza o objeto de referência para o novo estado do banco
-      setNormativaDados((prev) => ({
-        ...prev,
-        description: novaDescricaoCompleta,
-      }));
-
-      enqueueSnackbar("Comentário adicionado com sucesso!", {
-        variant: "success",
-      });
+      setNormativaDados(response.data);
+      setFormData(mapNormativeToForm(response.data));
+      setDraftComments(INITIAL_DRAFT_COMMENTS);
+      setDeletedFiles([]);
+      setHasChanges(false);
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Não foi possível salvar o comentário.", {
+      enqueueSnackbar("Não foi possível carregar a normativa.", {
         variant: "error",
       });
-      setLoading(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  // Usuário confirma a revogação
-  const handleConfirmRevog = async () => {
-    // Verifica se a justificativa está preenchida
-    if (!motivoRevogacao || motivoRevogacao.trim() === "") {
-      enqueueSnackbar("A justificativa de revogação é obrigatória!", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!formData.aprovador) {
-      setFormValidation((prev) => ({ ...prev, aprovador: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Exclusão de arquivos, se necessário
-      if (deletedFiles.length > 0) {
-        const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: {
-            containerFolder: 4,
-            files: deletedFilesPayload,
-          },
-        });
-      }
-
-      const newFiles = formData.files.filter((file) => file instanceof File);
-      const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File),
-      );
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 4);
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-        uploadFilesResult = uploadResponse.data;
-      }
-
-      // Combinar arquivos existentes com os novos enviados
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-        method = "PUT";
-        payload = {
-          idNormative: normativaDados.idNormative,
-          code: codigo,
-          name: nome,
-          description: getDescricaoAtualizada(),
-          registerDate: formData.dataCadastro,
-          //normativeInternType: formData.tipoNorma,
-          publishDate: formData.dataPublicacao,
-          initialVigency: formData.vigenciaInicial,
-          lastRevision: formData.ultimaRevisao,
-          idReviewer: formData.revisor || null,
-          conclusion: conclusaoRevisao,
-          frequencyRevision:
-            formData.periodicidadeRevisao === undefined ||
-            formData.periodicidadeRevisao === null ||
-            (typeof formData.periodicidadeRevisao === "string" &&
-              formData.periodicidadeRevisao.trim() === "")
-              ? null
-              : formData.periodicidadeRevisao,
-          limitDateRevision: formData.dataLimiteRevisao,
-          daysRevision:
-            diasDaRevisao === undefined ||
-            diasDaRevisao === null ||
-            (typeof diasDaRevisao === "string" && diasDaRevisao.trim() === "")
-              ? null
-              : typeof diasDaRevisao === "number"
-                ? String(diasDaRevisao)
-                : String(diasDaRevisao).trim(),
-
-          revocationDate: tempRevDate,
-          revocationReason: `[${userName}]: ${motivoRevogacao}`, // <-- ALTERADO PARA INCLUIR O NOME DO USUÁRIO
-          normativeStatus: 6,
-          normativeRisk:
-            formData.riscoNorma === undefined ||
-            formData.riscoNorma === null ||
-            (typeof formData.riscoNorma === "string" &&
-              formData.riscoNorma.trim() === "")
-              ? null
-              : formData.riscoNorma,
-          active: ativo,
-          idNormativeType:
-            formData.tipoNorma === undefined ||
-            formData.tipoNorma === null ||
-            (typeof formData.tipoNorma === "string" &&
-              formData.tipoNorma.trim() === "") ||
-            (Array.isArray(formData.tipoNorma) &&
-              formData.tipoNorma.length === 0)
-              ? null
-              : formData.tipoNorma,
-          idRegulatory:
-            formData.regulador === undefined ||
-            formData.regulador === null ||
-            (typeof formData.regulador === "string" &&
-              formData.regulador.trim() === "") ||
-            (Array.isArray(formData.regulador) &&
-              formData.regulador.length === 0)
-              ? null
-              : formData.regulador,
-          idResponsible:
-            formData.responsavel === undefined ||
-            formData.responsavel === null ||
-            (typeof formData.responsavel === "string" &&
-              formData.responsavel.trim() === "") ||
-            (Array.isArray(formData.responsavel) &&
-              formData.responsavel.length === 0)
-              ? null
-              : formData.responsavel,
-          idOrigins: formData.normaOrigem,
-          idDestinies: formData.normaDestino,
-          idActionPlans: formData.planoAcao,
-          idApprovers: formData.aprovador,
-          idCompanies: formData.empresa,
-          idDepartments: formData.departamento,
-          idProcesses: formData.processo,
-          files: finalFilesPayload,
-        };
-      }
-
-      // Envia a requisição para a API
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // Se a resposta for 204 (sem conteúdo) ou tiver um content-type JSON, tratamos de forma adequada
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
-
-      // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({
-        ...prev,
-        dataRevogacao: tempRevDate,
-        statusNorma: 6,
-      }));
-      setNormativaDados((prev) => ({ ...prev, normativeStatus: 6 }));
-      handleCancelRevog();
-      setHasStartedByTester(true);
-      enqueueSnackbar("Norma revogada com sucesso!", {
-        variant: "success",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setReload(true);
-      window.scrollTo(0, 0);
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível revogar essa norma.", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setLoading(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Usuário cancela a alteração
-  const handleCancelRevog = () => {
-    setConfirmRevogOpen(false);
-    setTempRevDate(null);
-    setShowJustificativaField(false);
-  };
-
-  // 2) Sempre que diasDaRevisao mudar, atribui statuRevisao
   useEffect(() => {
-    // Se está vazio, limpa
-    if (diasDaRevisao === "") {
-      setFormData((prev) => ({
-        ...prev,
-        statuRevisao: "",
-      }));
-      return;
-    }
+    if (!token) return;
 
-    let novoStatus;
-    if (diasDaRevisao > 30) {
-      novoStatus = 1; // Revisada
-    } else if (diasDaRevisao >= 0) {
-      novoStatus = 2; // Próxima da revisão
-    } else {
-      novoStatus = 3; // Em atraso
-    }
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        await loadOptions();
 
-    setFormData((prev) => ({
-      ...prev,
-      statuRevisao: novoStatus,
-    }));
-  }, [diasDaRevisao]);
+        if (idNormativeFromRoute) {
+          await loadNormative(idNormativeFromRoute);
+        }
 
-  const handleCompanyCreated = (newEmpresa) => {
-    setEmpresa((prevEmpresas) => [...prevEmpresas, newEmpresa]);
-    setFormData((prev) => ({
-      ...prev,
-      empresa: [...prev.empresa, newEmpresa.id],
-    }));
-  };
-
-  // Função chamada quando o usuário seleciona um Responsável no Autocomplete
-  const handleResponsavelChange = (event, newValue) => {
-    const newId = newValue ? newValue.id : "";
-
-    // Atualiza o Responsável imediatamente
-    setFormData((prev) => ({
-      ...prev,
-      responsavel: newId,
-    }));
-
-    // Se houve uma seleção válida, pergunta se quer replicar para o Revisor
-    if (newId) {
-      setTempResponsavelId(newId);
-      setConfirmRevisorOpen(true);
-    }
-  };
-
-  // Usuário clicou em "Sim"
-  const handleConfirmReplication = () => {
-    setFormData((prev) => ({
-      ...prev,
-      revisor: tempResponsavelId, // Copia o ID para o campo revisor
-    }));
-    setConfirmRevisorOpen(false);
-    setTempResponsavelId(null);
-  };
-
-  // Usuário clicou em "Não"
-  const handleDenyReplication = () => {
-    setConfirmRevisorOpen(false);
-    setTempResponsavelId(null);
-    // Não faz nada com o campo revisor, ele permanece como estava
-  };
-
-  const handleDepartmentCreated = (newDepartamento) => {
-    setDepartamentos((prevDepartamentos) => [
-      ...prevDepartamentos,
-      newDepartamento,
-    ]);
-    setFormData((prev) => ({
-      ...prev,
-      departamento: [...prev.departamento, newDepartamento.id],
-    }));
-  };
-
-  const handleProcessCreated = (newProcesso) => {
-    setProcessos((prevProcessos) => [...prevProcessos, newProcesso]);
-    setFormData((prev) => ({
-      ...prev,
-      processo: [...prev.processo, newProcesso.id],
-    }));
-  };
-
-  const tratarMudancaInputGeral = (field, value) => {
-    if (field === "regulador") {
-      // Guarde apenas o ID do item selecionado
-      setFormData({ ...formData, [field]: value ? value.id : null });
-    } else {
-      // Para outros campos
-      setFormData({ ...formData, [field]: value });
-    }
-  };
-
-  const handleSelectAll = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.normaOrigem.length === normaOrigens.length) {
-        // Deselect all
-        setFormData({ ...formData, normaOrigem: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          normaOrigem: normaOrigens.map((normaOrigem) => normaOrigem.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "normaOrigem",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const handlePlanCreated = (newPlan) => {
-    setPlanoAcao((prevPlans) => [...prevPlans, newPlan]);
-    setFormData((prev) => ({
-      ...prev,
-      planoAcao: [...prev.planoAcao, newPlan.id],
-    }));
-  };
-
-  const handleSelectAllDepartamentos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.departamento.length === departamentos.length) {
-        // Deselect all
-        setFormData({ ...formData, departamento: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          departamento: departamentos.map((departamento) => departamento.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "departamento",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const handleSelectAllPlanoAcao = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.planoAcao.length === planosAcoes.length) {
-        // Deselect all
-        setFormData({ ...formData, planoAcao: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          planoAcao: planosAcoes.map((planoAcao) => planoAcao.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "planoAcao",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const handleSelectAllAprovadores = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.aprovador.length === aprovadores.length) {
-        // Deselect all
-        setFormData({ ...formData, aprovador: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          aprovador: aprovadores.map((aprovador) => aprovador.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "aprovador",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const handleSelectAllNormaDestinos = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.normaDestino.length === normaDestinos.length) {
-        // Deselect all
-        setFormData({ ...formData, normaDestino: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          normaDestino: normaDestinos.map((normaDestino) => normaDestino.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "normaDestino",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const handleSelectAllEmpresas = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.empresa.length === empresas.length) {
-        // Deselect all
-        setFormData({ ...formData, empresa: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          empresa: empresas.map((empresa) => empresa.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "empresa",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const handleSelectAll2 = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.processo.length === processos.length) {
-        // Deselect all
-        setFormData({ ...formData, processo: [] });
-      } else {
-        // Select all
-        setFormData({
-          ...formData,
-          processo: processos.map((processo) => processo.id),
-        });
-      }
-    } else {
-      tratarMudancaInputGeral(
-        "processo",
-        newValue.map((item) => item.id),
-      );
-    }
-  };
-
-  const voltarParaCadastroMenu = () => {
-    navigate(-1);
-    window.scrollTo(0, 0);
-    // navigate('/apps/processos/configuracoes-menu', { state: { tab: 'Órgão' } });
-  };
-
-  const continuarEdicao = () => {
-    setRequisicao("Editar");
-    setSuccessDialogOpen(false);
-  };
-
-  // Função para voltar para a listagem
-  const voltarParaListagem = () => {
-    setSuccessDialogOpen(false);
-    voltarParaCadastroMenu();
-  };
-
-  const [formValidation, setFormValidation] = useState({
-    codigo: true,
-    nome: true,
-    revisor: true,
-  });
-
-  const allSelected =
-    formData.normaOrigem.length === normaOrigens.length &&
-    normaOrigens.length > 0;
-  const allSelected2 =
-    formData.processo.length === processos.length && processos.length > 0;
-  const allSelectedDiretrizes =
-    formData.normaDestino.length === normaDestinos.length &&
-    normaDestinos.length > 0;
-  const allSelectedEmpresas =
-    formData.empresa.length === empresas.length && empresas.length > 0;
-  const allSelectedPlanoAcao =
-    formData.planoAcao.length === planosAcoes.length && planosAcoes.length > 0;
-  const allSelectedAprovadores =
-    formData.aprovador.length === aprovadores.length && aprovadores.length > 0;
-
-  const allSelectedDepartamentos =
-    formData.departamento.length === departamentos.length &&
-    departamentos.length > 0;
-
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-
-  const actionButtons = useMemo(() => {
-    if (requisicao !== "Editar") return [];
-
-    const currentStatus = formData.statusNorma;
-    const tester =
-      String(formData.responsavel) === String(idUser) ||
-      String(formData.revisor) === String(idUser);
-    const approver =
-      Array.isArray(formData.aprovador) &&
-      formData.aprovador.some((id) => String(id) === String(idUser));
-    const externo = formData.ambiente === 2;
-
-    let buttons = [];
-
-    // Se for externo, anula o workflow e exibe apenas REVOGAR
-    if (externo) {
-      if (currentStatus !== 6) buttons.push("REVOGAR");
-      return buttons;
-    }
-
-    if (currentStatus === 1 && tester) {
-      buttons.push("ELABORADA"); // Servirá para ALTERADA também
-    } else if (currentStatus === 4 && approver) {
-      buttons.push("APROVADA", "RETORNAR");
-    } else if (currentStatus === 3 && tester) {
-      buttons.push("ALTERAR", "REVOGAR");
-    }
-
-    return buttons;
-  }, [
-    idUser,
-    formData.statusNorma,
-    formData.responsavel,
-    formData.aprovador,
-    formData.ambiente,
-    requisicao,
-  ]);
-
-  const handleStart = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!formData.aprovador) {
-      setFormValidation((prev) => ({ ...prev, aprovador: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Exclusão de arquivos, se necessário
-      if (deletedFiles.length > 0) {
-        const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: {
-            containerFolder: 4,
-            files: deletedFilesPayload,
-          },
-        });
-      }
-
-      const newFiles = formData.files.filter((file) => file instanceof File);
-      const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File),
-      );
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 4);
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-        uploadFilesResult = uploadResponse.data;
-      }
-
-      // Combinar arquivos existentes com os novos enviados
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      const statusToSend =
-        formData.statusNorma === 1
-          ? Array.isArray(formData.aprovador) && formData.aprovador.length > 0
-            ? 4
-            : 3
-          : formData.statusNorma;
-
-      if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-        method = "PUT";
-        payload = {
-          idNormative: normativaDados.idNormative,
-          code: codigo,
-          name: nome,
-          description: getDescricaoAtualizada(),
-          idReviewer: formData.revisor || null,
-          registerDate: formData.dataCadastro,
-          //normativeInternType: formData.tipoNorma,
-          publishDate: formData.dataPublicacao,
-          initialVigency: formData.vigenciaInicial,
-          lastRevision:
-            statusToSend === 3
-              ? new Date().toISOString()
-              : formData.ultimaRevisao,
-          conclusion: conclusaoRevisao,
-          frequencyRevision:
-            formData.periodicidadeRevisao === undefined ||
-            formData.periodicidadeRevisao === null ||
-            (typeof formData.periodicidadeRevisao === "string" &&
-              formData.periodicidadeRevisao.trim() === "")
-              ? null
-              : formData.periodicidadeRevisao,
-          limitDateRevision: formData.dataLimiteRevisao,
-          daysRevision:
-            diasDaRevisao === undefined ||
-            diasDaRevisao === null ||
-            (typeof diasDaRevisao === "string" && diasDaRevisao.trim() === "")
-              ? null
-              : typeof diasDaRevisao === "number"
-                ? String(diasDaRevisao)
-                : String(diasDaRevisao).trim(),
-
-          revocationDate: formData.dataRevogacao,
-          revocationReason: `[${userName}]: ${motivoRevogacao}`, // <-- ALTERADO PARA INCLUIR O NOME DO USUÁRIO
-          normativeStatus: statusToSend,
-          normativeRisk:
-            formData.riscoNorma === undefined ||
-            formData.riscoNorma === null ||
-            (typeof formData.riscoNorma === "string" &&
-              formData.riscoNorma.trim() === "")
-              ? null
-              : formData.riscoNorma,
-          active: ativo,
-          idNormativeType:
-            formData.tipoNorma === undefined ||
-            formData.tipoNorma === null ||
-            (typeof formData.tipoNorma === "string" &&
-              formData.tipoNorma.trim() === "") ||
-            (Array.isArray(formData.tipoNorma) &&
-              formData.tipoNorma.length === 0)
-              ? null
-              : formData.tipoNorma,
-          idRegulatory:
-            formData.regulador === undefined ||
-            formData.regulador === null ||
-            (typeof formData.regulador === "string" &&
-              formData.regulador.trim() === "") ||
-            (Array.isArray(formData.regulador) &&
-              formData.regulador.length === 0)
-              ? null
-              : formData.regulador,
-          idResponsible:
-            formData.responsavel === undefined ||
-            formData.responsavel === null ||
-            (typeof formData.responsavel === "string" &&
-              formData.responsavel.trim() === "") ||
-            (Array.isArray(formData.responsavel) &&
-              formData.responsavel.length === 0)
-              ? null
-              : formData.responsavel,
-          idOrigins: formData.normaOrigem,
-          idDestinies: formData.normaDestino,
-          idActionPlans: formData.planoAcao,
-          idApprovers: formData.aprovador,
-          idCompanies: formData.empresa,
-          idDepartments: formData.departamento,
-          idProcesses: formData.processo,
-          files: finalFilesPayload,
-        };
-      }
-
-      // Envia a requisição para a API
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // Se a resposta for 204 (sem conteúdo) ou tiver um content-type JSON, tratamos de forma adequada
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
-
-      // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, statusNorma: statusToSend }));
-      setNormativaDados((prev) => ({ ...prev, normativeStatus: statusToSend }));
-      setHasStartedByTester(true);
-      enqueueSnackbar("Status alterado com sucesso!", {
-        variant: "success",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setReload(true);
-      window.scrollTo(0, 0);
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setLoading(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAlterar = async () => {
-    try {
-      setLoading(true);
-      const url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-      const payload = {
-        idNormative: normativaDados.idNormative,
-        code: codigo,
-        name: nome,
-        description: getDescricaoAtualizada(),
-        idReviewer: formData.revisor || null,
-        registerDate: formData.dataCadastro,
-        publishDate: formData.dataPublicacao,
-        initialVigency: formData.vigenciaInicial,
-        lastRevision: formData.ultimaRevisao,
-        conclusion: conclusaoRevisao,
-        frequencyRevision: formData.periodicidadeRevisao || null,
-        limitDateRevision: formData.dataLimiteRevisao,
-        daysRevision: diasDaRevisao ? String(diasDaRevisao).trim() : null,
-        revocationDate: formData.dataRevogacao,
-        revocationReason: motivoRevogacao
-          ? `[${userName}]: ${motivoRevogacao}`
-          : null,
-        normativeStatus: 1, // Volta para Em Alteração / Elaboração
-        normativeRisk: formData.riscoNorma || null,
-        active: ativo,
-        idNormativeType: formData.tipoNorma || null,
-        idRegulatory: formData.regulador || null,
-        idResponsible: formData.responsavel || null,
-        idOrigins: formData.normaOrigem,
-        idDestinies: formData.normaDestino,
-        idActionPlans: formData.planoAcao,
-        idApprovers: formData.aprovador,
-        idCompanies: formData.empresa,
-        idDepartments: formData.departamento,
-        idProcesses: formData.processo,
-        files: formData.files.map((file) =>
-          typeof file === "string" ? file : file.path || file,
-        ),
-      };
-
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error("Erro ao alterar norma.");
-
-      setFormData((prev) => ({ ...prev, statusNorma: 1 }));
-      setNormativaDados((prev) => ({ ...prev, normativeStatus: 1 }));
-      enqueueSnackbar("Normativa colocada em alteração!", {
-        variant: "success",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      window.scrollTo(0, 0);
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível alterar a normativa", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTesteRealizado = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!formData.aprovador) {
-      setFormValidation((prev) => ({ ...prev, aprovador: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Exclusão de arquivos, se necessário
-      if (deletedFiles.length > 0) {
-        const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: {
-            containerFolder: 4,
-            files: deletedFilesPayload,
-          },
-        });
-      }
-
-      const newFiles = formData.files.filter((file) => file instanceof File);
-      const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File),
-      );
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 4);
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-        uploadFilesResult = uploadResponse.data;
-      }
-
-      // Combinar arquivos existentes com os novos enviados
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-        method = "PUT";
-        payload = {
-          idNormative: normativaDados.idNormative,
-          code: codigo,
-          name: nome,
-          description: getDescricaoAtualizada(),
-          idReviewer: formData.revisor || null,
-          registerDate: formData.dataCadastro,
-          //normativeInternType: formData.tipoNorma,
-          publishDate: formData.dataPublicacao,
-          initialVigency: formData.vigenciaInicial,
-          lastRevision: formData.ultimaRevisao,
-          conclusion: conclusaoRevisao,
-          frequencyRevision:
-            formData.periodicidadeRevisao === undefined ||
-            formData.periodicidadeRevisao === null ||
-            (typeof formData.periodicidadeRevisao === "string" &&
-              formData.periodicidadeRevisao.trim() === "")
-              ? null
-              : formData.periodicidadeRevisao,
-          limitDateRevision: formData.dataLimiteRevisao,
-          daysRevision:
-            diasDaRevisao === undefined ||
-            diasDaRevisao === null ||
-            (typeof diasDaRevisao === "string" && diasDaRevisao.trim() === "")
-              ? null
-              : typeof diasDaRevisao === "number"
-                ? String(diasDaRevisao)
-                : String(diasDaRevisao).trim(),
-
-          revocationDate: formData.dataRevogacao,
-          revocationReason: `[${userName}]: ${motivoRevogacao}`, // <-- ALTERADO PARA INCLUIR O NOME DO USUÁRIO
-          normativeStatus: formData.statusNorma,
-          normativeRisk:
-            formData.riscoNorma === undefined ||
-            formData.riscoNorma === null ||
-            (typeof formData.riscoNorma === "string" &&
-              formData.riscoNorma.trim() === "")
-              ? null
-              : formData.riscoNorma,
-          active: ativo,
-          idNormativeType:
-            formData.tipoNorma === undefined ||
-            formData.tipoNorma === null ||
-            (typeof formData.tipoNorma === "string" &&
-              formData.tipoNorma.trim() === "") ||
-            (Array.isArray(formData.tipoNorma) &&
-              formData.tipoNorma.length === 0)
-              ? null
-              : formData.tipoNorma,
-          idRegulatory:
-            formData.regulador === undefined ||
-            formData.regulador === null ||
-            (typeof formData.regulador === "string" &&
-              formData.regulador.trim() === "") ||
-            (Array.isArray(formData.regulador) &&
-              formData.regulador.length === 0)
-              ? null
-              : formData.regulador,
-          idResponsible:
-            formData.responsavel === undefined ||
-            formData.responsavel === null ||
-            (typeof formData.responsavel === "string" &&
-              formData.responsavel.trim() === "") ||
-            (Array.isArray(formData.responsavel) &&
-              formData.responsavel.length === 0)
-              ? null
-              : formData.responsavel,
-          idOrigins: formData.normaOrigem,
-          idDestinies: formData.normaDestino,
-          idActionPlans: formData.planoAcao,
-          idApprovers: formData.aprovador,
-          idCompanies: formData.empresa,
-          idDepartments: formData.departamento,
-          idProcesses: formData.processo,
-          files: finalFilesPayload,
-        };
-      }
-
-      // Envia a requisição para a API
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // Se a resposta for 204 (sem conteúdo) ou tiver um content-type JSON, tratamos de forma adequada
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
-
-      // No caso de criação, podemos esperar que a resposta traga os dados (por exemplo, idTestPhase)
-      if (requisicao === "Criar" && data.data && data.data.idTestPhase) {
-        setNormativaDados(data.data);
-        setSuccessDialogOpen(true);
-      } else {
-        // Para edição, mesmo sem retorno, redirecionamos para a listagem
-        setFormData((prev) => ({ ...prev, status: 3 }));
-        setNormativaDados((prev) => ({ ...prev, normativeStatus: 3 }));
-        setHasStartedByTester(true);
-        enqueueSnackbar("Teste realizado com sucesso!", {
-          variant: "success",
-          anchorOrigin: { vertical: "top", horizontal: "right" },
-        });
         window.scrollTo(0, 0);
-      }
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setLoading(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConcluirTeste = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!formData.aprovador) {
-      setFormValidation((prev) => ({ ...prev, aprovador: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Exclusão de arquivos, se necessário
-      if (deletedFiles.length > 0) {
-        const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: {
-            containerFolder: 4,
-            files: deletedFilesPayload,
-          },
+      } catch (error) {
+        console.error(error);
+        enqueueSnackbar("Não foi possível carregar os catálogos da tela.", {
+          variant: "error",
         });
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const newFiles = formData.files.filter((file) => file instanceof File);
-      const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File),
+    loadInitialData();
+  }, [idNormativeFromRoute, loadNormative, loadOptions, token]);
+
+  useEffect(() => {
+    if (requisicao !== "Criar") return;
+    if (formData.revisor) return;
+    if (!idUser || responsaveis.length === 0) return;
+
+    const userIsResponsible = responsaveis.some(
+      (responsavel) => String(responsavel.id) === String(idUser),
+    );
+
+    if (!userIsResponsible) return;
+
+    setFormData((previous) => ({
+      ...previous,
+      revisor: idUser,
+    }));
+  }, [requisicao, formData.revisor, idUser, responsaveis]);
+
+  const ambienteKind = useMemo(
+    () => getEnvironmentKind(formData.ambiente, ambientes),
+    [ambientes, formData.ambiente],
+  );
+
+  const isExterno = ambienteKind === "external";
+  const isInterno = ambienteKind === "internal";
+  const currentStatus = formData.statusNorma || "";
+  const currentNormativeId = formData.idNormative || idNormativeFromRoute;
+  const currentUserEmail = normalizeText(user?.email);
+
+  const revisionData = useMemo(
+    () =>
+      calculateRevisionFields(
+        formData.ultimaRevisao,
+        formData.periodicidadeRevisao,
+      ),
+    [formData.ultimaRevisao, formData.periodicidadeRevisao],
+  );
+
+  const currentNotification = useMemo(() => {
+    if (!currentUserEmail) return null;
+    if (!Array.isArray(normativaDados?.normativeNotifications)) return null;
+
+    return (
+      normativaDados.normativeNotifications.find(
+        (notification) =>
+          normalizeText(notification.email) === currentUserEmail,
+      ) || null
+    );
+  }, [currentUserEmail, normativaDados?.normativeNotifications]);
+
+  const isApproverListed =
+    Array.isArray(formData.aprovador) &&
+    formData.aprovador.some((id) => String(id) === String(idUser));
+
+  const isApprovalPendingForCurrentUser = Boolean(
+    currentNotification?.emailSent &&
+      !currentNotification?.emailReplied &&
+      !currentNotification?.returned,
+  );
+
+  const isFutureApprover = Boolean(
+    currentStatus === STATUS.EM_APROVACAO &&
+      currentNotification &&
+      !currentNotification.emailSent &&
+      !currentNotification.emailReplied &&
+      !currentNotification.approved &&
+      !currentNotification.returned,
+  );
+
+  const canReplyApproval =
+    currentStatus === STATUS.EM_APROVACAO &&
+    (isApprovalPendingForCurrentUser ||
+      (!currentNotification && isApproverListed));
+
+  const isResponsible = String(formData.responsavel) === String(idUser);
+  const isReviewer = String(formData.revisor) === String(idUser);
+  const reviewWorkflowEnabled =
+    currentStatus === STATUS.VERSAO_FINAL &&
+    resolveRiskValue(formData.riscoNorma) !== null;
+
+  const canEditGeneralFields =
+    requisicao === "Criar" ||
+    ((currentStatus === STATUS.ELABORACAO ||
+      currentStatus === STATUS.EM_ALTERACAO) &&
+      isResponsible &&
+      !isFutureApprover);
+
+  const canEditReviewFields = requisicao === "Editar" && isReviewer;
+  const canEditLastRevision =
+    canEditReviewFields &&
+    currentStatus === STATUS.VERSAO_FINAL &&
+    !formData.ultimaRevisao;
+  const canEditRisk = canEditGeneralFields || canEditReviewFields;
+  const canEditElaborationComment =
+    (requisicao === "Criar" && !isExterno) ||
+    ((currentStatus === STATUS.ELABORACAO ||
+      currentStatus === STATUS.EM_ALTERACAO) &&
+      isResponsible);
+  const canEditApprovalComment = canReplyApproval;
+  const canRevogar =
+    requisicao === "Editar" &&
+    currentStatus !== STATUS.REVOGADO &&
+    isResponsible;
+  const canAlterar =
+    requisicao === "Editar" &&
+    currentStatus === STATUS.VERSAO_FINAL &&
+    isResponsible &&
+    !isExterno;
+  const canSendElaborated =
+    requisicao === "Editar" &&
+    currentStatus === STATUS.ELABORACAO &&
+    isResponsible;
+  const canSendAltered =
+    requisicao === "Editar" &&
+    currentStatus === STATUS.EM_ALTERACAO &&
+    isResponsible;
+  const canMarkReviewed = reviewWorkflowEnabled && canEditReviewFields;
+
+  const showElaborationComment =
+    !(isExterno && currentStatus === STATUS.VERSAO_FINAL) ||
+    Boolean(formData.description);
+  const showApprovalComment =
+    requisicao === "Editar" &&
+    (formData.aprovador.length > 0 || Boolean(formData.note));
+
+  const visibleStatusOptions = useMemo(() => {
+    if (requisicao !== "Criar") {
+      return STATUS_OPTIONS;
+    }
+
+    if (isExterno) {
+      return STATUS_OPTIONS.filter(
+        (statusOption) => statusOption.id === STATUS.VERSAO_FINAL,
       );
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 4);
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-        uploadFilesResult = uploadResponse.data;
-      }
-
-      // Combinar arquivos existentes com os novos enviados
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-        method = "PUT";
-        payload = {
-          idNormative: normativaDados.idNormative,
-          code: codigo,
-          name: nome,
-          description: getDescricaoAtualizada(),
-          idReviewer: formData.revisor || null,
-          registerDate: formData.dataCadastro,
-          //normativeInternType: formData.tipoNorma,
-          publishDate: formData.dataPublicacao,
-          initialVigency: formData.vigenciaInicial,
-          lastRevision: new Date().toISOString(),
-          conclusion: conclusaoRevisao,
-          frequencyRevision:
-            formData.periodicidadeRevisao === undefined ||
-            formData.periodicidadeRevisao === null ||
-            (typeof formData.periodicidadeRevisao === "string" &&
-              formData.periodicidadeRevisao.trim() === "")
-              ? null
-              : formData.periodicidadeRevisao,
-          limitDateRevision: formData.dataLimiteRevisao,
-          daysRevision:
-            diasDaRevisao === undefined ||
-            diasDaRevisao === null ||
-            (typeof diasDaRevisao === "string" && diasDaRevisao.trim() === "")
-              ? null
-              : typeof diasDaRevisao === "number"
-                ? String(diasDaRevisao)
-                : String(diasDaRevisao).trim(),
-
-          revocationDate: formData.dataRevogacao,
-          revocationReason: `[${userName}]: ${motivoRevogacao}`, // <-- ALTERADO PARA INCLUIR O NOME DO USUÁRIO
-          normativeStatus: 3,
-          normativeRisk:
-            formData.riscoNorma === undefined ||
-            formData.riscoNorma === null ||
-            (typeof formData.riscoNorma === "string" &&
-              formData.riscoNorma.trim() === "")
-              ? null
-              : formData.riscoNorma,
-          active: ativo,
-          idNormativeType:
-            formData.tipoNorma === undefined ||
-            formData.tipoNorma === null ||
-            (typeof formData.tipoNorma === "string" &&
-              formData.tipoNorma.trim() === "") ||
-            (Array.isArray(formData.tipoNorma) &&
-              formData.tipoNorma.length === 0)
-              ? null
-              : formData.tipoNorma,
-          idRegulatory:
-            formData.regulador === undefined ||
-            formData.regulador === null ||
-            (typeof formData.regulador === "string" &&
-              formData.regulador.trim() === "") ||
-            (Array.isArray(formData.regulador) &&
-              formData.regulador.length === 0)
-              ? null
-              : formData.regulador,
-          idResponsible:
-            formData.responsavel === undefined ||
-            formData.responsavel === null ||
-            (typeof formData.responsavel === "string" &&
-              formData.responsavel.trim() === "") ||
-            (Array.isArray(formData.responsavel) &&
-              formData.responsavel.length === 0)
-              ? null
-              : formData.responsavel,
-          idOrigins: formData.normaOrigem,
-          idDestinies: formData.normaDestino,
-          idActionPlans: formData.planoAcao,
-          idApprovers: formData.aprovador,
-          idCompanies: formData.empresa,
-          idDepartments: formData.departamento,
-          idProcesses: formData.processo,
-          files: finalFilesPayload,
-        };
-      }
-
-      // Envia a requisição para a API
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // Se a resposta for 204 (sem conteúdo) ou tiver um content-type JSON, tratamos de forma adequada
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
-
-      // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, statusNorma: 3 }));
-      setNormativaDados((prev) => ({ ...prev, normativeStatus: 3 }));
-      setHasStartedByTester(true);
-      enqueueSnackbar("Normativa aprovada com sucesso!", {
-        variant: "success",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setReload(true);
-      window.scrollTo(0, 0);
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setLoading(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRetornar = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    // Validação dos campos obrigatórios
-    const missingFields = [];
-    if (!formData.aprovador) {
-      setFormValidation((prev) => ({ ...prev, aprovador: false }));
-      missingFields.push("Processo");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      return;
     }
 
-    try {
-      setLoading(true);
-
-      // Exclusão de arquivos, se necessário
-      if (deletedFiles.length > 0) {
-        const deletedFilesPayload = deletedFiles.map((file) => file.name);
-        await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          data: {
-            containerFolder: 4,
-            files: deletedFilesPayload,
-          },
-        });
-      }
-
-      const newFiles = formData.files.filter((file) => file instanceof File);
-      const existingFiles = formData.files.filter(
-        (file) => !(file instanceof File),
+    if (isInterno) {
+      return STATUS_OPTIONS.filter(
+        (statusOption) =>
+          statusOption.id === STATUS.ELABORACAO ||
+          statusOption.id === STATUS.VERSAO_FINAL,
       );
-
-      let uploadFilesResult = { files: [] };
-      if (newFiles.length > 0) {
-        const formDataUpload = new FormData();
-        formDataUpload.append("ContainerFolder", 4);
-        formDataUpload.append(
-          "IdContainer",
-          requisicao === "Editar" ? normativaDados?.idTestPhase : "",
-        );
-        newFiles.forEach((file) => {
-          formDataUpload.append("Files", file, file.name);
-        });
-
-        const uploadResponse = await axios.post(
-          "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
-          formDataUpload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          },
-        );
-        uploadFilesResult = uploadResponse.data;
-      }
-
-      // Combinar arquivos existentes com os novos enviados
-      const finalFiles = [...existingFiles, ...uploadFilesResult.files];
-      const finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file.path) return file.path;
-        return file;
-      });
-
-      if (requisicao === "Editar") {
-        url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-        method = "PUT";
-        payload = {
-          idNormative: normativaDados.idNormative,
-          code: codigo,
-          name: nome,
-          idReviewer: formData.revisor || null,
-          description: getDescricaoAtualizada(),
-          registerDate: formData.dataCadastro,
-          //normativeInternType: formData.tipoNorma,
-          publishDate: formData.dataPublicacao,
-          initialVigency: formData.vigenciaInicial,
-          lastRevision: formData.ultimaRevisao,
-          conclusion: conclusaoRevisao,
-          frequencyRevision:
-            formData.periodicidadeRevisao === undefined ||
-            formData.periodicidadeRevisao === null ||
-            (typeof formData.periodicidadeRevisao === "string" &&
-              formData.periodicidadeRevisao.trim() === "")
-              ? null
-              : formData.periodicidadeRevisao,
-          limitDateRevision: formData.dataLimiteRevisao,
-          daysRevision:
-            diasDaRevisao === undefined ||
-            diasDaRevisao === null ||
-            (typeof diasDaRevisao === "string" && diasDaRevisao.trim() === "")
-              ? null
-              : typeof diasDaRevisao === "number"
-                ? String(diasDaRevisao)
-                : String(diasDaRevisao).trim(),
-
-          revocationDate: formData.dataRevogacao,
-          revocationReason: `[${userName}]: ${motivoRevogacao}`, // <-- ALTERADO PARA INCLUIR O NOME DO USUÁRIO
-          normativeStatus: 1,
-          normativeRisk:
-            formData.riscoNorma === undefined ||
-            formData.riscoNorma === null ||
-            (typeof formData.riscoNorma === "string" &&
-              formData.riscoNorma.trim() === "")
-              ? null
-              : formData.riscoNorma,
-          active: ativo,
-          idNormativeType:
-            formData.tipoNorma === undefined ||
-            formData.tipoNorma === null ||
-            (typeof formData.tipoNorma === "string" &&
-              formData.tipoNorma.trim() === "") ||
-            (Array.isArray(formData.tipoNorma) &&
-              formData.tipoNorma.length === 0)
-              ? null
-              : formData.tipoNorma,
-          idRegulatory:
-            formData.regulador === undefined ||
-            formData.regulador === null ||
-            (typeof formData.regulador === "string" &&
-              formData.regulador.trim() === "") ||
-            (Array.isArray(formData.regulador) &&
-              formData.regulador.length === 0)
-              ? null
-              : formData.regulador,
-          idResponsible:
-            formData.responsavel === undefined ||
-            formData.responsavel === null ||
-            (typeof formData.responsavel === "string" &&
-              formData.responsavel.trim() === "") ||
-            (Array.isArray(formData.responsavel) &&
-              formData.responsavel.length === 0)
-              ? null
-              : formData.responsavel,
-          idOrigins: formData.normaOrigem,
-          idDestinies: formData.normaDestino,
-          idActionPlans: formData.planoAcao,
-          idApprovers: formData.aprovador,
-          idCompanies: formData.empresa,
-          idDepartments: formData.departamento,
-          idProcesses: formData.processo,
-          files: finalFilesPayload,
-        };
-      }
-
-      // Envia a requisição para a API
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // Se a resposta for 204 (sem conteúdo) ou tiver um content-type JSON, tratamos de forma adequada
-      let data = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json();
-      }
-
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
-
-      // Para edição, mesmo sem retorno, redirecionamos para a listagem
-      setFormData((prev) => ({ ...prev, statusNorma: 1 }));
-      setNormativaDados((prev) => ({ ...prev, normativeStatus: 1 }));
-      setHasStartedByTester(true);
-      enqueueSnackbar("Normativa retornada com sucesso!", {
-        variant: "success",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setReload(true);
-      window.scrollTo(0, 0);
-    } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar essa normativa", {
-        variant: "error",
-        anchorOrigin: { vertical: "top", horizontal: "right" },
-      });
-      setLoading(false);
-    } finally {
-      setLoading(false);
     }
+
+    return STATUS_OPTIONS.filter(
+      (statusOption) =>
+        statusOption.id === STATUS.ELABORACAO ||
+        statusOption.id === STATUS.VERSAO_FINAL,
+    );
+  }, [isExterno, isInterno, requisicao]);
+
+  const selectedRiskOption =
+    RISK_OPTIONS.find((option) =>
+      option.id === "na"
+        ? resolveRiskValue(formData.riscoNorma) === null
+        : option.id === resolveRiskValue(formData.riscoNorma),
+    ) || null;
+
+  const buildUpdatePayload = (source, overrides = {}) => {
+    const base = {
+      ...INITIAL_FORM_DATA,
+      ...source,
+      ...overrides,
+    };
+
+    const normalizedRisk = resolveRiskValue(base.riscoNorma);
+    const normalizedStatus = Number(base.statusNorma) || null;
+    const shouldFillRevisionWorkflow =
+      normalizedStatus === STATUS.VERSAO_FINAL && normalizedRisk !== null;
+
+    const computedRevision = shouldFillRevisionWorkflow
+      ? calculateRevisionFields(base.ultimaRevisao, base.periodicidadeRevisao)
+      : { limitDate: null, days: "", status: "" };
+
+    return {
+      idNormative: base.idNormative,
+      code: base.code?.trim() || null,
+      name: base.name?.trim() || null,
+      description: base.description || null,
+      note: base.note || null,
+      registerDate: toIso(base.dataCadastro),
+      publishDate: toIso(base.dataPublicacao),
+      initialVigency: toIso(base.vigenciaInicial),
+      lastRevision: toIso(base.ultimaRevisao),
+      conclusion: base.descriptionReviewer || null,
+      frequencyRevision: shouldFillRevisionWorkflow
+        ? Number(base.periodicidadeRevisao) || null
+        : null,
+      limitDateRevision: shouldFillRevisionWorkflow
+        ? toIso(computedRevision.limitDate)
+        : null,
+      daysRevision:
+        shouldFillRevisionWorkflow && computedRevision.days !== ""
+          ? String(computedRevision.days)
+          : null,
+      revocationDate: toIso(base.dataRevogacao),
+      revocationReason: base.motivoRevogacao || null,
+      normativeStatus: normalizedStatus,
+      normativeRevisionStatus: shouldFillRevisionWorkflow
+        ? Number(base.statuRevisao) || computedRevision.status || null
+        : null,
+      normativeRisk: normalizedRisk,
+      descriptionReviewer: base.descriptionReviewer || null,
+      active: Boolean(base.ativo),
+      idNormativeType: base.tipoNorma || null,
+      idRegulatory: base.regulador || null,
+      idResponsible: base.responsavel || null,
+      idEnvironment: base.ambiente || null,
+      idReviwer: base.revisor || null,
+      idOrigins: base.normaOrigem,
+      idDestinies: base.normaDestino,
+      idActionPlans: base.planoAcao,
+      idApprovers: base.aprovador,
+      idCompanies: base.empresa,
+      idDepartments: base.departamento,
+      idProcesses: base.processo,
+      files: extractFilePaths(base.files),
+    };
   };
 
-  const tratarSubmit = async () => {
-    let url = "";
-    let method = "";
-    let payload = {};
-
-    const missingFields = [];
-    if (!nome.trim()) {
-      setFormValidation((prev) => ({ ...prev, nome: false }));
-      missingFields.push("Nome");
-    }
-    if (!codigo.trim()) {
-      setFormValidation((prev) => ({ ...prev, codigo: false }));
-      missingFields.push("Código");
-    }
-    if (!formData.revisor || String(formData.revisor).trim() === "") {
-      setFormValidation((prev) => ({ ...prev, revisor: false }));
-      missingFields.push("Revisor");
-    }
-    if (missingFields.length > 0) {
-      const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural =
-        missingFields.length > 1
-          ? "são obrigatórios e devem estar válidos!"
-          : "é obrigatório e deve estar válido!";
-      enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
-        variant: "error",
-      });
-      return; // Para a execução se a validação falhar
-    }
-
+  const uploadCurrentFiles = async (idNormative) => {
     if (deletedFiles.length > 0) {
-      const deletedFilesPayload = deletedFiles.map((file) => file.name);
+      const payload = deletedFiles
+        .map((file) => file?.name || file?.filename)
+        .filter(Boolean);
 
-      await axios.delete("https://api.egrc.homologacao.com.br/api/v1/files", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        data: {
-          containerFolder: 6,
-          files: deletedFilesPayload,
-        },
-      });
+      if (payload.length > 0) {
+        await axios.delete(`${API_URL}files`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          data: {
+            containerFolder: FILE_CONTAINER_FOLDER,
+            files: payload,
+          },
+        });
+      }
     }
 
     const newFiles = formData.files.filter((file) => file instanceof File);
@@ -2009,21 +915,22 @@ function ColumnsLayouts() {
       (file) => !(file instanceof File),
     );
 
-    let uploadFilesResult = { files: [] };
+    let uploadedFiles = [];
+
     if (newFiles.length > 0) {
       const formDataUpload = new FormData();
-      formDataUpload.append("ContainerFolder", 6);
+      formDataUpload.append("ContainerFolder", FILE_CONTAINER_FOLDER);
 
-      formDataUpload.append(
-        "IdContainer",
-        requisicao === "Editar" ? dadosApi?.idNormative : "",
-      );
+      if (idNormative) {
+        formDataUpload.append("IdContainer", idNormative);
+      }
+
       newFiles.forEach((file) => {
         formDataUpload.append("Files", file, file.name);
       });
 
       const uploadResponse = await axios.post(
-        "https://api.egrc.homologacao.com.br/api/v1/files/uploads",
+        `${API_URL}files/uploads`,
         formDataUpload,
         {
           headers: {
@@ -2032,288 +939,647 @@ function ColumnsLayouts() {
           },
         },
       );
-      uploadFilesResult = uploadResponse.data;
+
+      uploadedFiles = uploadResponse.data?.files || [];
     }
 
-    // Combina os arquivos já existentes com os novos enviados (retornados pelo endpoint)
-    const finalFiles = [...existingFiles, ...uploadFilesResult.files];
+    return [...existingFiles, ...uploadedFiles];
+  };
 
-    // Transforma cada item para que o payload contenha somente a URL (string)
-    const finalFilesPayload = finalFiles.map((file) => {
-      if (typeof file === "string") return file;
-      if (file.path) return file.path;
-      return file;
+  const applyDraftComments = (source, fields = Object.keys(draftComments)) => {
+    const nextSource = { ...source };
+
+    fields.forEach((field) => {
+      const draftValue = draftComments[field]?.trim();
+      if (!draftValue) return;
+
+      nextSource[field] = appendCommentHistory(
+        nextSource[field],
+        draftValue,
+        userName,
+      );
     });
 
-    // Verifica se é para criar ou atualizar
-    if (requisicao === "Criar") {
-      url = "https://api.egrc.homologacao.com.br/api/v1/normatives";
-      method = "POST";
-      payload = {
-        code: codigo,
-        name: nome,
-        idReviewer: formData.revisor || null,
-      };
-    } else if (requisicao === "Editar") {
-      url = `https://api.egrc.homologacao.com.br/api/v1/normatives`;
-      method = "PUT";
-      payload = {
-        idNormative: normativaDados.idNormative,
-        code: codigo,
-        name: nome,
-        description: getDescricaoAtualizada(),
-        registerDate: formData.dataCadastro,
-        //normativeInternType: formData.tipoNorma,
-        publishDate: formData.dataPublicacao,
-        initialVigency: formData.vigenciaInicial,
-        idReviwer: formData.revisor || null,
-        lastRevision: formData.ultimaRevisao,
-        conclusion: conclusaoRevisao,
-        frequencyRevision:
-          formData.periodicidadeRevisao === undefined ||
-          formData.periodicidadeRevisao === null ||
-          (typeof formData.periodicidadeRevisao === "string" &&
-            formData.periodicidadeRevisao.trim() === "")
-            ? null
-            : formData.periodicidadeRevisao,
-        limitDateRevision: formData.dataLimiteRevisao,
-        daysRevision:
-          diasDaRevisao === undefined ||
-          diasDaRevisao === null ||
-          (typeof diasDaRevisao === "string" && diasDaRevisao.trim() === "")
-            ? null
-            : typeof diasDaRevisao === "number"
-              ? String(diasDaRevisao)
-              : String(diasDaRevisao).trim(),
+    return nextSource;
+  };
 
-        revocationDate: formData.dataRevogacao,
-        revocationReason: motivoRevogacao,
-        normativeStatus: formData.statusNorma,
-        normativeRisk:
-          formData.riscoNorma === undefined ||
-          formData.riscoNorma === null ||
-          (typeof formData.riscoNorma === "string" &&
-            formData.riscoNorma.trim() === "")
-            ? null
-            : formData.riscoNorma,
-        active: ativo,
-        idNormativeType:
-          formData.tipoNorma === undefined ||
-          formData.tipoNorma === null ||
-          (typeof formData.tipoNorma === "string" &&
-            formData.tipoNorma.trim() === "") ||
-          (Array.isArray(formData.tipoNorma) && formData.tipoNorma.length === 0)
-            ? null
-            : formData.tipoNorma,
-        idRegulatory:
-          formData.regulador === undefined ||
-          formData.regulador === null ||
-          (typeof formData.regulador === "string" &&
-            formData.regulador.trim() === "") ||
-          (Array.isArray(formData.regulador) && formData.regulador.length === 0)
-            ? null
-            : formData.regulador,
-        idResponsible:
-          formData.responsavel === undefined ||
-          formData.responsavel === null ||
-          (typeof formData.responsavel === "string" &&
-            formData.responsavel.trim() === "") ||
-          (Array.isArray(formData.responsavel) &&
-            formData.responsavel.length === 0)
-            ? null
-            : formData.responsavel,
-        idOrigins: formData.normaOrigem,
-        idDestinies: formData.normaDestino,
-        idActionPlans: formData.planoAcao,
-        idApprovers: formData.aprovador,
-        idCompanies: formData.empresa,
-        idDepartments: formData.departamento,
-        idProcesses: formData.processo,
-        files: finalFilesPayload,
-      };
+  const clearDraftComments = (fields = Object.keys(draftComments)) => {
+    setDraftComments((previous) => {
+      const nextDrafts = { ...previous };
+      fields.forEach((field) => {
+        nextDrafts[field] = "";
+      });
+      return nextDrafts;
+    });
+  };
+
+  const validateBaseFields = ({ requireLastRevision = false } = {}) => {
+    const nextValidation = {
+      code: Boolean(formData.code.trim()),
+      name: Boolean(formData.name.trim()),
+      ambiente: Boolean(formData.ambiente),
+      revisor: Boolean(formData.revisor),
+      responsavel: Boolean(formData.responsavel),
+      statusNorma: Boolean(formData.statusNorma),
+      ultimaRevisao: !requireLastRevision || Boolean(formData.ultimaRevisao),
+    };
+
+    setFormValidation(nextValidation);
+
+    const missingLabels = [];
+
+    if (!nextValidation.name) missingLabels.push("Nome");
+    if (!nextValidation.code) missingLabels.push("Código");
+    if (!nextValidation.ambiente) missingLabels.push("Ambiente");
+    if (!nextValidation.revisor) missingLabels.push("Revisor");
+    if (!nextValidation.responsavel) missingLabels.push("Responsável");
+    if (!nextValidation.statusNorma) missingLabels.push("Status da norma");
+    if (!nextValidation.ultimaRevisao) missingLabels.push("Última revisão");
+
+    if (missingLabels.length > 0) {
+      enqueueSnackbar(
+        `Os campos ${missingLabels.join(", ")} são obrigatórios para continuar.`,
+        {
+          variant: "error",
+        },
+      );
+      return false;
     }
 
-    try {
-      setLoading(true);
+    return true;
+  };
 
-      // Primeira requisição (POST ou PUT inicial)
-      const response = await fetch(url, {
-        method,
+  const saveCommentField = async (field) => {
+    const draftValue = draftComments[field]?.trim();
+
+    if (!draftValue) {
+      enqueueSnackbar("Escreva um comentário antes de salvar.", {
+        variant: "warning",
+      });
+      return;
+    }
+
+    if (!normativaDados?.idNormative) {
+      enqueueSnackbar(
+        "O comentário rápido só pode ser salvo após a criação da normativa.",
+        {
+          variant: "warning",
+        },
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const baseSource = mapNormativeToForm(normativaDados);
+      const updatedValue = appendCommentHistory(
+        baseSource[field],
+        draftValue,
+        userName,
+      );
+
+      const payload = buildUpdatePayload(baseSource, {
+        [field]: updatedValue,
+      });
+
+      await axios.put(`${API_URL}normatives`, payload, {
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error("O Código informado já foi cadastrado.");
-      }
+      setNormativaDados((previous) => ({
+        ...previous,
+        [field]: updatedValue,
+        ...(field === "descriptionReviewer" ? { conclusion: updatedValue } : {}),
+      }));
 
-      let companyId;
-      if (requisicao === "Editar" && response.status === 204) {
-        companyId = normativaDados?.idNormative;
-        enqueueSnackbar(`Normativa ${mensagemFeedback} com sucesso!`, {
-          variant: "success",
-        });
-      } else {
-        const data = await response.json();
-        companyId = data.data.idNormative;
-        enqueueSnackbar(`Normativa ${mensagemFeedback} com sucesso!`, {
-          variant: "success",
-        });
-      }
+      setFormData((previous) => ({
+        ...previous,
+        [field]: updatedValue,
+      }));
 
-      if (requisicao === "Criar") {
-        setNormativaDados((prev) => ({ ...prev, idNormative: companyId }));
-        setSuccessDialogOpen(true);
-        navigate(location.pathname, {
-          replace: true,
-          state: { dadosApi: { idNormative: companyId } },
-        });
-      } else {
-        voltarParaCadastroMenu();
-      }
+      clearDraftComments([field]);
+
+      enqueueSnackbar("Comentário salvo com sucesso.", {
+        variant: "success",
+      });
     } catch (error) {
-      console.error(error.message);
-      enqueueSnackbar("Não foi possível cadastrar essa normativa.", {
+      console.error(error);
+      enqueueSnackbar("Não foi possível salvar o comentário.", {
         variant: "error",
       });
-      setLoading(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const isTester = idUser === formData.responsavel;
-  const isReviewer = !isTester && formData.aprovador.includes(idUser);
-  const status = normativaDados?.normativeStatus || formData.statusNorma;
-  const canEditListagem = true;
-  const creating = requisicao === "Criar";
-  const editing = !creating; // originalRequisicao === "Editar"
-  const started = hasStartedByTester;
+  const createNormative = async () => {
+    if (!validateBaseFields()) return;
 
-  const fieldPermissions = useMemo(() => {
-    // Se for criação, libera tudo
-    if (creating) {
-      return {
-        nomeFaseTeste: true,
-        status: true,
-        populacao: true,
-        tipoTeste: true,
-        amostra: true,
-        metodologia: true,
-        responsavel: true, // agora também liberado em "Criar"
-        revisores: true,
-        descricao: true,
-        dataInicioCobertura: true,
-        dataFimCobertura: true,
-        dataInicioTeste: true,
-        dataFimTeste: true,
-        dataConclusaoEfetiva: true,
-        conclusaoTeste: true,
-        descricaoTestador: true,
-        descricaoRevisor: true,
+    setLoading(true);
+
+    try {
+      const createPayload = {
+        code: formData.code.trim(),
+        name: formData.name.trim(),
+        idReviewer: formData.revisor || null,
+        idResponsible: formData.responsavel || null,
+        idEnvironment: formData.ambiente || null,
       };
+
+      const createResponse = await axios.post(
+        `${API_URL}normatives`,
+        createPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const createdId = createResponse.data?.data?.idNormative;
+
+      if (!createdId) {
+        throw new Error("A API não retornou o identificador da normativa.");
+      }
+
+      const sourceForUpdate = applyDraftComments(
+        {
+          ...formData,
+          idNormative: createdId,
+          statusNorma:
+            formData.statusNorma ||
+            (isExterno ? STATUS.VERSAO_FINAL : STATUS.ELABORACAO),
+        },
+        ["description"],
+      );
+
+      const payload = buildUpdatePayload(sourceForUpdate);
+
+      await axios.put(`${API_URL}normatives`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      clearDraftComments();
+      setFieldErrorMessages(INITIAL_FIELD_ERROR_MESSAGES);
+      setHasChanges(false);
+      setSuccessDialogOpen(true);
+
+      navigate(location.pathname, {
+        replace: true,
+        state: { dadosApi: { idNormative: createdId } },
+      });
+
+      await loadNormative(createdId);
+
+      enqueueSnackbar(`Normativa ${feedbackLabel} com sucesso!`, {
+        variant: "success",
+      });
+    } catch (error) {
+      console.error(error);
+      applyApiValidationFeedback(error);
+      const [apiMessage] = getApiNotificationMessages(error);
+      enqueueSnackbar(apiMessage || "Não foi possível cadastrar a normativa.", {
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateNormative = async ({
+    overrides = {},
+    commentFields = Object.keys(draftComments),
+    reloadAfter = true,
+    successMessage = "Normativa atualizada com sucesso!",
+  } = {}) => {
+    if (!currentNormativeId) return false;
+
+    const currentSource = applyDraftComments(
+      {
+        ...formData,
+        ...overrides,
+      },
+      commentFields,
+    );
+
+    setLoading(true);
+
+    try {
+      const syncedFiles = await uploadCurrentFiles(currentNormativeId);
+      const payload = buildUpdatePayload(
+        {
+          ...currentSource,
+          files: syncedFiles,
+        },
+        overrides,
+      );
+
+      await axios.put(`${API_URL}normatives`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      clearDraftComments(commentFields);
+      setFieldErrorMessages(INITIAL_FIELD_ERROR_MESSAGES);
+      setDeletedFiles([]);
+      setHasChanges(false);
+
+      if (reloadAfter) {
+        await loadNormative(currentNormativeId);
+      } else {
+        setFormData((previous) => ({
+          ...previous,
+          ...currentSource,
+          files: syncedFiles,
+        }));
+      }
+
+      enqueueSnackbar(successMessage, {
+        variant: "success",
+      });
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      applyApiValidationFeedback(error);
+      const [apiMessage] = getApiNotificationMessages(error);
+      enqueueSnackbar(apiMessage || "Não foi possível atualizar a normativa.", {
+        variant: "error",
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenConfirmRevog = (newDate) => {
+    if (!newDate) {
+      withDirty({ dataRevogacao: null });
+      return;
     }
 
-    if (status === 4) {
-      return {
-        nomeFaseTeste: false,
-        status: false,
-        populacao: false,
-        tipoTeste: false,
-        amostra: false,
-        metodologia: false,
-        responsavel: false,
-        revisores: false,
-        descricao: false,
-        dataInicioCobertura: false,
-        dataFimCobertura: false,
-        dataInicioTeste: false,
-        dataFimTeste: false,
-        dataConclusaoEfetiva: false,
-        conclusaoTeste: false,
-        descricaoTestador: false,
-        descricaoRevisor: false,
-      };
+    setTempRevDate(newDate);
+    setShowJustificativaField(!formData.motivoRevogacao.trim());
+    setConfirmRevogOpen(true);
+  };
+
+  const handleCancelRevog = () => {
+    setConfirmRevogOpen(false);
+    setTempRevDate(null);
+    setShowJustificativaField(false);
+  };
+
+  const handleConfirmRevog = async () => {
+    if (!formData.motivoRevogacao.trim()) {
+      enqueueSnackbar("A justificativa de revogação é obrigatória.", {
+        variant: "error",
+      });
+      return;
     }
 
-    // Caso contrário, aplica as regras de edição
-    return {
-      nomeFaseTeste: editing && isTester && started && status < 3,
-      status: editing && isTester && started && status < 3,
-      populacao: editing && isTester && started && status < 3,
-      tipoTeste: editing && isTester && started && status < 3,
-      amostra: editing && isTester && started && status < 3,
-      metodologia: editing && isTester && started && status < 3,
+    const revocationReason = appendCommentHistory(
+      normativaDados?.revocationReason || "",
+      formData.motivoRevogacao,
+      userName,
+    );
 
-      // nunca liberar a edição do responsavel no modo de edição
-      responsavel: false,
+    const updated = await updateNormative({
+      overrides: {
+        statusNorma: STATUS.REVOGADO,
+        dataRevogacao: tempRevDate || new Date(),
+        motivoRevogacao: revocationReason,
+      },
+      commentFields: [],
+      successMessage: "Normativa revogada com sucesso!",
+    });
 
-      revisores: editing && isTester && started && status < 3,
-      descricao: editing && isTester && started && status < 3,
-      dataInicioCobertura: editing && isTester && started && status < 3,
-      dataFimCobertura: editing && isTester && started && status < 3,
-      dataInicioTeste: true,
-      dataFimTeste: editing && isTester && started && status < 3,
-      dataConclusaoEfetiva: true,
-      conclusaoTeste: editing && isTester && started && status < 3,
-      descricaoTestador: editing && isTester && started && status < 3,
+    if (updated) {
+      handleCancelRevog();
+    }
+  };
 
-      // só o aprovador pode editar o próprio comentário quando em revisão
-      descricaoRevisor: editing && isReviewer && status === 3,
-    };
-  }, [creating, editing, isTester, isReviewer, started, status]);
+  const handleWorkflowSubmit = async (targetStatus) => {
+    if (!validateBaseFields()) return;
 
-  const canEditAttributes = !(isTester && status === 1);
+    const hasApprovers =
+      Array.isArray(formData.aprovador) && formData.aprovador.length > 0;
 
-  // ==================================================================
-  //           NOVO BLOCO DE REGRAS DE PERMISSIONAMENTO
-  // ==================================================================
-  const isResponsavel =
-    String(formData.responsavel) === String(idUser) ||
-    String(formData.revisor) === String(idUser);
-  const isAprovador =
-    Array.isArray(formData.aprovador) &&
-    formData.aprovador.some((id) => String(id) === String(idUser));
+    const finalStatus =
+      targetStatus ||
+      (hasApprovers ? STATUS.EM_APROVACAO : STATUS.VERSAO_FINAL);
 
-  const isExterno = formData.ambiente === 2;
-  const isRevogado = formData.statusNorma === 6;
-  const isVersaoFinal = formData.statusNorma === 3;
-  const isEmAprovacao = formData.statusNorma === 4;
-  const isElaboracao = formData.statusNorma === 1;
+    const shouldStampLastRevision =
+      finalStatus === STATUS.VERSAO_FINAL && !formData.ultimaRevisao;
 
-  // Trava para os campos gerais da tela:
-  const isFormLocked =
-    requisicao === "Editar" &&
-    (isRevogado ||
-      isExterno ||
-      isVersaoFinal ||
-      isEmAprovacao ||
-      (isElaboracao && !isResponsavel));
+    const updated = await updateNormative({
+      overrides: {
+        statusNorma: finalStatus,
+        ultimaRevisao: shouldStampLastRevision
+          ? new Date()
+          : formData.ultimaRevisao,
+      },
+      commentFields: ["description"],
+      successMessage:
+        finalStatus === STATUS.EM_APROVACAO
+          ? "Normativa enviada para aprovação."
+          : "Normativa finalizada com sucesso!",
+    });
 
-  // Trava ESPECÍFICA para a área de comentários (Aprovador pode comentar em Aprovação):
-  const isCommentLocked =
-    requisicao === "Editar" &&
-    (isRevogado ||
-      isExterno ||
-      isVersaoFinal ||
-      (isEmAprovacao && !isAprovador) ||
-      (isElaboracao && !isResponsavel));
+    if (!updated) return;
 
-  // Regra de Revogação: Liberado se for Responsável ou se for Ambiente Externo.
-  const canRevogar =
-    requisicao === "Editar" && !isRevogado && (isResponsavel || isExterno);
-  // ==================================================================
+    if (finalStatus === STATUS.EM_APROVACAO) {
+      try {
+        await axios.put(
+          `${API_URL}normatives/${currentNormativeId}/send-mail-in-approver`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+      } catch (error) {
+        console.error(error);
+        enqueueSnackbar(
+          "A normativa foi atualizada, mas o disparo do e-mail do aprovador falhou.",
+          {
+            variant: "warning",
+          },
+        );
+      }
+    }
+  };
+
+  const handleReplyApproval = async (isApproved) => {
+    if (!currentNormativeId) return;
+
+    setLoading(true);
+
+    try {
+      if (draftComments.note.trim()) {
+        const sourceWithApprovalComment = applyDraftComments(
+          { ...formData },
+          ["note"],
+        );
+
+        const syncedFiles = await uploadCurrentFiles(currentNormativeId);
+        const payload = buildUpdatePayload({
+          ...sourceWithApprovalComment,
+          files: syncedFiles,
+        });
+
+        await axios.put(`${API_URL}normatives`, payload, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        clearDraftComments(["note"]);
+        setDeletedFiles([]);
+      }
+
+      await axios.put(
+        `${API_URL}normatives/reply-pending-approval-status`,
+        {
+          idNormative: currentNormativeId,
+          isApproved,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      await loadNormative(currentNormativeId);
+      setHasChanges(false);
+
+      enqueueSnackbar(
+        isApproved
+          ? "Resposta de aprovação enviada com sucesso!"
+          : "A normativa foi retornada ao responsável.",
+        {
+          variant: "success",
+        },
+      );
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Não foi possível responder a aprovação pendente.", {
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAlterar = async () => {
+    await updateNormative({
+      overrides: {
+        statusNorma: STATUS.EM_ALTERACAO,
+      },
+      commentFields: ["description"],
+      successMessage: "Normativa colocada em alteração!",
+    });
+  };
+
+  const handleMarkReviewed = async () => {
+    if (!currentNormativeId) return;
+
+    const updated = await updateNormative({
+      overrides: {
+        ultimaRevisao: new Date(),
+        statuRevisao: 1,
+      },
+      commentFields: ["descriptionReviewer"],
+      successMessage: "Revisão registrada com sucesso!",
+    });
+
+    if (updated) {
+      setFormValidation((previous) => ({
+        ...previous,
+        ultimaRevisao: true,
+      }));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (requisicao === "Criar") {
+      await createNormative();
+      return;
+    }
+
+    const requireLastRevision =
+      canEditReviewFields &&
+      currentStatus === STATUS.VERSAO_FINAL &&
+      (isExterno || canEditLastRevision);
+
+    if (!validateBaseFields({ requireLastRevision })) return;
+
+    const updated = await updateNormative({
+      successMessage: `Normativa ${feedbackLabel} com sucesso!`,
+    });
+
+    if (updated) {
+      navigate(-1);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const handleResponsavelChange = (_, newValue) => {
+    const newId = newValue ? newValue.id : "";
+
+    withDirty((previous) => ({
+      ...previous,
+      responsavel: newId,
+    }));
+
+    if (!newId) return;
+
+    setTempResponsavelId(newId);
+    setConfirmRevisorOpen(true);
+  };
+
+  const handleConfirmReplication = () => {
+    withDirty((previous) => ({
+      ...previous,
+      revisor: tempResponsavelId,
+    }));
+    setConfirmRevisorOpen(false);
+    setTempResponsavelId(null);
+  };
+
+  const handleDenyReplication = () => {
+    setConfirmRevisorOpen(false);
+    setTempResponsavelId(null);
+  };
+
+  const handleEnvironmentChange = (_, newValue) => {
+    const selectedEnvironmentId = newValue ? newValue.id : "";
+    const selectedKind = getEnvironmentKind(selectedEnvironmentId, ambientes);
+
+    withDirty((previous) => ({
+      ...previous,
+      ambiente: selectedEnvironmentId,
+      statusNorma:
+        selectedKind === "external"
+          ? STATUS.VERSAO_FINAL
+          : previous.statusNorma &&
+              [STATUS.ELABORACAO, STATUS.VERSAO_FINAL].includes(
+                previous.statusNorma,
+              )
+            ? previous.statusNorma
+            : STATUS.ELABORACAO,
+    }));
+  };
+
+  const handleRiskChange = (_, newValue) => {
+    const nextRisk = resolveRiskValue(newValue?.id);
+
+    withDirty((previous) => ({
+      ...previous,
+      riscoNorma: nextRisk,
+      periodicidadeRevisao: nextRisk || "",
+      statuRevisao: nextRisk ? previous.statuRevisao : "",
+    }));
+  };
+
+  const handleMultiSelectAll = (field, options) => (_, newValue) => {
+    const clickedAll = newValue.some((option) => option.id === "all");
+
+    if (clickedAll) {
+      withDirty((previous) => ({
+        ...previous,
+        [field]:
+          previous[field].length === options.length
+            ? []
+            : options.map((option) => option.id),
+      }));
+      return;
+    }
+
+    withDirty((previous) => ({
+      ...previous,
+      [field]: newValue.map((option) => option.id),
+    }));
+  };
+
+  const handleCompanyCreated = (newCompany) => {
+    const mappedCompany = mapOption(newCompany);
+    setEmpresas((previous) => [...previous, mappedCompany]);
+    withDirty((previous) => ({
+      ...previous,
+      empresa: [...previous.empresa, mappedCompany.id],
+    }));
+  };
+
+  const handleDepartmentCreated = (newDepartment) => {
+    const mappedDepartment = mapOption(newDepartment);
+    setDepartamentos((previous) => [...previous, mappedDepartment]);
+    withDirty((previous) => ({
+      ...previous,
+      departamento: [...previous.departamento, mappedDepartment.id],
+    }));
+  };
+
+  const handleProcessCreated = (newProcess) => {
+    const mappedProcess = mapOption(newProcess);
+    setProcessos((previous) => [...previous, mappedProcess]);
+    withDirty((previous) => ({
+      ...previous,
+      processo: [...previous.processo, mappedProcess.id],
+    }));
+  };
+
+  const handlePlanCreated = (newPlan) => {
+    const mappedPlan = mapOption(newPlan);
+    setPlanosAcoes((previous) => [...previous, mappedPlan]);
+    withDirty((previous) => ({
+      ...previous,
+      planoAcao: [...previous.planoAcao, mappedPlan.id],
+    }));
+  };
+
+  const selectedEnvironment =
+    ambientes.find((item) => String(item.id) === String(formData.ambiente)) ||
+    null;
+  const selectedResponsible =
+    responsaveis.find(
+      (item) => String(item.id) === String(formData.responsavel),
+    ) || null;
+  const selectedReviewer =
+    responsaveis.find((item) => String(item.id) === String(formData.revisor)) ||
+    null;
+  const selectedStatus =
+    STATUS_OPTIONS.find((item) => item.id === formData.statusNorma) || null;
+  const selectedNormativeType =
+    tipoNormas.find((item) => String(item.id) === String(formData.tipoNorma)) ||
+    null;
+  const selectedRegulatory =
+    reguladores.find((item) => String(item.id) === String(formData.regulador)) ||
+    null;
+  const selectedFrequency =
+    FREQUENCY_OPTIONS.find(
+      (item) => item.id === Number(formData.periodicidadeRevisao),
+    ) || null;
+  const selectedRevisionStatus =
+    REVISION_STATUS_OPTIONS.find(
+      (item) =>
+        item.id === Number(formData.statuRevisao || revisionData.status || ""),
+    ) || null;
 
   return (
     <>
       <LoadingOverlay isActive={loading} />
+
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={3} sx={{ padding: 3 }}>
-          {/* ================= SEÇÃO DE BOTÕES (TOPO) ================= */}
-          {requisicao === "Editar" && (
+          {requisicao === "Editar" ? (
             <Grid
               item
               xs={12}
@@ -2325,35 +1591,49 @@ function ColumnsLayouts() {
               <Typography variant="h5" fontWeight="bold" color="primary">
                 Edição de Normativa
               </Typography>
+
               <Stack direction="row" alignItems="center" spacing={2}>
-                {actionButtons.includes("ELABORADA") && (
+                {canSendElaborated ? (
                   <Button
                     variant="contained"
                     color="primary"
-                    onClick={handleStart}
+                    onClick={() => handleWorkflowSubmit()}
                   >
                     ELABORADA
                   </Button>
-                )}
-                {actionButtons.includes("APROVADA") && (
+                ) : null}
+
+                {canSendAltered ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => handleWorkflowSubmit()}
+                  >
+                    ALTERADA
+                  </Button>
+                ) : null}
+
+                {canReplyApproval ? (
                   <Button
                     variant="contained"
                     color="success"
-                    onClick={handleConcluirTeste}
+                    onClick={() => handleReplyApproval(true)}
                   >
                     APROVADA
                   </Button>
-                )}
-                {actionButtons.includes("RETORNAR") && (
+                ) : null}
+
+                {canReplyApproval ? (
                   <Button
                     variant="outlined"
                     color="warning"
-                    onClick={handleRetornar}
+                    onClick={() => handleReplyApproval(false)}
                   >
                     RETORNAR
                   </Button>
-                )}
-                {actionButtons.includes("ALTERAR") && (
+                ) : null}
+
+                {canAlterar ? (
                   <Button
                     variant="contained"
                     color="secondary"
@@ -2361,8 +1641,19 @@ function ColumnsLayouts() {
                   >
                     ALTERAR
                   </Button>
-                )}
-                {actionButtons.includes("REVOGAR") && (
+                ) : null}
+
+                {canMarkReviewed ? (
+                  <Button
+                    variant="outlined"
+                    color="info"
+                    onClick={handleMarkReviewed}
+                  >
+                    REVISADO
+                  </Button>
+                ) : null}
+
+                {canRevogar ? (
                   <Button
                     variant="outlined"
                     color="error"
@@ -2370,19 +1661,23 @@ function ColumnsLayouts() {
                   >
                     REVOGAR
                   </Button>
-                )}
+                ) : null}
               </Stack>
             </Grid>
-          )}
+          ) : null}
 
-          {/* ================= 1. IDENTIFICAÇÃO PRINCIPAL ================= */}
+          {isFutureApprover ? (
+            <Grid item xs={12}>
+              <Alert severity="info">
+                Esta normativa ainda não está liberada para a sua aprovação.
+                Enquanto isso, a tela permanece somente para consulta.
+              </Alert>
+            </Grid>
+          ) : null}
+
           <Grid item xs={12}>
-            <Typography
-              variant="subtitle1"
-              fontWeight="bold"
-              sx={{ color: "#555" }}
-            >
-              1. Identificação Principal
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: "#555" }}>
+              1. Identificação principal
             </Typography>
           </Grid>
 
@@ -2390,142 +1685,369 @@ function ColumnsLayouts() {
             <Stack spacing={1}>
               <InputLabel>Código *</InputLabel>
               <TextField
-                onChange={(event) => setCodigo(event.target.value)}
                 fullWidth
-                value={codigo}
-                error={!codigo && formValidation.codigo === false}
-                disabled={isFormLocked}
+                value={formData.code}
+                error={!formValidation.code}
+                disabled={!canEditGeneralFields}
+                helperText={
+                  !formValidation.code
+                    ? fieldErrorMessages.code || "Campo obrigatório."
+                    : ""
+                }
+                onChange={(event) => {
+                  clearFieldError("code");
+                  withDirty({ code: event.target.value });
+                }}
               />
             </Stack>
           </Grid>
+
           <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
               <InputLabel>Nome *</InputLabel>
               <TextField
-                onChange={(event) => setNome(event.target.value)}
                 fullWidth
-                value={nome}
-                error={!nome && formValidation.nome === false}
-                disabled={isFormLocked}
+                value={formData.name}
+                error={!formValidation.name}
+                disabled={!canEditGeneralFields}
+                onChange={(event) =>
+                  withDirty({ name: event.target.value })
+                }
               />
             </Stack>
           </Grid>
+
           <Grid item xs={12} sm={4}>
             <Stack spacing={1}>
               <InputLabel>Ambiente *</InputLabel>
               <Autocomplete
                 options={ambientes}
                 getOptionLabel={(option) => option.nome}
-                value={
-                  ambientes.find((a) => a.id === formData.ambiente) || null
-                }
-                onChange={(event, newValue) => {
-                  const ambienteId = newValue ? newValue.id : "";
-                  setFormData((prev) => ({
-                    ...prev,
-                    ambiente: ambienteId,
-                    statusNorma:
-                      ambienteId === 2
-                        ? 3
-                        : ambienteId === 1
-                          ? 1
-                          : prev.statusNorma,
-                    ultimaRevisao:
-                      ambienteId === 2 ? new Date() : prev.ultimaRevisao,
-                  }));
-                }}
-                renderInput={(params) => <TextField {...params} />}
-                disabled={isFormLocked}
+                value={selectedEnvironment}
+                onChange={handleEnvironmentChange}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField {...params} error={!formValidation.ambiente} />
+                )}
+                disabled={!canEditGeneralFields}
               />
             </Stack>
           </Grid>
+
           <Grid item xs={12} sm={6}>
             <Stack spacing={1}>
               <InputLabel>Revisor *</InputLabel>
               <Autocomplete
                 options={responsaveis}
                 getOptionLabel={(option) => option.nome}
-                value={
-                  responsaveis.find((r) => r.id === formData.revisor) || null
+                value={selectedReviewer}
+                onChange={(_, newValue) =>
+                  withDirty({ revisor: newValue ? newValue.id : "" })
                 }
-                onChange={(event, newValue) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    revisor: newValue ? newValue.id : "",
-                  }))
-                }
-                renderInput={(params) => <TextField {...params} />}
-                disabled={isFormLocked}
-              />
-            </Stack>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Stack spacing={1}>
-              <InputLabel>Responsável (Dono da Norma) *</InputLabel>
-              <Autocomplete
-                options={responsaveis}
-                getOptionLabel={(option) => option.nome}
-                value={
-                  responsaveis.find((r) => r.id === formData.responsavel) ||
-                  null
-                }
-                onChange={handleResponsavelChange}
-                renderInput={(params) => <TextField {...params} />}
-                disabled={isFormLocked}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField {...params} error={!formValidation.revisor} />
+                )}
+                disabled={!canEditGeneralFields}
               />
             </Stack>
           </Grid>
 
           <Grid item xs={12} sm={6}>
             <Stack spacing={1}>
-              <InputLabel>Status da norma</InputLabel>
+              <InputLabel>Responsável (dono da norma) *</InputLabel>
               <Autocomplete
-                options={statusNormas}
+                options={responsaveis}
                 getOptionLabel={(option) => option.nome}
-                value={
-                  statusNormas.find(
-                    (item) => item.id === formData.statusNorma,
-                  ) || null
-                }
-                onChange={(event, newValue) =>
-                  setFormData((prev) => ({
-                    ...prev,
+                value={selectedResponsible}
+                onChange={handleResponsavelChange}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField {...params} error={!formValidation.responsavel} />
+                )}
+                disabled={!canEditGeneralFields}
+              />
+            </Stack>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Stack spacing={1}>
+              <InputLabel>Status da norma *</InputLabel>
+              <Autocomplete
+                options={visibleStatusOptions}
+                getOptionLabel={(option) => option.nome}
+                value={selectedStatus}
+                onChange={(_, newValue) =>
+                  withDirty({
                     statusNorma: newValue ? newValue.id : "",
-                  }))
+                  })
                 }
-                renderInput={(params) => <TextField {...params} />}
-                disabled={isFormLocked}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField {...params} error={!formValidation.statusNorma} />
+                )}
+                disabled={requisicao === "Editar" || !canEditGeneralFields}
               />
             </Stack>
           </Grid>
 
           <Grid item xs={12} sm={3} display="flex" alignItems="center">
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1}
-              sx={{ mt: 3 }}
-            >
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 3 }}>
               <Switch
-                checked={ativo}
-                onChange={(event) => setAtivo(event.target.checked)}
-                disabled={isFormLocked}
+                checked={formData.ativo}
+                onChange={(event) =>
+                  withDirty({ ativo: event.target.checked })
+                }
+                disabled={!canEditGeneralFields}
               />
-              <Typography>{ativo ? "Ativo" : "Inativo"}</Typography>
+              <Typography>{formData.ativo ? "Ativo" : "Inativo"}</Typography>
             </Stack>
           </Grid>
 
-          {/* SÓ MOSTRA O RESTANTE SE FOR MODO DE EDIÇÃO */}
-          {requisicao === "Editar" && (
+          {requisicao === "Editar" ? (
             <>
-              {/* ================= 4. CLASSIFICAÇÃO E DATAS ================= */}
               <Grid item xs={12} mt={2}>
                 <Typography
                   variant="subtitle1"
                   fontWeight="bold"
                   sx={{ color: "#555" }}
                 >
-                  2. Classificação e Prazos
+                  2. Associações e relacionamentos
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Norma de origem</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaOrigens]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(formData.normaOrigem, normaOrigens)}
+                    onChange={handleMultiSelectAll("normaOrigem", normaOrigens)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.normaOrigem.length === normaOrigens.length &&
+                                normaOrigens.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Norma de destino</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaDestinos]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(formData.normaDestino, normaDestinos)}
+                    onChange={handleMultiSelectAll("normaDestino", normaDestinos)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.normaDestino.length ===
+                                  normaDestinos.length && normaDestinos.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>
+                    Empresa{" "}
+                    {canEditGeneralFields ? (
+                      <DrawerEmpresa
+                        buttonSx={{ ml: 1, width: 20, height: 20 }}
+                        onCompanyCreated={handleCompanyCreated}
+                      />
+                    ) : null}
+                  </InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...empresas]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(formData.empresa, empresas)}
+                    onChange={handleMultiSelectAll("empresa", empresas)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.empresa.length === empresas.length &&
+                                empresas.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>
+                    Departamentos{" "}
+                    {canEditGeneralFields ? (
+                      <DrawerDepartamento
+                        buttonSx={{ ml: 1, width: 20, height: 20 }}
+                        onDepartmentCreated={handleDepartmentCreated}
+                      />
+                    ) : null}
+                  </InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...departamentos,
+                    ]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(
+                      formData.departamento,
+                      departamentos,
+                    )}
+                    onChange={handleMultiSelectAll(
+                      "departamento",
+                      departamentos,
+                    )}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.departamento.length ===
+                                  departamentos.length &&
+                                departamentos.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>
+                    Processos{" "}
+                    {canEditGeneralFields ? (
+                      <DrawerProcesso
+                        buttonSx={{ ml: 1, width: 20, height: 20 }}
+                        onProcessCreated={handleProcessCreated}
+                      />
+                    ) : null}
+                  </InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[{ id: "all", nome: "Selecionar todos" }, ...processos]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(formData.processo, processos)}
+                    onChange={handleMultiSelectAll("processo", processos)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.processo.length === processos.length &&
+                                processos.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>
+                    Plano de ação{" "}
+                    {canEditGeneralFields ? (
+                      <DrawerPlanos
+                        buttonSx={{ ml: 1, width: 20, height: 20 }}
+                        onPlansCreated={handlePlanCreated}
+                      />
+                    ) : null}
+                  </InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...planosAcoes,
+                    ]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(formData.planoAcao, planosAcoes)}
+                    onChange={handleMultiSelectAll("planoAcao", planosAcoes)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.planoAcao.length ===
+                                  planosAcoes.length && planosAcoes.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} mt={2}>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ color: "#555" }}
+                >
+                  3. Classificação e prazos
                 </Typography>
               </Grid>
 
@@ -2535,40 +2057,30 @@ function ColumnsLayouts() {
                   <Autocomplete
                     options={tipoNormas}
                     getOptionLabel={(option) => option.nome}
-                    value={
-                      tipoNormas.find(
-                        (item) => item.id === formData.tipoNorma,
-                      ) || null
+                    value={selectedNormativeType}
+                    onChange={(_, newValue) =>
+                      withDirty({ tipoNorma: newValue ? newValue.id : "" })
                     }
-                    onChange={(event, newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        tipoNorma: newValue ? newValue.id : "",
-                      }))
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
+                    disabled={!canEditGeneralFields}
                   />
                 </Stack>
               </Grid>
+
               <Grid item xs={12} sm={4}>
                 <Stack spacing={1}>
                   <InputLabel>Regulador</InputLabel>
                   <Autocomplete
                     options={reguladores}
                     getOptionLabel={(option) => option.nome}
-                    value={
-                      reguladores.find((r) => r.id === formData.regulador) ||
-                      null
+                    value={selectedRegulatory}
+                    onChange={(_, newValue) =>
+                      withDirty({ regulador: newValue ? newValue.id : "" })
                     }
-                    onChange={(event, newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        regulador: newValue ? newValue.id : "",
-                      }))
-                    }
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
+                    disabled={!canEditGeneralFields}
                   />
                 </Stack>
               </Grid>
@@ -2577,60 +2089,52 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Data de cadastro</InputLabel>
                   <DatePicker
-                    disabled
                     value={formData.dataCadastro || null}
-                    onChange={(newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        dataCadastro: newValue,
-                      }))
-                    }
+                    disabled
+                    onChange={() => {}}
                     slotProps={{ textField: { placeholder: "00/00/0000" } }}
                   />
                 </Stack>
               </Grid>
+
               <Grid item xs={12} sm={4}>
                 <Stack spacing={1}>
                   <InputLabel>Data de publicação</InputLabel>
                   <DatePicker
                     value={formData.dataPublicacao || null}
                     onChange={(newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        dataPublicacao: newValue,
-                      }))
+                      withDirty({ dataPublicacao: newValue })
                     }
                     slotProps={{ textField: { placeholder: "00/00/0000" } }}
-                    disabled={isFormLocked}
+                    disabled={!canEditGeneralFields}
                   />
                 </Stack>
               </Grid>
+
               <Grid item xs={12} sm={4}>
                 <Stack spacing={1}>
                   <InputLabel>Vigência inicial</InputLabel>
                   <DatePicker
                     value={formData.vigenciaInicial || null}
                     onChange={(newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        vigenciaInicial: newValue,
-                      }))
+                      withDirty({ vigenciaInicial: newValue })
                     }
                     slotProps={{ textField: { placeholder: "00/00/0000" } }}
-                    disabled={isFormLocked}
+                    disabled={!canEditGeneralFields}
                   />
                 </Stack>
               </Grid>
-              {/* ================= 2. ÁREA DE COMENTÁRIOS E APROVAÇÃO ================= */}
+
               <Grid item xs={12} mt={2}>
                 <Typography
                   variant="subtitle1"
                   fontWeight="bold"
                   sx={{ color: "#555" }}
                 >
-                  3. Aprovação e Comentários do Workflow
+                  4. Workflow e comentários
                 </Typography>
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
                   <InputLabel>Aprovadores</InputLabel>
@@ -2642,19 +2146,16 @@ function ColumnsLayouts() {
                       ...aprovadores,
                     ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.aprovador.map(
-                      (id) => aprovadores.find((a) => a.id === id) || id,
-                    )}
-                    onChange={handleSelectAllAprovadores}
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
+                    value={buildSelectedValues(formData.aprovador, aprovadores)}
+                    onChange={handleMultiSelectAll("aprovador", aprovadores)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Checkbox
                           checked={
                             option.id === "all"
-                              ? allSelectedAprovadores
+                              ? formData.aprovador.length ===
+                                  aprovadores.length && aprovadores.length > 0
                               : selected
                           }
                         />
@@ -2662,389 +2163,51 @@ function ColumnsLayouts() {
                       </li>
                     )}
                     renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
+                    disabled={!canEditGeneralFields}
                   />
-                </Stack>
-              </Grid>
-              <Grid item xs={12}>
-                <Stack
-                  spacing={2}
-                  sx={{
-                    backgroundColor: "#f9f9f9",
-                    padding: 3,
-                    borderRadius: 2,
-                    border: "1px solid #eee",
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <InputLabel sx={{ m: 0, fontWeight: "bold" }}>
-                      {descricao
-                        ? "Adicionar novo comentário"
-                        : "Comentário da Elaboração"}
-                    </InputLabel>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleSalvarComentarioRapido}
-                      disabled={isCommentLocked || loading}
-                      sx={{ fontWeight: 600, textTransform: "none" }}
-                    >
-                      Salvar Comentário
-                    </Button>
-                  </Stack>
-                  <TextField
-                    onChange={(event) => setNovoComentario(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={3}
-                    value={novoComentario}
-                    placeholder="Digite aqui seu comentário, justificativa ou observação..."
-                    disabled={isCommentLocked}
-                    sx={{ backgroundColor: "#fff" }}
-                  />
-                  {descricao && (
-                    <>
-                      <InputLabel sx={{ fontWeight: "bold", mt: 2 }}>
-                        Histórico de Comentários
-                      </InputLabel>
-                      <TextField
-                        fullWidth
-                        multiline
-                        minRows={3}
-                        maxRows={8}
-                        value={descricao}
-                        InputProps={{ readOnly: true }}
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            backgroundColor: "#f0f7ff",
-                          },
-                          "& .MuiInputBase-input": {
-                            color: "#0d0d0d !important",
-                            WebkitTextFillColor: "#0d0d0d !important",
-                          },
-                        }}
-                      />
-                    </>
-                  )}
-                </Stack>
-              </Grid>
-              <Grid item xs={12}>
-                <Stack
-                  spacing={2}
-                  sx={{
-                    backgroundColor: "#f9f9f9",
-                    padding: 3,
-                    borderRadius: 2,
-                    border: "1px solid #eee",
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-                    <InputLabel sx={{ m: 0, fontWeight: "bold" }}>
-                      {descricao
-                        ? "Adicionar novo comentário"
-                        : "Comentário da Revisão"}
-                    </InputLabel>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={handleSalvarComentarioRapido}
-                      disabled={isCommentLocked || loading}
-                      sx={{ fontWeight: 600, textTransform: "none" }}
-                    >
-                      Salvar Comentário
-                    </Button>
-                  </Stack>
-                  <TextField
-                    onChange={(event) => setNovoComentario(event.target.value)}
-                    fullWidth
-                    multiline
-                    rows={3}
-                    value={novoComentario}
-                    placeholder="Digite aqui seu comentário, justificativa ou observação..."
-                    disabled={isCommentLocked}
-                    sx={{ backgroundColor: "#fff" }}
-                  />
-                  {descricao && (
-                    <>
-                      <InputLabel sx={{ fontWeight: "bold", mt: 2 }}>
-                        Histórico de Comentários
-                      </InputLabel>
-                      <TextField
-                        fullWidth
-                        multiline
-                        minRows={3}
-                        maxRows={8}
-                        value={descricao}
-                        InputProps={{ readOnly: true }}
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            backgroundColor: "#f0f7ff",
-                          },
-                          "& .MuiInputBase-input": {
-                            color: "#0d0d0d !important",
-                            WebkitTextFillColor: "#0d0d0d !important",
-                          },
-                        }}
-                      />
-                    </>
-                  )}
                 </Stack>
               </Grid>
 
-              {/* ================= 5. ASSOCIAÇÕES ================= */}
-              <Grid item xs={12} mt={2}>
-                <Typography
-                  variant="subtitle1"
-                  fontWeight="bold"
-                  sx={{ color: "#555" }}
-                >
-                  4. Associações e Relacionamentos
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Norma de origem</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...normaOrigens.filter((n) => n.id !== idNormativoAtual),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.normaOrigem.map(
-                      (id) => normaOrigens.find((n) => n.id === id) || id,
-                    )}
-                    onChange={(event, newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        normaOrigem: newValue.map((item) => item.id),
+              {showElaborationComment ? (
+                <Grid item xs={12}>
+                  <CommentCard
+                    title="Comentário da elaboração"
+                    placeholder="Digite aqui seu comentário, justificativa ou observação da elaboração."
+                    draftValue={draftComments.description}
+                    historyValue={formData.description}
+                    onDraftChange={(value) =>
+                      setDraftComments((previous) => ({
+                        ...previous,
+                        description: value,
                       }))
                     }
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    getOptionDisabled={(option) =>
-                      option.id !== "all" &&
-                      formData.normaDestino.includes(option.id)
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={option.id === "all" ? allSelected : selected}
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
+                    onSave={() => saveCommentField("description")}
+                    disabled={!canEditElaborationComment}
+                    loading={loading}
                   />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Norma de destino</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...normaDestinos.filter((n) => n.id !== idNormativoAtual),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.normaDestino.map(
-                      (id) => normaDestinos.find((n) => n.id === id) || id,
-                    )}
-                    onChange={(event, newValue) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        normaDestino: newValue.map((item) => item.id),
+                </Grid>
+              ) : null}
+
+              {showApprovalComment ? (
+                <Grid item xs={12}>
+                  <CommentCard
+                    title="Comentário da aprovação"
+                    placeholder="Digite aqui o comentário da aprovação pendente."
+                    draftValue={draftComments.note}
+                    historyValue={formData.note}
+                    onDraftChange={(value) =>
+                      setDraftComments((previous) => ({
+                        ...previous,
+                        note: value,
                       }))
                     }
-                    isOptionEqualToValue={(option, value) =>
-                      option.id === value.id
-                    }
-                    getOptionDisabled={(option) =>
-                      option.id !== "all" &&
-                      formData.normaOrigem.includes(option.id)
-                    }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={
-                            option.id === "all"
-                              ? allSelectedDiretrizes
-                              : selected
-                          }
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
+                    onSave={() => saveCommentField("note")}
+                    disabled={!canEditApprovalComment}
+                    loading={loading}
                   />
-                </Stack>
-              </Grid>
+                </Grid>
+              ) : null}
 
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel display="flex" alignItems="center">
-                    Empresas{" "}
-                    <DrawerEmpresa
-                      buttonSx={{ ml: 1, width: 20, height: 20 }}
-                      onCompanyCreated={handleCompanyCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...empresas,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.empresa.map(
-                      (id) => empresas.find((e) => e.id === id) || id,
-                    )}
-                    onChange={handleSelectAllEmpresas}
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={
-                            option.id === "all" ? allSelectedEmpresas : selected
-                          }
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Departamentos{" "}
-                    <DrawerDepartamento
-                      buttonSx={{ ml: 1, width: 20, height: 20 }}
-                      onDepartmentCreated={handleDepartmentCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...departamentos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.departamento.map(
-                      (id) => departamentos.find((d) => d.id === id) || id,
-                    )}
-                    onChange={handleSelectAllDepartamentos}
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={
-                            option.id === "all"
-                              ? allSelectedDepartamentos
-                              : selected
-                          }
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Processos{" "}
-                    <DrawerProcesso
-                      buttonSx={{ ml: 1, width: 20, height: 20 }}
-                      onProcessCreated={handleProcessCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...processos,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processo.map(
-                      (id) => processos.find((p) => p.id === id) || id,
-                    )}
-                    onChange={handleSelectAll2}
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={
-                            option.id === "all" ? allSelected2 : selected
-                          }
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>
-                    Plano de ação{" "}
-                    <DrawerPlanos
-                      buttonSx={{ ml: 1, width: 20, height: 20 }}
-                      onPlansCreated={handlePlanCreated}
-                    />
-                  </InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...planosAcoes,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.planoAcao.map(
-                      (id) => planosAcoes.find((p) => p.id === id) || id,
-                    )}
-                    onChange={handleSelectAllPlanoAcao}
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={
-                            option.id === "all"
-                              ? allSelectedPlanoAcao
-                              : selected
-                          }
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={isFormLocked}
-                  />
-                </Stack>
-              </Grid>
-
-              {/* ================= 6. REVISÃO E REVOGAÇÃO ================= */}
               <Grid item xs={12} mt={2}>
                 <Accordion
                   sx={{
@@ -3055,147 +2218,138 @@ function ColumnsLayouts() {
                 >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Typography variant="subtitle1" fontWeight="bold">
-                      5. Revisão Periódica
+                      5. Revisão periódica
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <Alert severity="info" sx={{ mb: 1 }}>
+                          Apenas o revisor pode alterar os campos desta seção.
+                          Quando a norma nasce em versão final, a primeira data
+                          de última revisão deve ser preenchida aqui.
+                        </Alert>
+                      </Grid>
+
                       <Grid item xs={12} sm={6}>
                         <Stack spacing={1}>
                           <InputLabel>Última revisão</InputLabel>
                           <DatePicker
-                            disabled
                             value={formData.ultimaRevisao || null}
                             onChange={(newValue) =>
-                              setFormData((prev) => ({
-                                ...prev,
+                              withDirty({
                                 ultimaRevisao: newValue,
-                              }))
+                              })
                             }
+                            disabled={!canEditLastRevision}
                             slotProps={{
-                              textField: { placeholder: "00/00/0000" },
+                              textField: {
+                                placeholder: "00/00/0000",
+                                error: !formValidation.ultimaRevisao,
+                                helperText:
+                                  currentStatus === STATUS.VERSAO_FINAL &&
+                                  !formData.ultimaRevisao &&
+                                  canEditLastRevision
+                                    ? "Obrigatória para normativas que começam em versão final."
+                                    : currentStatus === STATUS.ELABORACAO ||
+                                        currentStatus === STATUS.EM_ALTERACAO
+                                      ? "Será preenchida automaticamente quando a normativa ficar em versão final."
+                                      : "",
+                              },
                             }}
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12} sm={6}>
                         <Stack spacing={1}>
                           <InputLabel>Risco da norma</InputLabel>
                           <Autocomplete
-                            options={riscoNormas}
+                            options={RISK_OPTIONS}
                             getOptionLabel={(option) => option.nome}
-                            value={
-                              riscoNormas.find(
-                                (item) => item.id === formData.riscoNorma,
-                              ) || null
-                            }
-                            onChange={(_, newValue) => {
-                              const risco = newValue?.id ?? null;
-                              setFormData((prev) => ({
-                                ...prev,
-                                riscoNorma: risco,
-                                periodicidadeRevisao: [1, 2, 3].includes(risco)
-                                  ? risco
-                                  : null,
-                              }));
-                            }}
+                            value={selectedRiskOption}
+                            onChange={handleRiskChange}
+                            isOptionEqualToValue={(option, value) => option.id === value.id}
                             renderInput={(params) => <TextField {...params} />}
-                            disabled={isFormLocked}
+                            disabled={!canEditRisk}
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Status da revisão</InputLabel>
                           <Autocomplete
-                            disabled={isFormLocked}
-                            options={statusRevisao}
+                            options={REVISION_STATUS_OPTIONS}
                             getOptionLabel={(option) => option.nome}
-                            value={
-                              statusRevisao.find(
-                                (item) => item.id === formData.statuRevisao,
-                              ) || null
-                            }
-                            onChange={(event, newValue) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                statuRevisao: newValue ? newValue.id : "",
-                              }))
-                            }
+                            value={selectedRevisionStatus}
                             renderInput={(params) => <TextField {...params} />}
+                            disabled
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Periodicidade</InputLabel>
                           <Autocomplete
-                            disabled={isFormLocked}
-                            options={periodicidadeRevisoes}
+                            options={FREQUENCY_OPTIONS}
                             getOptionLabel={(option) => option.nome}
-                            value={
-                              periodicidadeRevisoes.find(
-                                (item) =>
-                                  item.id === formData.periodicidadeRevisao,
-                              ) || null
+                            value={selectedFrequency}
+                            onChange={(_, newValue) =>
+                              withDirty({
+                                periodicidadeRevisao: newValue ? newValue.id : "",
+                              })
                             }
-                            onChange={(event, newValue) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                periodicidadeRevisao: newValue
-                                  ? newValue.id
-                                  : "",
-                              }))
-                            }
+                            isOptionEqualToValue={(option, value) => option.id === value.id}
                             renderInput={(params) => <TextField {...params} />}
+                            disabled={!canEditReviewFields}
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Data limite</InputLabel>
                           <DatePicker
-                            disabled={isFormLocked}
-                            value={formData.dataLimiteRevisao || null}
-                            onChange={(newValue) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                dataLimiteRevisao: newValue,
-                              }))
-                            }
+                            value={revisionData.limitDate || null}
+                            onChange={() => {}}
+                            disabled
                             slotProps={{
                               textField: { placeholder: "00/00/0000" },
                             }}
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12} sm={3}>
                         <Stack spacing={1}>
                           <InputLabel>Dias da revisão</InputLabel>
                           <TextField
-                            disabled={isFormLocked}
-                            onChange={(event) =>
-                              setDiasDaRevisao(event.target.value)
+                            value={
+                              revisionData.days === "" ? "" : String(revisionData.days)
                             }
-                            fullWidth
-                            value={diasDaRevisao}
+                            disabled
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12}>
-                        <Stack spacing={1}>
-                          <InputLabel>Comentário do revisor</InputLabel>
-                          <TextField
-                            onChange={(event) =>
-                              setConclusaoRevisao(event.target.value)
-                            }
-                            fullWidth
-                            multiline
-                            rows={3}
-                            value={conclusaoRevisao}
-                            disabled={isFormLocked}
-                          />
-                        </Stack>
+                        <CommentCard
+                          title="Comentário da revisão"
+                          placeholder="Digite aqui o comentário da revisão periódica."
+                          draftValue={draftComments.descriptionReviewer}
+                          historyValue={formData.descriptionReviewer}
+                          onDraftChange={(value) =>
+                            setDraftComments((previous) => ({
+                              ...previous,
+                              descriptionReviewer: value,
+                            }))
+                          }
+                          onSave={() => saveCommentField("descriptionReviewer")}
+                          disabled={!canEditReviewFields}
+                          loading={loading}
+                        />
                       </Grid>
                     </Grid>
                   </AccordionDetails>
@@ -3216,7 +2370,7 @@ function ColumnsLayouts() {
                       fontWeight="bold"
                       color="error"
                     >
-                      6. Revogação de Norma
+                      6. Revogação da norma
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
@@ -3234,17 +2388,20 @@ function ColumnsLayouts() {
                           />
                         </Stack>
                       </Grid>
+
                       <Grid item xs={12} sm={9}>
                         <Stack spacing={1}>
                           <InputLabel>Motivo da revogação</InputLabel>
                           <TextField
-                            onChange={(event) =>
-                              setMotivoRevogacao(event.target.value)
-                            }
                             fullWidth
                             multiline
                             rows={2}
-                            value={motivoRevogacao}
+                            value={formData.motivoRevogacao}
+                            onChange={(event) =>
+                              withDirty({
+                                motivoRevogacao: event.target.value,
+                              })
+                            }
                             disabled={!canRevogar}
                           />
                         </Stack>
@@ -3254,7 +2411,6 @@ function ColumnsLayouts() {
                 </Accordion>
               </Grid>
 
-              {/* ================= 8. ANEXOS E TRECHOS ================= */}
               <Grid item xs={12} mt={2}>
                 <Typography
                   variant="subtitle1"
@@ -3264,25 +2420,30 @@ function ColumnsLayouts() {
                   Anexos
                 </Typography>
               </Grid>
+
               <Grid item xs={12}>
                 <Stack spacing={1}>
                   <InputLabel>Anexo</InputLabel>
                   <FileUploader
-                    containerFolder={1}
+                    containerFolder={FILE_CONTAINER_FOLDER}
                     initialFiles={formData.files}
-                    onFilesChange={(files) =>
-                      setFormData((prev) => ({ ...prev, files }))
-                    }
+                    disabled={!canEditGeneralFields}
+                    onFilesChange={(files) => {
+                      setHasChanges(true);
+                      setFormData((previous) => ({
+                        ...previous,
+                        files,
+                      }));
+                    }}
                     onFileDelete={(file) =>
-                      setDeletedFiles((prev) => [...prev, file])
+                      setDeletedFiles((previous) => [...previous, file])
                     }
                   />
                 </Stack>
               </Grid>
+
               <Grid item xs={12}>
-                <Accordion
-                  sx={{ border: "1px solid #e0e0e0", boxShadow: "none" }}
-                >
+                <Accordion sx={{ border: "1px solid #e0e0e0", boxShadow: "none" }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Typography variant="subtitle1" fontWeight="bold">
                       Trechos
@@ -3294,32 +2455,32 @@ function ColumnsLayouts() {
                 </Accordion>
               </Grid>
             </>
-          )}
+          ) : null}
 
-          {/* BOTÃO DE SALVAR FORMULÁRIO GERAL */}
-          <Grid
-            item
-            xs={12}
-            mt={2}
-            mb={5}
-            display="flex"
-            justifyContent="flex-start"
-          >
-            <Button
-              variant="contained"
-              color="primary"
-              sx={{ px: 4, py: 1, fontWeight: "bold" }}
-              onClick={tratarSubmit}
+          {requisicao === "Criar" || canEditGeneralFields ? (
+            <Grid
+              item
+              xs={12}
+              mt={2}
+              mb={5}
+              display="flex"
+              justifyContent="flex-start"
             >
-              {requisicao === "Criar" ? "Cadastrar" : "Atualizar Formulário"}
-            </Button>
-          </Grid>
+              <Button
+                variant="contained"
+                color="primary"
+                sx={{ px: 4, py: 1, fontWeight: "bold" }}
+                onClick={handleSubmit}
+              >
+                {requisicao === "Criar" ? "Cadastrar" : "Atualizar formulário"}
+              </Button>
+            </Grid>
+          ) : null}
         </Grid>
 
-        {/* DIÁLOGOS DE CONFIRMAÇÃO (MANTIDOS INTACTOS) */}
         <Dialog
           open={successDialogOpen}
-          onClose={voltarParaListagem}
+          onClose={() => setSuccessDialogOpen(false)}
           sx={{
             "& .MuiDialog-paper": {
               padding: "24px",
@@ -3335,36 +2496,39 @@ function ColumnsLayouts() {
           <DialogTitle
             sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
           >
-            Normativa Criada com Sucesso!
+            Normativa criada com sucesso!
           </DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>
               A normativa foi cadastrada com sucesso. Você pode voltar para a
-              listagem ou adicionar mais informações a essa normativa.
+              listagem ou continuar a edição desta normativa.
             </DialogContentText>
           </DialogContent>
           <DialogActions
             sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
           >
             <Button
-              onClick={voltarParaListagem}
+              onClick={() => {
+                setSuccessDialogOpen(false);
+                navigate(-1);
+              }}
               variant="outlined"
               sx={{ borderColor: "#007bff", color: "#007bff", fontWeight: 600 }}
             >
               Voltar para a listagem
             </Button>
             <Button
-              onClick={continuarEdicao}
+              onClick={() => setSuccessDialogOpen(false)}
               variant="contained"
               sx={{ backgroundColor: "#007bff", fontWeight: 600 }}
             >
-              Adicionar mais informações
+              Continuar editando
             </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={confirmRevisorOpen} onClose={handleDenyReplication}>
-          <DialogTitle>{"Definir Revisor?"}</DialogTitle>
+          <DialogTitle>Definir revisor?</DialogTitle>
           <DialogContent>
             <DialogContentText>
               Deseja que o responsável selecionado também seja atribuído como
@@ -3373,37 +2537,38 @@ function ColumnsLayouts() {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleDenyReplication}>Não</Button>
-            <Button
-              onClick={handleConfirmReplication}
-              autoFocus
-              variant="contained"
-            >
+            <Button onClick={handleConfirmReplication} autoFocus variant="contained">
               Sim
             </Button>
           </DialogActions>
         </Dialog>
 
         <Dialog open={confirmRevogOpen} onClose={handleCancelRevog}>
-          <DialogTitle>Confirmar Revogação</DialogTitle>
+          <DialogTitle>Confirmar revogação</DialogTitle>
           <DialogContent>
             <DialogContentText>
               Tem certeza que deseja revogar esta norma em{" "}
               {tempRevDate?.toLocaleDateString("pt-BR")}? Isso definirá o status
-              como "Revogado" e essa norma não poderá mais ser editada.
+              como "Revogado" e esta norma não poderá mais ser editada.
             </DialogContentText>
-            {showJustificativaField && (
+
+            {showJustificativaField ? (
               <TextField
                 autoFocus
                 margin="dense"
-                label="Justificativa de Revogação"
+                label="Justificativa de revogação"
                 fullWidth
                 multiline
                 rows={3}
-                value={motivoRevogacao}
-                onChange={(e) => setMotivoRevogacao(e.target.value)}
+                value={formData.motivoRevogacao}
+                onChange={(event) =>
+                  withDirty({
+                    motivoRevogacao: event.target.value,
+                  })
+                }
                 sx={{ mt: 2 }}
               />
-            )}
+            ) : null}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCancelRevog}>Cancelar</Button>
