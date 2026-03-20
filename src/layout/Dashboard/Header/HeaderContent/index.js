@@ -5,7 +5,6 @@ import { ArrowBack } from '@mui/icons-material';
 import ConfirmDialog from '../../../../pages/apps/configuracoes/ConfirmDialog';
 
 // Importações do projeto
-import Search from './Search';
 import Message from './Message';
 import Profile from './Profile';
 import Notification from './Notification';
@@ -15,6 +14,7 @@ import MobileSection from './MobileSection';
 import { useLocation } from 'react-router-dom';
 import useConfig from '../../../../hooks/useConfig';
 import DrawerHeader from '../../../../layout/Dashboard/Drawer/DrawerHeader';
+import Breadcrumbs from '../../../../components/@extended/Breadcrumbs';
 
 import { MenuOrientation } from '../../../../config';
 
@@ -684,8 +684,15 @@ const HeaderContent = () => {
         onClose={() => setShowChangesNotSavedModal(false)}
         onConfirm={handleConfirmExit}
       />
-      {!downLG && <Search />}
-      {downLG && <Box sx={{ width: '100%', ml: 1 }} />}
+      {!downLG ? (
+        <Box sx={{ minWidth: 0, flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ minWidth: 0, flexGrow: 1, display: 'flex', alignItems: 'center', ml: 1.5, mr: 2 }}>
+            <Breadcrumbs compact sx={{ minWidth: 0, width: '100%', maxWidth: 720 }} />
+          </Box>
+        </Box>
+      ) : (
+        <Box sx={{ width: '100%', ml: 1 }} />
+      )}
 
       {/* <Notification />
       <Message /> */}
