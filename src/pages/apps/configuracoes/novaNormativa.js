@@ -508,8 +508,17 @@ function ColumnsLayouts() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const normativeIdFromQuery =
+    queryParams.get("idnormative") || queryParams.get("idNormative");
+  const dadosApiFromUrl = normativeIdFromQuery
+    ? {
+        idNormative: normativeIdFromQuery,
+      }
+    : null;
   const { dadosApi } = location.state || {};
-  const idNormativeFromRoute = dadosApi?.idNormative || "";
+  const routeData = dadosApi || dadosApiFromUrl;
+  const idNormativeFromRoute = routeData?.idNormative || "";
   const idUser = localStorage.getItem("id_user");
   const userName = localStorage.getItem("username") || "Usuário";
 
@@ -552,7 +561,8 @@ function ColumnsLayouts() {
     ultimaRevisao: true,
   });
 
-  const requisicao = formData.idNormative ? "Editar" : "Criar";
+  const requisicao =
+    formData.idNormative || idNormativeFromRoute ? "Editar" : "Criar";
   const feedbackLabel = requisicao === "Criar" ? "cadastrada" : "editada";
 
   useEffect(() => {

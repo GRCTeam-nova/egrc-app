@@ -387,6 +387,15 @@ const MainRoutes = {
           ]
         },
         {
+          path: 'normativos',
+          children: [
+            {
+              path: 'aprovar',
+              element: <NovaNormativa />
+            }
+          ]
+        },
+        {
           path: 'planos',
           children: [
             {
