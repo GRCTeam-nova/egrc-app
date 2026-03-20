@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "config";
+import { enrichItemsWithResponsibleNames } from "../utils/responsibleLookup";
 
 // Hook para buscar as avaliações vinculadas a um risco
 export function useGetAvaliacoesByRisco(formData, idRisk) {
@@ -39,7 +40,12 @@ export function useGetAvaliacoesByRisco(formData, idRisk) {
           ? data
           : data?.reportAssessments || data?.data || [];
 
-        setCustomers(normalizedData);
+        const enrichedData = await enrichItemsWithResponsibleNames(
+          normalizedData,
+          token,
+        );
+
+        setCustomers(enrichedData);
       } catch (err) {
         setError(err.message);
       } finally {

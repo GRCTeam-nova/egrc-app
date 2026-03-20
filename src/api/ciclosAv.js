@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { API_URL } from 'config';
+import { enrichItemsWithResponsibleNames } from "../utils/responsibleLookup";
 
 // Hook para buscar os dados de empresas
 export function useGetCiclos(formData, idCycle) {
@@ -32,7 +33,15 @@ export function useGetCiclos(formData, idCycle) {
         }
 
         const data = await response.json();
-        setCustomers(data);
+        const normalizedData = Array.isArray(data)
+          ? data
+          : data?.reportAssessments || data?.data || [];
+        const enrichedData = await enrichItemsWithResponsibleNames(
+          normalizedData,
+          token,
+        );
+
+        setCustomers(enrichedData);
       } catch (err) {
         setError(err.message);
       } finally {
