@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { API_URL } from 'config';
+import { enrichItemsWithResponsibleNames } from "../utils/responsibleLookup";
 
 // Hook para buscar os dados de avaliações (assessments)
 export function useGetAvaliacoes(formData = {}) {
@@ -103,7 +104,12 @@ export function useGetAvaliacoes(formData = {}) {
           });
 
           // Seta o estado com os dados já alterados
-          setAvaliacoes(dadosFormatados);
+          const dadosEnriquecidos = await enrichItemsWithResponsibleNames(
+            dadosFormatados,
+            token,
+          );
+
+          setAvaliacoes(dadosEnriquecidos);
         }
       } catch (err) {
         setError(err.message);

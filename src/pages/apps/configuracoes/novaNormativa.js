@@ -78,6 +78,11 @@ const RISK_OPTIONS = [
   { id: "na", nome: "Não aplicável" },
 ];
 
+const NORMATIVE_ENVIRONMENT_OPTIONS = [
+  { id: 1, nome: "Interno", kind: "internal" },
+  { id: 2, nome: "Externo", kind: "external" },
+];
+
 const INITIAL_FORM_DATA = {
   idNormative: "",
   code: "",
@@ -165,6 +170,14 @@ function mapOption(item) {
     nome: item?.nome || item?.name || item?.description || "",
     ...item,
   };
+}
+
+function resolveEnvironmentKind(environment) {
+  const normalizedName = normalizeText(environment?.nome || environment?.name);
+
+  if (normalizedName.includes("extern")) return "external";
+  if (normalizedName.includes("intern")) return "internal";
+  return "";
 }
 
 function toIdArray(value, fallback = []) {
@@ -387,11 +400,25 @@ function getEnvironmentKind(environmentId, environments) {
     (item) => String(item.id) === String(environmentId),
   );
 
-  const normalizedName = normalizeText(environment?.nome || environment?.name);
+  return resolveEnvironmentKind(environment);
+}
 
-  if (normalizedName.includes("extern")) return "external";
-  if (normalizedName.includes("intern")) return "internal";
-  return "";
+function buildNormativeEnvironmentOptions(environments) {
+  return NORMATIVE_ENVIRONMENT_OPTIONS.map((preset) => {
+    const matchedEnvironment = environments.find(
+      (item) => resolveEnvironmentKind(item) === preset.kind,
+    );
+
+    if (matchedEnvironment) {
+      return {
+        ...matchedEnvironment,
+        nome: preset.nome,
+        kind: preset.kind,
+      };
+    }
+
+    return { ...preset };
+  });
 }
 
 function buildSelectedValues(ids, options) {
@@ -513,6 +540,8 @@ function ColumnsLayouts() {
   const [tempRevDate, setTempRevDate] = useState(null);
   const [showJustificativaField, setShowJustificativaField] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [initialResponsibleApplied, setInitialResponsibleApplied] =
+    useState(false);
   const [formValidation, setFormValidation] = useState({
     code: true,
     name: true,
@@ -587,7 +616,11 @@ function ColumnsLayouts() {
 
   const loadOptions = useCallback(async () => {
     const endpoints = [
-      { url: `${API_URL}actives/environments`, setter: setAmbientes },
+      {
+        url: `${API_URL}actives/environments`,
+        setter: setAmbientes,
+        transform: buildNormativeEnvironmentOptions,
+      },
       { url: `${API_URL}departments`, setter: setDepartamentos },
       { url: `${API_URL}normatives/types`, setter: setTipoNormas },
       { url: `${API_URL}normatives/regulatories`, setter: setReguladores },
@@ -607,14 +640,15 @@ function ColumnsLayouts() {
     ];
 
     await Promise.all(
-      endpoints.map(async ({ url, setter }) => {
+      endpoints.map(async ({ url, setter, transform }) => {
         const response = await axios.get(url, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        setter((response.data || []).map(mapOption));
+        const mappedOptions = (response.data || []).map(mapOption);
+        setter(transform ? transform(mappedOptions) : mappedOptions);
       }),
     );
   }, [token]);
@@ -673,21 +707,28 @@ function ColumnsLayouts() {
   }, [idNormativeFromRoute, loadNormative, loadOptions, token]);
 
   useEffect(() => {
+    if (initialResponsibleApplied) return;
     if (requisicao !== "Criar") return;
-    if (formData.revisor) return;
     if (!idUser || responsaveis.length === 0) return;
 
     const userIsResponsible = responsaveis.some(
       (responsavel) => String(responsavel.id) === String(idUser),
     );
 
-    if (!userIsResponsible) return;
+    setInitialResponsibleApplied(true);
+    if (formData.responsavel || !userIsResponsible) return;
 
     setFormData((previous) => ({
       ...previous,
-      revisor: idUser,
+      responsavel: idUser,
     }));
-  }, [requisicao, formData.revisor, idUser, responsaveis]);
+  }, [
+    formData.responsavel,
+    idUser,
+    initialResponsibleApplied,
+    requisicao,
+    responsaveis,
+  ]);
 
   const ambienteKind = useMemo(
     () => getEnvironmentKind(formData.ambiente, ambientes),
@@ -1725,9 +1766,28 @@ function ColumnsLayouts() {
                 getOptionLabel={(option) => option.nome}
                 value={selectedEnvironment}
                 onChange={handleEnvironmentChange}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
+                isOptionEqualToValue={(option, value) =>
+                  String(option.id) === String(value.id)
+                }
                 renderInput={(params) => (
                   <TextField {...params} error={!formValidation.ambiente} />
+                )}
+                disabled={!canEditGeneralFields}
+              />
+            </Stack>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Stack spacing={1}>
+              <InputLabel>Responsável (dono da norma) *</InputLabel>
+              <Autocomplete
+                options={responsaveis}
+                getOptionLabel={(option) => option.nome}
+                value={selectedResponsible}
+                onChange={handleResponsavelChange}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => (
+                  <TextField {...params} error={!formValidation.responsavel} />
                 )}
                 disabled={!canEditGeneralFields}
               />
@@ -1747,23 +1807,6 @@ function ColumnsLayouts() {
                 isOptionEqualToValue={(option, value) => option.id === value.id}
                 renderInput={(params) => (
                   <TextField {...params} error={!formValidation.revisor} />
-                )}
-                disabled={!canEditGeneralFields}
-              />
-            </Stack>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <Stack spacing={1}>
-              <InputLabel>Responsável (dono da norma) *</InputLabel>
-              <Autocomplete
-                options={responsaveis}
-                getOptionLabel={(option) => option.nome}
-                value={selectedResponsible}
-                onChange={handleResponsavelChange}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                renderInput={(params) => (
-                  <TextField {...params} error={!formValidation.responsavel} />
                 )}
                 disabled={!canEditGeneralFields}
               />
