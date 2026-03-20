@@ -59,7 +59,7 @@ const DashboardLayout = () => {
               flexDirection: 'column'
             }}
           >
-            <Breadcrumbs />
+            {downLG && <Breadcrumbs />}
             <Outlet />
             <Footer />
           </Container>
