@@ -22,7 +22,7 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
@@ -37,7 +37,10 @@ function ColumnsLayouts() {
   const location = useLocation();
   // --- NOVA LÓGICA DE DETECÇÃO DE DADOS ---
   // Tenta pegar do state (navegação interna) OU da URL (link de email)
-  const queryParams = new URLSearchParams(location.search);
+  const queryParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
   const fromListaQuestionariosMainQuery =
     queryParams.get("from") === "listaQuestionariosMain";
   const fromListaQuestionariosMainSession =
@@ -56,6 +59,10 @@ function ColumnsLayouts() {
 
   // Usa o que estiver disponível (Prioridade: State > URL)
   const dadosApi = location.state?.dadosApi || dadosApiUrl;
+  const currentAssessmentId = dadosApi?.idAssessment || "";
+  const currentQuizId = dadosApi?.idQuiz || "";
+  const currentRespondentName = dadosApi?.respondent || "";
+  const currentQuizStatus = dadosApi?.statusQuiz || null;
   
   // Ajuste do ReadOnly e Mode
   const readOnlyFromState = location.state?.readOnly;
@@ -221,12 +228,12 @@ function ColumnsLayouts() {
   }, []);
 
   useEffect(() => {
-    if (dadosApi && dadosApi.idAssessment) {
+    if (token && currentAssessmentId && currentQuizId) {
       setLoading(true);
       const fetchAssessmentDados = async () => {
         try {
           const response = await fetch(
-            `${process.env.REACT_APP_API_URL}assessments/${dadosApi.idAssessment}`,
+            `${process.env.REACT_APP_API_URL}assessments/${currentAssessmentId}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -267,7 +274,7 @@ function ColumnsLayouts() {
           const dataProfile = await resPerfil.json();
 
           const [resQuestionario] = await Promise.all([
-            fetch(` ${process.env.REACT_APP_API_URL}quiz/${dadosApi.idQuiz}`, {
+            fetch(`${process.env.REACT_APP_API_URL}quiz/${currentQuizId}`, {
               headers: { Authorization: `Bearer ${token}` },
             }),
           ]);
@@ -299,7 +306,7 @@ function ColumnsLayouts() {
           setDescricaoRisco(data.riskDescription || "");
           setFormData((prev) => ({
             ...prev,
-            status: dadosApi.statusQuiz || null,
+            status: currentQuizStatus,
             categoria: dataRisk.idCategory || null,
             dataIdentificacao: data.identificationDate
               ? new Date(data.identificationDate)
@@ -309,7 +316,11 @@ function ColumnsLayouts() {
                 ? data.processes
                 : [data.processes]
               : [],
-            respondente: dadosApi.respondent,
+            respondente:
+              currentRespondentName ||
+              dataQuiz.respondent ||
+              dataQuiz.respondentName ||
+              "",
             ciclo: data.idCycle || null,
             risco: data.idRisk || null,
             controle: data.controls
@@ -371,7 +382,13 @@ function ColumnsLayouts() {
 
       fetchAssessmentDados();
     }
-  }, [dadosApi, token]);
+  }, [
+    currentAssessmentId,
+    currentQuizId,
+    currentQuizStatus,
+    currentRespondentName,
+    token,
+  ]);
 
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "prioridade") {
@@ -594,8 +611,8 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  const idQuiz = dadosApi?.idQuiz || normativaDados?.idQuiz;
-  const idAssessmentPai = dadosApi?.idAssessment || normativaDados?.idAssessment;
+  const idQuiz = currentQuizId || normativaDados?.idQuiz;
+  const idAssessmentPai = currentAssessmentId || normativaDados?.idAssessment;
 
   const irParaListaQuestionariosMain = () => {
     setSuccessDialogOpen(false);

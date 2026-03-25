@@ -172,6 +172,7 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [ciclosOptions, setCiclosOptions] = useState([]);
   const [riscosOptions, setRiscosOptions] = useState([]);
+  const [responsibleOptions, setResponsibleOptions] = useState([]);
   const [resultInherentOptions, setResultInherentOptions] = useState([]);
   const [resultResidualOptions, setResultResidualOptions] = useState([]);
   const [resultPlannedOptions, setResultPlannedOptions] = useState([]);
@@ -189,6 +190,7 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
   const [draftFilters, setDraftFilters] = useState({
     ciclo: [],
     risco: [],
+    responsible: [],
     status: [],
     assessmentStatus: [],
     resultInherent: [],
@@ -198,6 +200,9 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
 
   const toggleDrawer = () => setDrawerOpen((current) => !current);
 
+  const getResponsibleValue = (item) =>
+    item.responsibleName || item.responsible || item.idResponsible || null;
+
   useEffect(() => {
     const ciclos = [
       ...new Set(data.map((item) => (item.cycle ?? item.name) || null)),
@@ -206,6 +211,10 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
     const riscos = [...new Set(data.map((item) => item.risk || null))].filter(
       Boolean,
     );
+
+    const responsibles = [
+      ...new Set(data.map((item) => getResponsibleValue(item))),
+    ].filter(Boolean);
 
     const inherentResults = [
       ...new Set(data.map((item) => getRiskResultLabel(item.resultInherent))),
@@ -221,6 +230,7 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
 
     setCiclosOptions(ciclos);
     setRiscosOptions(riscos);
+    setResponsibleOptions(responsibles);
     setResultInherentOptions(inherentResults);
     setResultResidualOptions(residualResults);
     setResultPlannedOptions(plannedResults);
@@ -235,6 +245,13 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
 
     if (draftFilters.risco.length > 0) {
       newFilters.push({ type: "Risco", values: draftFilters.risco });
+    }
+
+    if (draftFilters.responsible.length > 0) {
+      newFilters.push({
+        type: "Responsável",
+        values: draftFilters.responsible,
+      });
     }
 
     if (draftFilters.status.length > 0) {
@@ -291,6 +308,10 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
           updatedDraft.risco = updatedDraft.risco.filter(
             (value) => !filterToRemove.values.includes(value),
           );
+        } else if (filterToRemove.type === "Responsável") {
+          updatedDraft.responsible = updatedDraft.responsible.filter(
+            (value) => !filterToRemove.values.includes(value),
+          );
         } else if (filterToRemove.type === "Status") {
           updatedDraft.status = updatedDraft.status.filter(
             (item) => !filterToRemove.values.includes(item.value),
@@ -327,6 +348,7 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
     setDraftFilters({
       ciclo: [],
       risco: [],
+      responsible: [],
       status: [],
       assessmentStatus: [],
       resultInherent: [],
@@ -347,6 +369,10 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
 
           if (filter.type === "Risco") {
             return filter.values.includes(item.risk);
+          }
+
+          if (filter.type === "Responsável") {
+            return filter.values.includes(getResponsibleValue(item));
           }
 
           if (filter.type === "Status") {
@@ -643,6 +669,27 @@ function ReactTable({ data, columns, totalItems, isLoading, riskId }) {
                   value={draftFilters.risco}
                   onChange={(event, value) =>
                     setDraftFilters((prev) => ({ ...prev, risco: value }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Responsável
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={responsibleOptions}
+                  value={draftFilters.responsible}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      responsible: value,
+                    }))
                   }
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -1062,6 +1109,18 @@ const ListaRiscoAvaliacoes = ({
             }}
           >
             {row.original.cycle ?? row.original.name ?? "—"}
+          </Typography>
+        ),
+      },
+      {
+        header: "Responsável",
+        accessorKey: "responsible",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.responsibleName ||
+              row.original.responsible ||
+              row.original.idResponsible ||
+              "—"}
           </Typography>
         ),
       },

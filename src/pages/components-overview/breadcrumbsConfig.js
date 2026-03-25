@@ -243,6 +243,10 @@ export const routeMapping = {
     editTitle: "Editar Normativa",
     parent: "/normativas/lista",
   },
+  "/normativos/aprovar": {
+    title: "Aprovar Normativa",
+    parent: "/normativas/lista",
+  },
 
   "/planos/lista": { title: "Planos", parent: null },
   "/planos/criar": {

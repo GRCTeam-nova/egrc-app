@@ -29,6 +29,10 @@ import AnimateButton from "../../../components/@extended/AnimateButton";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useToken } from "../../../api/TokenContext";
+import {
+  clearPostLoginRedirect,
+  getSavedPostLoginRedirect,
+} from "../../../utils/authRedirect";
 
 import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 
@@ -45,7 +49,7 @@ const AuthLogin = ({ isDemo = false }) => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (location.state && location.state.from) {
+    if (location.state?.from || getSavedPostLoginRedirect()) {
       setLoginMessage(
         "Você precisa efetuar o login para visualizar este questionário.",
       );
@@ -60,6 +64,15 @@ const AuthLogin = ({ isDemo = false }) => {
     const timer = setTimeout(() => {}, 10000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (
+      loginMessage &&
+      loginMessage !== "Voce precisa efetuar o login para continuar."
+    ) {
+      setLoginMessage("Voce precisa efetuar o login para continuar.");
+    }
+  }, [loginMessage]);
 
   const handleClickShowPassword = () => {
     setShowPassword((prev) => !prev);
@@ -129,10 +142,15 @@ const AuthLogin = ({ isDemo = false }) => {
 
       login(finalToken, userData);
 
-      if (location.state && location.state.from) {
-        navigate(location.state.from);
+      const redirectAfterLogin =
+        location.state?.from || getSavedPostLoginRedirect();
+
+      clearPostLoginRedirect();
+
+      if (redirectAfterLogin) {
+        navigate(redirectAfterLogin, { replace: true });
       } else {
-        navigate("/dashboard/resumo");
+        navigate("/dashboard/resumo", { replace: true });
       }
     } catch (error) {
       console.error("Erro no processo de login:", error);
@@ -207,6 +225,11 @@ const AuthLogin = ({ isDemo = false }) => {
               <Typography variant="h4" sx={{ mb: 3 }}>
                 Entrar
               </Typography>
+              {loginMessage && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  {loginMessage}
+                </Alert>
+              )}
               {showExpiredAlert && (
                 <Alert severity="warning" sx={{ mb: 3 }}>
                   Sua sessão expirou. Por favor, faça login novamente.

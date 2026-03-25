@@ -33,7 +33,22 @@ export function getMapboxAccessToken() {
 }
 
 export function getBaseName() {
-  return getRuntimeEnv('BASE_NAME');
+  const winEnv = readWindowEnv();
+  const configuredBaseName = winEnv.BASE_NAME;
+
+  if (typeof configuredBaseName === 'string' && configuredBaseName.length > 0) {
+    return configuredBaseName;
+  }
+
+  if (typeof window !== 'undefined') {
+    const pathname = window.location.pathname || '';
+
+    if (pathname === '/app' || pathname.startsWith('/app/')) {
+      return '/app';
+    }
+  }
+
+  return DEFAULTS.BASE_NAME;
 }
 
 export function getGoogleMapsApiKey() {

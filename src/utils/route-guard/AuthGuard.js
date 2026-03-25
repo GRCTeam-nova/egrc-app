@@ -1,9 +1,10 @@
-import PropTypes from 'prop-types';
-import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import PropTypes from "prop-types";
+import { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 // project import
-import useAuth from '../../hooks/useAuth';
+import useAuth from "../../hooks/useAuth";
+import { savePostLoginRedirect } from "../authRedirect";
 
 // ==============================|| AUTH GUARD ||============================== //
 
@@ -12,14 +13,17 @@ const AuthGuard = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-useEffect(() => {
+  useEffect(() => {
     if (!isLoggedIn) {
-      navigate('login', {
+      const redirectPath = location.pathname + location.search;
+
+      savePostLoginRedirect(redirectPath);
+
+      navigate("/login", {
         state: {
-          // CORREÇÃO AQUI: Concatenar location.search para manter os parâmetros ?id=...
-          from: location.pathname + location.search 
+          from: redirectPath,
         },
-        replace: true
+        replace: true,
       });
     }
   }, [isLoggedIn, navigate, location]);
@@ -28,7 +32,7 @@ useEffect(() => {
 };
 
 AuthGuard.propTypes = {
-  children: PropTypes.node
+  children: PropTypes.node,
 };
 
 export default AuthGuard;

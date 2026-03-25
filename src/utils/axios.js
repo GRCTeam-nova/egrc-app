@@ -1,5 +1,10 @@
 import axios from "axios";
 import { API_URL } from "config";
+import {
+  getCurrentAppPath,
+  getLoginPath,
+  savePostLoginRedirect,
+} from "./authRedirect";
 
 const axiosServices = axios.create({
   baseURL: API_URL || "http://localhost:8010/",
@@ -48,7 +53,8 @@ axiosServices.interceptors.response.use(
           return axiosServices(originalRequest);
         } catch (refreshError) {
           // Se a renovação falhar, redireciona para o login
-          window.location = "/login";
+          savePostLoginRedirect(getCurrentAppPath());
+          window.location = getLoginPath();
           return Promise.reject(refreshError);
         }
       }
@@ -66,7 +72,8 @@ axiosServices.interceptors.response.use(
         window.location.href.includes("/primeiro-acesso");
 
       if (!isPublicRoute) {
-        window.location = "/login";
+        savePostLoginRedirect(getCurrentAppPath());
+        window.location = getLoginPath();
       }
     }
 

@@ -1562,7 +1562,12 @@ const ListagemAvaliacoes = () => {
         header: "Responsável",
         accessorKey: "responsible",
         cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.responsible}</Typography>
+          <Typography sx={{ fontSize: "13px" }}>
+            {row.original.responsibleName ||
+              row.original.responsible ||
+              row.original.idResponsible ||
+              "â€”"}
+          </Typography>
         ),
       },
       {
