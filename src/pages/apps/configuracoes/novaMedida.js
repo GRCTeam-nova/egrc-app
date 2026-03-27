@@ -21,7 +21,7 @@ import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
@@ -30,50 +30,89 @@ function NovaMedida() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { medidaDados } = location.state || {};
+  const { id } = useParams();
+  const [medidaDados, setMedidaDados] = useState(location.state?.medidaDados || null);
   
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrada");
   const [hasChanges, setHasChanges] = useState(false);
 
-  const formatos = [
-  { id: 1, nome: "numérico", valor: "numérico" },
-  { id: 2, nome: "inteiro", valor: "inteiro" },
-  { id: 3, nome: "%", valor: "%" },
-  { id: 4, nome: "$$", valor: "$$" },
-];
+  // Fetch data if accessed directly by ID
+  useEffect(() => {
+    const fetchMeasureData = async () => {
+      if (id && !medidaDados && token) {
+        try {
+          setLoading(true);
+          const res = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/Measure`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const measures = Array.isArray(res.data) ? res.data : [];
+          const item = measures.find(m => m.id === id || m.measureCode === id);
+          if (item) {
+            setMedidaDados(item);
+          } else {
+            enqueueSnackbar("Medida não encontrada", { variant: "error" });
+          }
+        } catch (error) {
+          console.error("Erro ao buscar dados da medida:", error);
+          enqueueSnackbar("Não foi possível carregar os dados da medida", { variant: "error" });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchMeasureData();
+  }, [id, token]);
 
-const unidades = [
-  { id: 1, nome: "Unidade", valor: "Unidade" },
-  { id: 2, nome: "Litro", valor: "Litro" },
-  { id: 3, nome: "kg CO₂e/unidade", valor: "kg CO₂e/unidade" },
-  { id: 4, nome: "kWh", valor: "kWh" },
-  { id: 5, nome: "Tonelada", valor: "Tonelada" },
-  { id: 6, nome: "Passageiro.km", valor: "Passageiro.km" },
-  { id: 7, nome: "Reais", valor: "Reais" },
-  { id: 8, nome: "Dólar", valor: "Dólar" },
-  { id: 9, nome: "metros cúbicos", valor: "metros cúbicos" },
-  { id: 10, nome: "metros quadrados", valor: "metros quadrados" },
-];
+  const [formatos, setFormatos] = useState([]);
+  const [unidades, setUnidades] = useState([]);
   
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
   const [formData, setFormData] = useState({
-    codigo_medida: "", // código da medida (número, ex: LT)
-    nome_medida: "", // nome da medida (alpha, ex: Litro)
-    formato: null, // formato dos valores (alpha numérico interio/ % / $$)
-    unidade: null, // unidade (select/autocomplete)
+    id: "",
+    codigo_medida: "",
+    nome_medida: "", 
+    formato: null, 
+    unidade: null,
+    active: true
   });
+
+  useEffect(() => {
+    const fetchEnums = async () => {
+      if (!token) return;
+      try {
+        const response = await axios.get("https://api.egrc.homologacao.com.br/api/v1/Measure/enums", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // The API returns an object with "formats" and "units" directly
+        const data = response.data || {};
+        
+        setFormatos(data.formats || []);
+        setUnidades(data.units || []);
+      } catch (error) {
+        console.error("Erro ao buscar enums da medida:", error);
+      }
+    };
+    fetchEnums();
+  }, [token]);
 
   // Em caso de edição
   useEffect(() => {
     if (medidaDados) {
       setRequisicao("Editar");
       setMensagemFeedback("editada");
-      // Aqui você carregaria os dados da medida para edição
-      // setFormData com os dados existentes
+      setFormData({
+        id: medidaDados.id || "",
+        codigo_medida: medidaDados.measureCode || "",
+        nome_medida: medidaDados.measureName || "",
+        formato: medidaDados.measureFormatId || null,
+        unidade: medidaDados.measureUnitId || null,
+        active: medidaDados.active !== undefined ? medidaDados.active : true
+      });
     }
   }, [medidaDados]);
 
@@ -159,8 +198,24 @@ const unidades = [
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const payload = {
+        measureCode: formData.codigo_medida,
+        measureName: formData.nome_medida,
+        measureFormatId: formData.formato,
+        measureUnitId: formData.unidade
+      };
+
+      if (requisicao === "Criar") {
+        await axios.post("https://api.egrc.homologacao.com.br/api/v1/Measure", payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        payload.id = formData.id;
+        payload.active = formData.active;
+        await axios.put("https://api.egrc.homologacao.com.br/api/v1/Measure", payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
       
       enqueueSnackbar(`Medida ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -200,6 +255,7 @@ const unidades = [
               fullWidth
               value={formData.codigo_medida}
               onChange={(e) => handleInputChange('codigo_medida', e.target.value)}
+              disabled={requisicao === "Editar"}
               error={!formValidation.codigo_medida}
               placeholder="Ex: LT"
               helperText={!formValidation.codigo_medida ? "Campo obrigatório" : "Ex: LT"}
@@ -226,12 +282,12 @@ const unidades = [
             <InputLabel>Formato *</InputLabel>
             <Autocomplete
               options={formatos}
-              getOptionLabel={(option) => option.nome}
-              value={formatos.find(f => f.valor === formData.formato) || null}
+              getOptionLabel={(option) => option.name || ""}
+              value={formatos.find(f => f.id === formData.formato) || null}
               onChange={(event, newValue) => {
-                handleInputChange('formato', newValue ? newValue.valor : null);
+                handleInputChange('formato', newValue ? newValue.id : null);
               }}
-              isOptionEqualToValue={(option, value) => option.valor === value.valor}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
               renderInput={(params) => (
                 <TextField 
                   {...params} 
@@ -248,12 +304,12 @@ const unidades = [
             <InputLabel>Unidade *</InputLabel>
             <Autocomplete
               options={unidades}
-              getOptionLabel={(option) => option.nome}
-              value={unidades.find(u => u.valor === formData.unidade) || null}
+              getOptionLabel={(option) => option.name || ""}
+              value={unidades.find(u => u.id === formData.unidade) || null}
               onChange={(event, newValue) => {
-                handleInputChange('unidade', newValue ? newValue.valor : null);
+                handleInputChange('unidade', newValue ? newValue.id : null);
               }}
-              isOptionEqualToValue={(option, value) => option.valor === value.valor}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
               renderInput={(params) => (
                 <TextField 
                   {...params} 
@@ -279,6 +335,7 @@ const unidades = [
               variant="contained"
               color="primary"
               onClick={tratarSubmit}
+              disabled={requisicao === "Editar" ? !hasChanges : !(formData.codigo_medida?.trim() && formData.nome_medida?.trim() && formData.formato && formData.unidade)}
               sx={{ minWidth: 120 }}
             >
               {requisicao === "Criar" ? "Criar" : "Atualizar"}

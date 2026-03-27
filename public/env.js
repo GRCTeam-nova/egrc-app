@@ -1,7 +1,7 @@
 // Runtime environment variables (generated/overwritten at container startup).
 // This file exists to support local development too.
 window.__ENV__ = window.__ENV__ || {
-  EGRC_API_URL_URL: 'https://localhost:7176/api/v1/',
+  EGRC_API_URL_URL: 'https://api.egrc.homologacao.com.br/api/v1/',
   // EGRC_API_URL_URL: 'https://api.egrc.homologacao.com.br/api/v1/',
   EGRC_COLLABORA_URL: 'https://clbr.egrc.homologacao.com.br',
   MAPBOX_ACCESS_TOKEN: '',

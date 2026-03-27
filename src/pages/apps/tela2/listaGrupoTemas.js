@@ -1,6 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -8,8 +7,6 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/planos";
-import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
 import emitter from "./eventEmitter";
@@ -75,7 +72,7 @@ import {
   EmptyTable,
   RowSelection,
   TablePagination,
-} from "../../../components/third-party/react-table"; import axios from "axios";
+} from "../../../components/third-party/react-table";
 import { useToken } from "../../../api/TokenContext";
 
 // assets
@@ -650,33 +647,26 @@ function ActionCell({ row, refreshData }) {
   };
 
   const toggleStatus = async () => {
-    const idActionPlan = row.original.idActionPlan;
     const newStatus = status === true ? "Inativo" : "Ativo";
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}action-plans/${idActionPlan}`, {
+      await fetch('https://api.egrc.homologacao.com.br/api/v1/ThemeGroup', {
+        method: 'PUT',
         headers: {
-          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-      });
-  
-      const dadosEndpoint = getResponse.data;
-  
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
-  
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}action-plans`, dadosAtualizados, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        body: JSON.stringify({
+          id: row.original.id,
+          themeGroupName: row.original.themeGroupName,
+          themeGroupDescription: row.original.themeGroupDescription,
+          active: newStatus === "Ativo"
+        })
       });
   
       // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Plano de ação ${row.original.name} ${newStatus.toLowerCase()}.`;
+      setStatus(newStatus === "Ativo");
+      const message = `Grupo tema ${row.original.themeGroupName} ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {
         variant: "success",
@@ -690,7 +680,7 @@ function ActionCell({ row, refreshData }) {
       refreshData();
     } catch (error) {
       console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, { variant: "error" });
+      enqueueSnackbar(`Erro: ${error.message}`, { variant: "error" });
     }
   
     handleDialogClose();
@@ -699,14 +689,17 @@ function ActionCell({ row, refreshData }) {
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+        `https://api.egrc.homologacao.com.br/api/v1/ThemeGroup/${row.original.id}`,
         {
           method: "DELETE",
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
       );
 
       if (response.ok) {
-        enqueueSnackbar(`Plano de ação ${row.original.nome} excluído.`, {
+        enqueueSnackbar(`Grupo tema ${row.original.themeGroupName} excluído.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
@@ -718,7 +711,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o plano: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o grupo tema: ${response.status} ${response.statusText} - ${errorBody}`
         );
       }
     } catch (error) {
@@ -768,7 +761,7 @@ function ActionCell({ row, refreshData }) {
           <Button
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/grupoTemas/criar`, {
+              navigation(`/grupoTemas/editar/${row.original.id}`, {
                 state: {
                   indoPara: "NovoGrupoTemas",
                   dadosApi,
@@ -1167,14 +1160,32 @@ ActionCell.propTypes = {
 const ListagemEmpresa = () => {
   const theme = useTheme();
   const navigation = useNavigate();
-  const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-    refetch,
-  } = useGetPlanos(formData, processoSelecionadoId);
+  const [lists, setLists] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { token } = useToken();
+
+  const fetchGruposTemas = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('https://api.egrc.homologacao.com.br/api/v1/ThemeGroup', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      setLists(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGruposTemas();
+  }, [formData.refreshCount]);
+
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1188,7 +1199,6 @@ const ListagemEmpresa = () => {
       ...currentData,
       refreshCount: currentData.refreshCount + 1,
     }));
-    
   };
 
   useEffect(() => {
@@ -1218,7 +1228,7 @@ const ListagemEmpresa = () => {
     () => [
       {
         header: "Grupos",
-        accessorKey: "name",
+        accessorKey: "themeGroupName",
         cell: ({ row }) => (
           <Typography
           sx={{
@@ -1227,7 +1237,7 @@ const ListagemEmpresa = () => {
           }}
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/grupoTemas/criar`, {
+              navigation(`/grupoTemas/editar/${row.original.id}`, {
                 state: {
                   indoPara: "NovoESG",
                   dadosApi,
@@ -1235,7 +1245,7 @@ const ListagemEmpresa = () => {
               });
             }}
           >
-            {row.original.name}
+            {row.original.themeGroupName}
           </Typography>
         ),
       },

@@ -1,7 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { API_URL} from 'config';
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -9,7 +7,6 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/planos";
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
@@ -118,7 +115,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
   const [columnVisibility, setColumnVisibility] = useState({});
-  const recordType = "Planos de ação";
+  const recordType = "Medidas";
   const tableRef = useRef(null);
   const [sorting, setSorting] = useState([{ id: "nome", asc: true }]);
   const [rowSelection, setRowSelection] = useState({});
@@ -137,7 +134,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
   useEffect(() => {
-    const planos = [...new Set(data.map((item) => item.name))];
+    const planos = [...new Set(data.map((item) => item.measureName))];
     setEmpresaOptions(planos);
   }, [data]);
 
@@ -145,7 +142,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const applyFilters = () => {
     const newFilters = [];
     if (draftFilters.plano.length > 0) {
-      newFilters.push({ type: "Plano de ação", values: draftFilters.plano });
+      newFilters.push({ type: "Medida", values: draftFilters.plano });
     }
     if (draftFilters.cnpj.length > 0) {
       newFilters.push({ type: "CNPJ", values: draftFilters.cnpj });
@@ -165,7 +162,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
       // Atualiza os filtros no drawer com base no tipo de filtro removido
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
-        if (filterToRemove.type === "Plano de ação") {
+        if (filterToRemove.type === "Medida") {
           updatedDraft.plano = updatedDraft.plano.filter(
             (value) => !filterToRemove.values.includes(value)
           );
@@ -196,7 +193,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       return selectedFilters.every((filter) => {
-        if (filter.type === "Plano de ação") return filter.values.includes(item.name);
+        if (filter.type === "Medida") return filter.values.includes(item.measureName);
         if (filter.type === "CNPJ") return filter.values.includes(item.document);
         if (filter.type === "Status") return filter.values.includes(item.active);
         return true;
@@ -420,7 +417,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
 
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Plano de ação</InputLabel>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Medidas</InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
@@ -651,24 +648,20 @@ function ActionCell({ row, refreshData }) {
   };
 
   const toggleStatus = async () => {
-    const idActionPlan = row.original.idActionPlan;
     const newStatus = status === true ? "Inativo" : "Ativo";
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}action-plans/${idActionPlan}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-  
-      const dadosEndpoint = getResponse.data;
-  
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
+      const dadosAtualizados = { 
+        id: row.original.id,
+        measureCode: row.original.measureCode,
+        measureName: row.original.measureName,
+        measureFormatId: row.original.measureFormatId,
+        measureUnitId: row.original.measureUnitId,
+        active: newStatus === "Ativo" 
+      };
   
       // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}action-plans`, dadosAtualizados, {
+      await axios.put(`https://api.egrc.homologacao.com.br/api/v1/Measure`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -676,8 +669,8 @@ function ActionCell({ row, refreshData }) {
       });
   
       // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Plano de ação ${row.original.name} ${newStatus.toLowerCase()}.`;
+      setStatus(newStatus === "Ativo");
+      const message = `Medida ${row.original.measureName} ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {
         variant: "success",
@@ -700,14 +693,17 @@ function ActionCell({ row, refreshData }) {
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+        `https://api.egrc.homologacao.com.br/api/v1/Measure/${row.original.id}`,
         {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          }
         }
       );
 
       if (response.ok) {
-        enqueueSnackbar(`Plano de ação ${row.original.nome} excluído.`, {
+        enqueueSnackbar(`Medida ${row.original.measureName} excluída.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
@@ -719,7 +715,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o plano: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir a medida: ${response.status} ${response.statusText} - ${errorBody}`
         );
       }
     } catch (error) {
@@ -768,11 +764,10 @@ function ActionCell({ row, refreshData }) {
         <Stack>
           <Button
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/medida/criar`, {
+              const medidaDados = row.original;
+              navigation(`/medida/editar/${medidaDados.measureCode || medidaDados.id}`, {
                 state: {
-                  indoPara: "NovoPlano",
-                  dadosApi,
+                  medidaDados,
                 },
               });
               handleClose();
@@ -872,13 +867,13 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja inativar a plano "{row.original.name}"?
+            Tem certeza que deseja inativar a medida "{row.original.measureName}"?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Ao inativar, essa plano não aparecerá mais no cadastro manual.
+            Ao inativar, essa medida não aparecerá mais no cadastro manual.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -997,13 +992,13 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja excluir o plano "{row.original.nome}"?
+            Tem certeza que deseja excluir a medida "{row.original.measureName}"?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Esse plano não será mais disponibilizado ao cadastrar um novo
+            Essa medida não será mais disponibilizada ao cadastrar um novo
             processo.
           </Typography>
         </DialogContent>
@@ -1168,19 +1163,43 @@ ActionCell.propTypes = {
 const ListagemEmpresa = () => {
   const theme = useTheme();
   const navigation = useNavigate();
-  const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
+  const { token } = useToken();
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading
-  } = useGetPlanos(formData, processoSelecionadoId);
+  const [lists, setLists] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
   const [selectedCustomer] = useState(null);
   const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Fetch as in API calls
+  const fetchMedidas = async () => {
+    setIsLoading(true);
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const response = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/Measure`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setLists(Array.isArray(response.data) ? response.data : (response.data.data || []));
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Erro ao carregar medidas', { variant: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMedidas();
+  }, [formData.refreshCount, token]);
 
   // Handler para atualizar 'formData' e disparar uma nova consulta
   const refreshOrgaos = () => {
@@ -1218,7 +1237,7 @@ const ListagemEmpresa = () => {
     () => [
       {
         header: "Medidas",
-        accessorKey: "name",
+        accessorKey: "measureName",
         cell: ({ row }) => (
           <Typography
           sx={{
@@ -1227,15 +1246,15 @@ const ListagemEmpresa = () => {
           }}
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/medida/criar`, {
+              navigation(`/medida/editar/${dadosApi.measureCode || dadosApi.id}`, {
                 state: {
                   indoPara: "NovoESG",
-                  dadosApi,
+                  medidaDados: dadosApi,
                 },
               });
             }}
           >
-            {row.original.name}
+            {row.original.measureName}
           </Typography>
         ),
       },

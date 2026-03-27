@@ -29,17 +29,14 @@ import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
+import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
-// Dados mock para os selects
-const metricas = [
-    { id: 1, nome: "Consumo de água" },
-    { id: 2, nome: "Consumo de combustível" },
-    { id: 3, nome: "Resíduos" },
-    { id: 4, nome: "Emissões de GEE" },
-    { id: 5, nome: "Horas de treinamento" },
-    { id: 6, nome: "Número de acidentes" },
+const eixosESG = [
+    { id: 1, nome: "Ambiental" },
+    { id: 2, nome: "Social" },
+    { id: 3, nome: "Governança" },
 ];
 
 const tiposMeta = [
@@ -50,17 +47,23 @@ const tiposMeta = [
     { id: 5, nome: "Neutra / Compensada", tipoCampo: "alpha" },
 ];
 
-const planosAcao = [
-    { id: 1, nome: "Plano de Mitigação de Risco A" },
-    { id: 2, nome: "Plano de Redução de Emissões B" },
-    { id: 3, nome: "Plano de Treinamento C" },
-    { id: 4, nome: "Plano de Compliance D" },
+const periodicidades = [
+    { id: 1, nome: "Anual" },
+    { id: 2, nome: "Semestral" },
+    { id: 3, nome: "Trimestral" },
+    { id: 4, nome: "Mensal" },
+    { id: 5, nome: "Quinzenal" },
+    { id: 6, nome: "Semanal" },
+    { id: 7, nome: "Diária" },
 ];
 
-const eixosESG = [
-    { id: 1, nome: "Ambiental" },
-    { id: 2, nome: "Social" },
-    { id: 3, nome: "Governança" },
+const metricas = [
+    { id: 1, nome: "Consumo de água" },
+    { id: 2, nome: "Consumo de combustível" },
+    { id: 3, nome: "Resíduos" },
+    { id: 4, nome: "Emissões de GEE" },
+    { id: 5, nome: "Horas de treinamento" },
+    { id: 6, nome: "Número de acidentes" },
 ];
 
 const temas = [
@@ -82,101 +85,88 @@ const gruposTema = [
     { id: 4, nome: "Econômico" },
 ];
 
-const unidadesMedida = [
-    { id: 1, nome: "Percentual (%)" },
-    { id: 2, nome: "Toneladas (t)" },
-    { id: 3, nome: "Quilogramas (kg)" },
-    { id: 4, nome: "Litros (L)" },
-    { id: 5, nome: "Metros cúbicos (m³)" },
-    { id: 6, nome: "Quilowatt-hora (kWh)" },
-    { id: 7, nome: "Número absoluto" },
-    { id: 8, nome: "Reais (R$)" },
-    { id: 9, nome: "Horas" },
-    { id: 10, nome: "Dias" },
-];
-
-const periodicidades = [
-    { id: 1, nome: "Anual" },
-    { id: 2, nome: "Semestral" },
-    { id: 3, nome: "Trimestral" },
-    { id: 4, nome: "Mensal" },
-    { id: 5, nome: "Quinzenal" },
-    { id: 6, nome: "Semanal" },
-    { id: 7, nome: "Diária" },
-];
-
-const colaboradores = [
-    { id: 1, nome: "Ana Silva - Sustentabilidade" },
-    { id: 2, nome: "Carlos Santos - Meio Ambiente" },
-    { id: 3, nome: "Maria Oliveira - Recursos Humanos" },
-    { id: 4, nome: "João Pereira - Compliance" },
-    { id: 5, nome: "Fernanda Costa - Qualidade" },
-    { id: 6, nome: "Roberto Lima - Operações" },
-];
-
-const padroesFrameworks = [
-    { id: 1, nome: "GRI Standards" },
-    { id: 2, nome: "SASB" },
-    { id: 3, nome: "TCFD" },
-    { id: 4, nome: "CDP" },
-    { id: 5, nome: "UN Global Compact" },
-    { id: 6, nome: "ISO 14001" },
-    { id: 7, nome: "ISO 45001" },
-    { id: 8, nome: "OHSAS 18001" },
-];
-
-const empresas = [
-    { id: 1, nome: "Matriz - São Paulo" },
-    { id: 2, nome: "Filial - Rio de Janeiro" },
-    { id: 3, nome: "Filial - Belo Horizonte" },
-    { id: 4, nome: "Subsidiária - Brasília" },
-    { id: 5, nome: "Unidade - Salvador" },
-];
-
-const processos = [
-    { id: 1, nome: "Gestão Ambiental" },
-    { id: 2, nome: "Gestão de Pessoas" },
-    { id: 3, nome: "Produção Industrial" },
-    { id: 4, nome: "Logística e Distribuição" },
-    { id: 5, nome: "Compras e Suprimentos" },
-    { id: 6, nome: "Vendas e Marketing" },
-    { id: 7, nome: "Financeiro e Controladoria" },
-];
-
-const departamentos = [
-    { id: 1, nome: "Sustentabilidade" },
-    { id: 2, nome: "Meio Ambiente" },
-    { id: 3, nome: "Recursos Humanos" },
-    { id: 4, nome: "Produção" },
-    { id: 5, nome: "Qualidade" },
-    { id: 6, nome: "Compliance" },
-    { id: 7, nome: "Operações" },
-    { id: 8, nome: "Financeiro" },
-];
-
-const riscos = [
-    { id: 1, nome: "Mudanças Climáticas" },
-    { id: 2, nome: "Escassez de Recursos Naturais" },
-    { id: 3, nome: "Poluição Ambiental" },
-    { id: 4, nome: "Acidentes de Trabalho" },
-    { id: 5, nome: "Violação de Direitos Humanos" },
-    { id: 6, nome: "Corrupção e Suborno" },
-    { id: 7, nome: "Não Conformidade Regulatória" },
-    { id: 8, nome: "Reputacional" },
-];
-
 // ==============================|| NOVO INDICADOR ||============================== //
 function NovoIndicador() {
     const { token } = useToken();
     const navigate = useNavigate();
     const location = useLocation();
-    const { indicadorDados } = location.state || {};
+    const { id } = useParams();
+    const [indicadorDados, setIndicadorDados] = useState(location.state?.indicadorDados || null);
 
     const [loading, setLoading] = useState(false);
     const [requisicao, setRequisicao] = useState("Criar");
     const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
-    const [indicadorEsgDados, setIndicadorEsgDados] = useState(null);
     const [hasChanges, setHasChanges] = useState(false);
+
+    // Fetch data if accessed directly by ID
+    useEffect(() => {
+        const fetchIndicatorData = async () => {
+            if (id && !indicadorDados && token) {
+                try {
+                    setLoading(true);
+                    const res = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/Indicator`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const indicators = Array.isArray(res.data) ? res.data : [];
+                    const item = indicators.find(ind => ind.id === id || ind.indicatorCode === id);
+                    if (item) {
+                        setIndicadorDados(item);
+                    } else {
+                        enqueueSnackbar("Indicador não encontrado", { variant: "error" });
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar dados do indicador:", error);
+                    enqueueSnackbar("Não foi possível carregar os dados do indicador", { variant: "error" });
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+        fetchIndicatorData();
+    }, [id, token]);
+
+    // Dynamic select options
+    const [unidadesMedida, setUnidadesMedida] = useState([]);
+    const [colaboradores, setColaboradores] = useState([]);
+    const [departamentos, setDepartamentos] = useState([]);
+    const [empresas, setEmpresas] = useState([]);
+    const [processos, setProcessos] = useState([]);
+    const [riscos, setRiscos] = useState([]);
+    const [padroesFrameworks, setPadroesFrameworks] = useState([]);
+    const [planosAcao, setPlanosAcao] = useState([]);
+
+    useEffect(() => {
+        const fetchOptions = async () => {
+            if (!token) return;
+            try {
+                const headers = { Authorization: `Bearer ${token}` };
+                
+                // Fetch for different endpoints in parallel
+                const endpoints = [
+                    { key: 'units', url: 'https://api.egrc.homologacao.com.br/api/v1/Measure/enums', setter: (data) => setUnidadesMedida(data.units || []) },
+                    { key: 'collaborators', url: 'https://api.egrc.homologacao.com.br/api/v1/collaborators', setter: setColaboradores },
+                    { key: 'departments', url: 'https://api.egrc.homologacao.com.br/api/v1/departments', setter: setDepartamentos },
+                    { key: 'companies', url: 'https://api.egrc.homologacao.com.br/api/v1/companies', setter: setEmpresas },
+                    { key: 'processes', url: 'https://api.egrc.homologacao.com.br/api/v1/processes', setter: setProcessos },
+                    { key: 'risks', url: 'https://api.egrc.homologacao.com.br/api/v1/risks', setter: setRiscos },
+                    { key: 'normatives', url: 'https://api.egrc.homologacao.com.br/api/v1/normatives', setter: setPadroesFrameworks },
+                    { key: 'action-plans', url: 'https://api.egrc.homologacao.com.br/api/v1/action-plans', setter: setPlanosAcao }
+                ];
+
+                await Promise.all(endpoints.map(async (ep) => {
+                    try {
+                        const res = await axios.get(ep.url, { headers });
+                        ep.setter(res.data || []);
+                    } catch (e) {
+                        console.error(`Error fetching ${ep.key}:`, e);
+                    }
+                }));
+            } catch (error) {
+                console.error("Error fetching indicator form options:", error);
+            }
+        };
+        fetchOptions();
+    }, [token]);
 
     window.hasChanges = hasChanges;
     window.setHasChanges = setHasChanges;
@@ -226,10 +216,57 @@ function NovoIndicador() {
         if (indicadorDados) {
             setRequisicao("Editar");
             setMensagemFeedback("editado");
-            // Aqui você carregaria os dados do indicador para edição
-            // setFormData com os dados existentes
+            
+             // Mapper de indicadorDados para formData
+            const safeParse = (str) => {
+                if (!str) return [];
+                try {
+                   return str.split(',').map(s => ({ id: isNaN(s) ? s : parseInt(s), nome: s }));
+                } catch(e) { return [] }
+            };
+
+            const findItem = (list, id, idField) => {
+                if (!id) return null;
+                return list.find(item => item[idField] === id) || { [idField]: id, name: `ID: ${id}`, active: true }; // active true by default for selected items to avoid filtering
+            };
+
+            const mapItems = (list, ids, idField) => {
+                if (!ids) return [];
+                return ids.map(id => findItem(list, id, idField)).filter(Boolean);
+            };
+
+            setFormData({
+                codigoIndicador: indicadorDados.indicatorCode || "",
+                nomeIndicador: indicadorDados.indicatorName || "",
+                eixoEsg: eixosESG.find(e => e.id === indicadorDados.esgAxis) || null,
+                metrica: metricas.find(m => m.id === Number(indicadorDados.metric)) ? [metricas.find(m => m.id === Number(indicadorDados.metric))] : safeParse(indicadorDados.metric), 
+                tipoMeta: tiposMeta.find(t => t.id === Number(indicadorDados.goalType)) || null,
+                valorMeta: indicadorDados.goalValue || "",
+                planoAcaoMitigacao: mapItems(planosAcao, indicadorDados.actionPlanIds, 'idActionPlan'),
+                tema: indicadorDados.theme ? safeParse(indicadorDados.theme) : [],
+                grupoTema: [],
+                unidadeMedida: findItem(unidadesMedida, indicadorDados.measureUnitId, 'id'),
+                formulaCalculo: indicadorDados.calculationFormulaDescription || "",
+                fonteDados: indicadorDados.dataSourceDescription || "",
+                periodicidade: periodicidades.find(p => p.id === Number(indicadorDados.periodicity)) || null,
+                responsavelInterno: findItem(colaboradores, indicadorDados.responsibleId, 'idCollaborator'),
+                referenciasPadrao: mapItems(padroesFrameworks, indicadorDados.frameworkIds, 'idNormative'),
+                meta: indicadorDados.goalName || "",
+                prazoMeta: indicadorDados.goalDeadline ? new Date(indicadorDados.goalDeadline) : null,
+                empresaIndicador: mapItems(empresas, indicadorDados.companyIds, 'idCompany'),
+                processoIndicador: mapItems(processos, indicadorDados.processIds, 'idProcess'),
+                departamentoIndicador: mapItems(departamentos, indicadorDados.departmentIds, 'idDepartment'),
+                riscoIndicador: mapItems(riscos, indicadorDados.riskIds, 'idRisk'),
+                observacoes: "",
+                requisitosObrigatorios: indicadorDados.mandatoryRequirementsDescription || "",
+                requisitosSugeridos: indicadorDados.suggestedRequirementsDescription || "",
+                conexao: "online", 
+                coleta: "automatico",
+                natureza: "quantitativo",
+                tempoImpacto: "lagging",
+            });
         }
-    }, [indicadorDados]);
+    }, [indicadorDados, unidadesMedida, colaboradores, departamentos, empresas, processos, riscos, padroesFrameworks, planosAcao]);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -361,8 +398,59 @@ function NovoIndicador() {
         try {
             setLoading(true);
 
-            // Simular requisição para API
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const payload = {
+                indicatorCode: formData.codigoIndicador || null,
+                indicatorName: formData.nomeIndicador || null,
+                measureUnitId: formData.unidadeMedida ? formData.unidadeMedida.id : null,
+                esgAxis: formData.eixoEsg ? formData.eixoEsg.id : 1,
+                metric: typeof formData.metrica === "string" ? formData.metrica : (formData.metrica.length > 0 ? formData.metrica.map(x=>x.id || x).join(',') : null),
+                theme: typeof formData.tema === "string" ? formData.tema : (formData.tema.length > 0 ? formData.tema.map(x=>x.id || x).join(',') : null),
+                periodicity: formData.periodicidade ? (formData.periodicidade.id ? String(formData.periodicidade.id) : formData.periodicidade) : null,
+                responsibleId: formData.responsavelInterno ? String(formData.responsavelInterno.idCollaborator || formData.responsavelInterno.id) : null,
+                indicatorType: 1, // DEFAULT type 1 per spec
+                calculationFormulaDescription: formData.formulaCalculo || null,
+                dataSourceDescription: formData.fonteDados || null,
+                mandatoryRequirementsDescription: formData.requisitosObrigatorios || null,
+                suggestedRequirementsDescription: formData.requisitosSugeridos || null,
+                goalName: formData.meta || null,
+                goalType: formData.tipoMeta ? String(formData.tipoMeta.id) : null,
+                goalValue: formData.valorMeta || null,
+                goalDeadline: formData.prazoMeta ? formData.prazoMeta.toISOString() : null,
+                frameworkIds: formData.referenciasPadrao.map(x => String(x.idNormative || x.id || x)),
+                companyIds: formData.empresaIndicador.map(x => String(x.idCompany || x.id || x)),
+                processIds: formData.processoIndicador.map(x => String(x.idProcess || x.id || x)),
+                departmentIds: formData.departamentoIndicador.map(x => String(x.idDepartment || x.id || x)),
+                riskIds: formData.riscoIndicador.map(x => String(x.idRisk || x.id || x)),
+                actionPlanIds: formData.planoAcaoMitigacao.map(x => String(x.idActionPlan || x.id || x))
+            };
+
+            let response;
+            if (requisicao === "Criar") {
+                response = await fetch('https://api.egrc.homologacao.com.br/api/v1/Indicator', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                payload.id = indicadorDados.id;
+                payload.active = indicadorDados.active !== undefined ? indicadorDados.active : true;
+                response = await fetch('https://api.egrc.homologacao.com.br/api/v1/Indicator', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erro ${response.status}: ${errorText}`);
+            }
 
             enqueueSnackbar(`Indicador ${mensagemFeedback} com sucesso!`, {
                 variant: "success",
@@ -375,7 +463,7 @@ function NovoIndicador() {
             }
         } catch (error) {
             console.error(error.message);
-            enqueueSnackbar("Não foi possível salvar o indicador.", {
+            enqueueSnackbar(`Não foi possível salvar o indicador: ${error.message}`, {
                 variant: "error",
             });
         } finally {
@@ -406,6 +494,7 @@ function NovoIndicador() {
                                 value={formData.codigoIndicador}
                                 onChange={(e) => handleInputChange('codigoIndicador', e.target.value)}
                                 error={!formData.codigoIndicador && formValidation.codigoIndicador === false}
+                                disabled={requisicao === "Editar"}
                                 placeholder="Digite o código do indicador (máx. 10 caracteres)"
                                 inputProps={{ maxLength: 10 }}
                                 helperText="Máximo de 10 caracteres alfanuméricos"
@@ -443,6 +532,7 @@ function NovoIndicador() {
                                         placeholder="Selecione o eixo ESG"
                                     />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.id === value.id}
                             />
                         </Stack>
                     </Grid>
@@ -452,13 +542,14 @@ function NovoIndicador() {
                         <Stack spacing={1}>
                             <InputLabel>Unidade de Medida</InputLabel>
                             <Autocomplete
-                                options={unidadesMedida}
-                                getOptionLabel={(option) => option.nome}
-                                value={formData.unidadeMedida}
+                                options={unidadesMedida.filter(u => u.active !== false || (formData.unidadeMedida && u.id === formData.unidadeMedida.id))}
+                                getOptionLabel={(option) => option.name || ""}
+                                value={unidadesMedida.find(u => u.id === formData.unidadeMedida?.id) || formData.unidadeMedida}
                                 onChange={(event, newValue) => handleInputChange('unidadeMedida', newValue)}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione a unidade de medida" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.id === value.id}
                             />
                         </Stack>
                     </Grid>
@@ -470,12 +561,13 @@ function NovoIndicador() {
                             <Autocomplete
                                 multiple
                                 options={metricas}
-                                getOptionLabel={(option) => option.nome}
+                                getOptionLabel={(option) => option.nome || ""}
                                 value={formData.metrica}
                                 onChange={handleMultiSelectChange('metrica')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione as métricas relacionadas" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.id === value.id}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => (
                                         <Box
@@ -506,12 +598,13 @@ function NovoIndicador() {
                             <Autocomplete
                                 multiple
                                 options={temas}
-                                getOptionLabel={(option) => option.nome}
+                                getOptionLabel={(option) => option.nome || ""}
                                 value={formData.tema}
                                 onChange={handleMultiSelectChange('tema')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione os temas relacionados" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.id === value.id}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => (
                                         <Box
@@ -555,12 +648,13 @@ function NovoIndicador() {
                             <InputLabel>Periodicidade</InputLabel>
                             <Autocomplete
                                 options={periodicidades}
-                                getOptionLabel={(option) => option.nome}
+                                getOptionLabel={(option) => option.nome || ""}
                                 value={formData.periodicidade}
                                 onChange={(event, newValue) => handleInputChange('periodicidade', newValue)}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione a periodicidade de coleta" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.id === value.id}
                             />
                         </Stack>
                     </Grid>
@@ -570,13 +664,14 @@ function NovoIndicador() {
                         <Stack spacing={1}>
                             <InputLabel>Responsável Interno</InputLabel>
                             <Autocomplete
-                                options={colaboradores}
-                                getOptionLabel={(option) => option.nome}
-                                value={formData.responsavelInterno}
+                                options={colaboradores.filter(c => c.active !== false || (formData.responsavelInterno && c.idCollaborator === formData.responsavelInterno.idCollaborator))}
+                                getOptionLabel={(option) => option.name || ""}
+                                value={colaboradores.find(c => c.idCollaborator === formData.responsavelInterno?.idCollaborator) || formData.responsavelInterno}
                                 onChange={(event, newValue) => handleInputChange('responsavelInterno', newValue)}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione o responsável interno" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idCollaborator === value.idCollaborator}
                             />
                         </Stack>
                     </Grid>
@@ -783,13 +878,14 @@ function NovoIndicador() {
                             <InputLabel>Referências de Padrão/Framework</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={padroesFrameworks}
-                                getOptionLabel={(option) => option.nome}
+                                options={padroesFrameworks.filter(p => p.active !== false || formData.referenciasPadrao.some(sel => sel.idNormative === p.idNormative))}
+                                getOptionLabel={(option) => option.name || ""}
                                 value={formData.referenciasPadrao}
                                 onChange={handleMultiSelectChange('referenciasPadrao')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione os padrões/frameworks relacionados" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idNormative === value.idNormative}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => (
                                         <Box
@@ -805,7 +901,7 @@ function NovoIndicador() {
                                             }}
                                             {...getTagProps({ index })}
                                         >
-                                            {option.nome}
+                                            {option.name || option.nome}
                                         </Box>
                                     ))
                                 }
@@ -827,13 +923,14 @@ function NovoIndicador() {
                             <InputLabel>Empresas Relacionadas</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={empresas}
-                                getOptionLabel={(option) => option.nome}
+                                options={empresas.filter(e => e.active !== false || formData.empresaIndicador.some(sel => sel.idCompany === e.idCompany))}
+                                getOptionLabel={(option) => option.name || ""}
                                 value={formData.empresaIndicador}
                                 onChange={handleMultiSelectChange('empresaIndicador')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione as empresas relacionadas" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idCompany === value.idCompany}
                             />
                         </Stack>
                     </Grid>
@@ -844,13 +941,14 @@ function NovoIndicador() {
                             <InputLabel>Processos Relacionados</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={processos}
-                                getOptionLabel={(option) => option.nome}
+                                options={processos.filter(p => p.active !== false || formData.processoIndicador.some(sel => sel.idProcess === p.idProcess))}
+                                getOptionLabel={(option) => option.name || ""}
                                 value={formData.processoIndicador}
                                 onChange={handleMultiSelectChange('processoIndicador')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione os processos relacionados" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idProcess === value.idProcess}
                             />
                         </Stack>
                     </Grid>
@@ -861,13 +959,14 @@ function NovoIndicador() {
                             <InputLabel>Departamentos Relacionados</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={departamentos}
-                                getOptionLabel={(option) => option.nome}
+                                options={departamentos.filter(d => d.active !== false || formData.departamentoIndicador.some(sel => sel.idDepartment === d.idDepartment))}
+                                getOptionLabel={(option) => option.name || ""}
                                 value={formData.departamentoIndicador}
                                 onChange={handleMultiSelectChange('departamentoIndicador')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione os departamentos relacionados" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idDepartment === value.idDepartment}
                             />
                         </Stack>
                     </Grid>
@@ -878,13 +977,14 @@ function NovoIndicador() {
                             <InputLabel>Riscos Relacionados</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={riscos}
-                                getOptionLabel={(option) => option.nome}
+                                options={riscos.filter(r => r.active !== false || formData.riscoIndicador.some(sel => sel.idRisk === r.idRisk))}
+                                getOptionLabel={(option) => option.name || ""}
                                 value={formData.riscoIndicador}
                                 onChange={handleMultiSelectChange('riscoIndicador')}
                                 renderInput={(params) => (
                                     <TextField {...params} placeholder="Selecione os riscos relacionados" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idRisk === value.idRisk}
                             />
                         </Stack>
                     </Grid>
@@ -894,17 +994,18 @@ function NovoIndicador() {
                             <InputLabel>Plano de Ação/Mitigação</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={planosAcao}
-                                getOptionLabel={(option) => option.nome}
+                                options={planosAcao.filter(p => p.active !== false || formData.planoAcaoMitigacao.some(sel => sel.idActionPlan === p.idActionPlan))}
+                                getOptionLabel={(option) => option.name || ""}
                                 value={formData.planoAcaoMitigacao}
                                 onChange={handleMultiSelectChange('planoAcaoMitigacao')}
                                 renderInput={(params) => (
-                                    <TextField {...params} placeholder="Selecione ou crie planos de ação/mitigação" />
+                                    <TextField {...params} placeholder="Selecione ou crie planos de ação/mitigacao" />
                                 )}
+                                isOptionEqualToValue={(option, value) => option.idActionPlan === value.idActionPlan}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => (
                                         <Box
-                                            key={option.id}
+                                            key={option.idActionPlan}
                                             component="span"
                                             sx={{
                                                 backgroundColor: '#e3f2fd',
@@ -916,7 +1017,7 @@ function NovoIndicador() {
                                             }}
                                             {...getTagProps({ index })}
                                         >
-                                            {option.nome}
+                                            {option.name || option.nome}
                                         </Box>
                                     ))
                                 }
@@ -938,7 +1039,7 @@ function NovoIndicador() {
                                 variant="contained"
                                 onClick={tratarSubmit}
                                 size="large"
-                                disabled={loading}
+                                disabled={loading || (requisicao === "Editar" ? !hasChanges : !(formData.codigoIndicador?.trim() && formData.nomeIndicador?.trim() && formData.unidadeMedida && formData.responsavel))}
                             >
                                 {requisicao === "Criar" ? "Cadastrar Indicador" : "Salvar Alterações"}
                             </Button>
