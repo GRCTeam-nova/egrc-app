@@ -25,8 +25,7 @@ import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from "react-router-dom";
-import axios from "axios";
+import { useLocation, useParams } from "react-router-dom";
 import { useToken } from "../../../api/TokenContext";
 
 // Dados mock para os selects
@@ -53,7 +52,11 @@ function NovoGrupoTemas() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { grupoTemaDados } = location.state || {};
+  const { id } = useParams();
+  const { grupoTemaDados, dadosApi } = location.state || {};
+  
+  // Guardaremos os dados em uma variável state para poder atualizar caso venha da API
+  const [grupoTemaDadosState, setGrupoTemaDadosState] = useState(grupoTemaDados || dadosApi || null);
   
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
@@ -73,15 +76,47 @@ function NovoGrupoTemas() {
     indicadorGruposTemas: [],
   });
 
+  // Fetch from API when navigating directly to the URL with an ID and without state data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (id && !grupoTemaDadosState) {
+        setLoading(true);
+        try {
+          // O GET /ThemeGroup lista todos, aqui podemos fazer GET do específico se a api suportar.
+          // Se não houver /ThemeGroup/{id}, podemos listar e filtrar
+          const response = await fetch(`https://api.egrc.homologacao.com.br/api/v1/ThemeGroup`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          const data = await response.json();
+          // Assume que a action da listagem retorna o objeto, buscaremos pelo id na listagem 
+          const item = data.find(g => g.id === id);
+          if (item) {
+             setGrupoTemaDadosState(item);
+          }
+        } catch (error) {
+          console.error("Failed to fetch tema data", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchData();
+  }, [id, grupoTemaDadosState, token]);
+
   // Em caso de edição
   useEffect(() => {
-    if (grupoTemaDados) {
+    if (grupoTemaDadosState) {
       setRequisicao("Editar");
       setMensagemFeedback("editado");
-      // Aqui você carregaria os dados do grupo de temas para edição
-      // setFormData com os dados existentes
+      setFormData(prev => ({
+        ...prev,
+        nomeGrupo: grupoTemaDadosState.themeGroupName || "",
+        descricaoGrupo: grupoTemaDadosState.themeGroupDescription || "",
+      }));
     }
-  }, [grupoTemaDados]);
+  }, [grupoTemaDadosState]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -157,8 +192,38 @@ function NovoGrupoTemas() {
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      let response;
+      if (requisicao === "Criar") {
+        response = await fetch('https://api.egrc.homologacao.com.br/api/v1/ThemeGroup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            themeGroupName: formData.nomeGrupo,
+            themeGroupDescription: formData.descricaoGrupo
+          })
+        });
+      } else {
+        response = await fetch('https://api.egrc.homologacao.com.br/api/v1/ThemeGroup', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            id: grupoTemaDados?.id || '',
+            themeGroupName: formData.nomeGrupo,
+            themeGroupDescription: formData.descricaoGrupo,
+            active: true
+          })
+        });
+      }
+
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
+      }
       
       enqueueSnackbar(`Grupo de Temas ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -303,13 +368,14 @@ function NovoGrupoTemas() {
               }}
             >
               <Button
-                variant="contained"
-                color="primary"
-                onClick={tratarSubmit}
-                sx={{ minWidth: 120 }}
-              >
-                {requisicao === "Criar" ? "Criar" : "Atualizar"}
-              </Button>
+              variant="contained"
+              color="primary"
+              onClick={tratarSubmit}
+              disabled={loading || (requisicao === "Editar" ? !hasChanges : !(formData.nomeGrupo?.trim() && formData.descricaoGrupo?.trim()))}
+              sx={{ minWidth: 120 }}
+            >
+              {requisicao === "Criar" ? "Criar" : "Atualizar"}
+            </Button>
               <Button
                 variant="outlined"
                 onClick={voltarParaCadastroMenu}

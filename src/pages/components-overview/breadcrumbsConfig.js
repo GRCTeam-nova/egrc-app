@@ -208,6 +208,10 @@ export const routeMapping = {
     editTitle: "Editar Grupo",
     parent: "/grupoTemas/lista",
   },
+  "/grupoTemas/editar/<<idThemeGroup>>": {
+    title: "Editar Grupo",
+    parent: "/grupoTemas/lista",
+  },
 
   "/coleta/lista": { title: "Métrica com coleta", parent: null },
   "/coleta/criar": {

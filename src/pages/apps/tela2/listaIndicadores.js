@@ -1,7 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { API_URL} from 'config';
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -9,8 +7,6 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/planos";
-import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
 import emitter from "./eventEmitter";
@@ -137,8 +133,8 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
   useEffect(() => {
-    const planos = [...new Set(data.map((item) => item.name))];
-    setEmpresaOptions(planos);
+    const empresas = [...new Set(data.filter(item => item && item.indicatorName).map((item) => item.indicatorName))];
+    setEmpresaOptions(empresas);
   }, [data]);
 
   // Aplica os filtros selecionados
@@ -195,9 +191,9 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   // Filtra os dados com base nos filtros selecionados
   const filteredData = useMemo(() => {
     return data.filter((item) => {
+      if (!item) return false;
       return selectedFilters.every((filter) => {
-        if (filter.type === "Plano de ação") return filter.values.includes(item.name);
-        if (filter.type === "CNPJ") return filter.values.includes(item.document);
+        if (filter.type === "Plano de ação") return filter.values.includes(item.indicatorName);
         if (filter.type === "Status") return filter.values.includes(item.active);
         return true;
       });
@@ -651,24 +647,16 @@ function ActionCell({ row, refreshData }) {
   };
 
   const toggleStatus = async () => {
-    const idActionPlan = row.original.idActionPlan;
     const newStatus = status === true ? "Inativo" : "Ativo";
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}action-plans/${idActionPlan}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Definir o novo status do campo "active" e enviar PUT
+      const indicatorPayload = {
+        ...row.original,
+        active: newStatus === "Ativo"
+      };
   
-      const dadosEndpoint = getResponse.data;
-  
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
-  
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}action-plans`, dadosAtualizados, {
+      await axios.put(`https://api.egrc.homologacao.com.br/api/v1/Indicator`, indicatorPayload, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -676,8 +664,8 @@ function ActionCell({ row, refreshData }) {
       });
   
       // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Plano de ação ${row.original.name} ${newStatus.toLowerCase()}.`;
+      setStatus(newStatus === "Ativo");
+      const message = `Indicador ${row.original.indicatorName} ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {
         variant: "success",
@@ -700,14 +688,17 @@ function ActionCell({ row, refreshData }) {
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+        `https://api.egrc.homologacao.com.br/api/v1/Indicator/${row.original.id}`,
         {
           method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
       if (response.ok) {
-        enqueueSnackbar(`Plano de ação ${row.original.nome} excluído.`, {
+        enqueueSnackbar(`Indicador ${row.original.indicatorName} excluído.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
@@ -719,7 +710,7 @@ function ActionCell({ row, refreshData }) {
       } else {
         const errorBody = await response.text();
         throw new Error(
-          `Falha ao excluir o plano: ${response.status} ${response.statusText} - ${errorBody}`
+          `Falha ao excluir o indicador: ${response.status} ${response.statusText} - ${errorBody}`
         );
       }
     } catch (error) {
@@ -768,11 +759,10 @@ function ActionCell({ row, refreshData }) {
         <Stack>
           <Button
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/indicadores/criar`, {
+              const indicadorDados = row.original;
+              navigation(`/indicadores/editar/${indicadorDados.indicatorCode || indicadorDados.id}`, {
                 state: {
-                  indoPara: "NovoIndicador",
-                  dadosApi,
+                  indicadorDados,
                 },
               });
               handleClose();
@@ -1168,14 +1158,11 @@ ActionCell.propTypes = {
 const ListagemEmpresa = () => {
   const theme = useTheme();
   const navigation = useNavigate();
-  const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
+  const { token } = useToken();
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-    refetch,
-  } = useGetPlanos(formData, processoSelecionadoId);
+  const [lists, setLists] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1183,13 +1170,38 @@ const ListagemEmpresa = () => {
   const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // Fetch as in API calls
+  const fetchIndicadores = async () => {
+    setIsLoading(true);
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const response = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/Indicator`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setLists(Array.isArray(response.data) ? response.data : (response.data.data || []));
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar('Erro ao carregar indicadores', { variant: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIndicadores();
+  }, [token, formData.refreshCount]);
+
   // Handler para atualizar 'formData' e disparar uma nova consulta
   const refreshOrgaos = () => {
     setFormData((currentData) => ({
       ...currentData,
       refreshCount: currentData.refreshCount + 1,
     }));
-    
   };
 
   useEffect(() => {
@@ -1219,7 +1231,7 @@ const ListagemEmpresa = () => {
     () => [
       {
         header: "Indicadores",
-        accessorKey: "name",
+        accessorKey: "indicatorName",
         cell: ({ row }) => (
           <Typography
           sx={{
@@ -1228,15 +1240,15 @@ const ListagemEmpresa = () => {
           }}
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/indicadores/criar`, {
+              navigation(`/indicadores/editar/${dadosApi.indicatorCode || dadosApi.id}`, {
                 state: {
                   indoPara: "NovoIndicador",
-                  dadosApi,
+                  indicadorDados: dadosApi,
                 },
               });
             }}
           >
-            {row.original.name}
+            {row.original.indicatorName}
           </Typography>
         ),
       },

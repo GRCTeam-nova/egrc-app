@@ -4,7 +4,6 @@ import {
   Button,
   Box,
   TextField,
-  Autocomplete,
   Grid,
   Stack,
   InputLabel,
@@ -21,7 +20,7 @@ import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
@@ -30,36 +29,63 @@ function NovaDimensao() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { dimensaoDados } = location.state || {};
+  const { id } = useParams();
   
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrada");
   const [hasChanges, setHasChanges] = useState(false);
 
-  const tiposDimensao = [
-  { id: 1, nome: "Local", valor: "local" },
-  { id: 2, nome: "Moeda", valor: "moeda" },
-  { id: 3, nome: "Fonte", valor: "fonte" },
-  { id: 4, nome: "Setor", valor: "setor" },
-  { id: 5, nome: "Região", valor: "regiao" },
-];
+  const [dimensaoDados, setDimensaoDados] = useState(location.state?.dimensaoDados || null);
   
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
   const [formData, setFormData] = useState({
-    tipo_dimensao: null, // tipo da dimensão (select/autocomplete)
-    nome_dimensao: "", // nome da dimensão (alpha, ex: São Paulo)
+    id: "",
+    dimensionCode: "",
+    dimensionName: "",
+    active: true
   });
 
-  // Em caso de edição
+  // Fetch data if accessed directly by ID
+  useEffect(() => {
+    const fetchDimensaoData = async () => {
+      if (id && !dimensaoDados && token) {
+        try {
+          setLoading(true);
+          const res = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/Dimension`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          // Find the specific dimension in the list
+          const item = Array.isArray(res.data) ? res.data.find(d => d.id === id || d.dimensionCode === id) : null;
+          if (item) {
+            setDimensaoDados(item);
+          } else {
+            enqueueSnackbar("Dimensão não encontrada", { variant: "error" });
+          }
+        } catch (error) {
+          console.error("Erro ao buscar dados da dimensão:", error);
+          enqueueSnackbar("Não foi possível carregar os dados da dimensão", { variant: "error" });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchDimensaoData();
+  }, [id, token]);
+
+  // Handle edit mode
   useEffect(() => {
     if (dimensaoDados) {
       setRequisicao("Editar");
       setMensagemFeedback("editada");
-      // Aqui você carregaria os dados da dimensão para edição
-      // setFormData com os dados existentes
+      setFormData({
+        id: dimensaoDados.id || "",
+        dimensionCode: dimensaoDados.dimensionCode || "",
+        dimensionName: dimensaoDados.dimensionName || "",
+        active: dimensaoDados.active !== undefined ? dimensaoDados.active : true
+      });
     }
   }, [dimensaoDados]);
 
@@ -72,8 +98,8 @@ function NovaDimensao() {
   };
 
   const [formValidation, setFormValidation] = useState({
-    tipo_dimensao: true,
-    nome_dimensao: true,
+    dimensionCode: true,
+    dimensionName: true,
   });
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -97,20 +123,20 @@ function NovaDimensao() {
     const missingFields = [];
     let isValid = true;
     
-    if (!formData.tipo_dimensao) {
-      setFormValidation(prev => ({ ...prev, tipo_dimensao: false }));
-      missingFields.push("Tipo da Dimensão");
+    if (!formData.dimensionCode?.toString().trim()) {
+      setFormValidation(prev => ({ ...prev, dimensionCode: false }));
+      missingFields.push("Código da Dimensão");
       isValid = false;
     } else {
-      setFormValidation(prev => ({ ...prev, tipo_dimensao: true }));
+      setFormValidation(prev => ({ ...prev, dimensionCode: true }));
     }
     
-    if (!formData.nome_dimensao.trim()) {
-      setFormValidation(prev => ({ ...prev, nome_dimensao: false }));
+    if (!formData.dimensionName?.toString().trim()) {
+      setFormValidation(prev => ({ ...prev, dimensionName: false }));
       missingFields.push("Nome da Dimensão");
       isValid = false;
     } else {
-      setFormValidation(prev => ({ ...prev, nome_dimensao: true }));
+      setFormValidation(prev => ({ ...prev, dimensionName: true }));
     }
 
     if (!isValid) {
@@ -127,8 +153,27 @@ function NovaDimensao() {
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const payload = requisicao === "Criar" 
+        ? { dimensionCode: formData.dimensionCode, dimensionName: formData.dimensionName }
+        : { 
+            id: formData.id, 
+            dimensionCode: formData.dimensionCode, 
+            dimensionName: formData.dimensionName, 
+            active: formData.active 
+          };
+
+      const config = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      if (requisicao === "Criar") {
+        await axios.post("https://api.egrc.homologacao.com.br/api/v1/Dimension", payload, config);
+      } else {
+        await axios.put("https://api.egrc.homologacao.com.br/api/v1/Dimension", payload, config);
+      }
       
       enqueueSnackbar(`Dimensão ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -137,10 +182,10 @@ function NovaDimensao() {
       if (requisicao === "Criar") {
         setSuccessDialogOpen(true);
       } else {
-        voltarParaCadastroMenu();
+        voltarParaListagem();
       }
     } catch (error) {
-      console.error(error.message);
+      console.error(error);
       enqueueSnackbar("Não foi possível salvar a dimensão.", {
         variant: "error",
       });
@@ -154,50 +199,41 @@ function NovaDimensao() {
       <LoadingOverlay isActive={loading} />
       <Grid container spacing={3} marginTop={1}>
         <Grid item xs={12}>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom sx={{ color: '#1C5297', fontWeight: 600 }}>
             {requisicao === "Criar" ? "Nova Dimensão" : "Editar Dimensão"}
           </Typography>
           <Divider sx={{ mb: 3 }} />
         </Grid>
 
-        {/* Campos da Dimensão */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
-            <InputLabel>Tipo da Dimensão *</InputLabel>
-            <Autocomplete
-              options={tiposDimensao}
-              getOptionLabel={(option) => option.nome}
-              value={tiposDimensao.find(t => t.valor === formData.tipo_dimensao) || null}
-              onChange={(event, newValue) => {
-                handleInputChange('tipo_dimensao', newValue ? newValue.valor : null);
-              }}
-              isOptionEqualToValue={(option, value) => option.valor === value.valor}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  error={!formValidation.tipo_dimensao}
-                  helperText={!formValidation.tipo_dimensao ? "Campo obrigatório" : "Ex: Local, Moeda, Fonte"}
-                />
-              )}
-            />
-          </Stack>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Stack spacing={1}>
-            <InputLabel>Nome da Dimensão *</InputLabel>
+            <InputLabel sx={{ fontWeight: 600, fontSize: '13px' }}>Código da Dimensão *</InputLabel>
             <TextField
               fullWidth
-              value={formData.nome_dimensao}
-              onChange={(e) => handleInputChange('nome_dimensao', e.target.value)}
-              error={!formValidation.nome_dimensao}
-              placeholder="Ex: São Paulo, Dólar, Energia Solar"
-              helperText={!formValidation.nome_dimensao ? "Campo obrigatório" : "Ex: São Paulo, Dólar, Energia Solar"}
+              value={formData.dimensionCode}
+              onChange={(e) => handleInputChange('dimensionCode', e.target.value)}
+              error={!formValidation.dimensionCode}
+              disabled={requisicao === "Editar"}
+              placeholder="Ex: LOC"
+              helperText={!formValidation.dimensionCode ? "Campo obrigatório" : "Identificador curto"}
             />
           </Stack>
         </Grid>
 
-        {/* Botões de ação */}
+        <Grid item xs={12} md={6}>
+          <Stack spacing={1}>
+            <InputLabel sx={{ fontWeight: 600, fontSize: '13px' }}>Nome da Dimensão *</InputLabel>
+            <TextField
+              fullWidth
+              value={formData.dimensionName}
+              onChange={(e) => handleInputChange('dimensionName', e.target.value)}
+              error={!formValidation.dimensionName}
+              placeholder="Ex: Localização"
+              helperText={!formValidation.dimensionName ? "Campo obrigatório" : "Nome detalhado"}
+            />
+          </Stack>
+        </Grid>
+
         <Grid item xs={12}>
           <Divider sx={{ my: 3 }} />
           <Box
@@ -211,14 +247,15 @@ function NovaDimensao() {
               variant="contained"
               color="primary"
               onClick={tratarSubmit}
-              sx={{ minWidth: 120 }}
+              disabled={requisicao === "Editar" ? !hasChanges : !(formData.dimensionCode?.trim() && formData.dimensionName?.trim())}
+              sx={{ minWidth: 120, borderRadius: '8px', textTransform: 'none' }}
             >
               {requisicao === "Criar" ? "Criar" : "Atualizar"}
             </Button>
             <Button
               variant="outlined"
               onClick={voltarParaCadastroMenu}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: 120, borderRadius: '8px', textTransform: 'none' }}
             >
               Cancelar
             </Button>
@@ -226,7 +263,6 @@ function NovaDimensao() {
         </Grid>
       </Grid>
 
-      {/* Dialog de Sucesso */}
       <Dialog
         open={successDialogOpen}
         onClose={voltarParaListagem}
@@ -259,14 +295,14 @@ function NovaDimensao() {
           <Button
             onClick={continuarEdicao}
             variant="outlined"
-            sx={{ minWidth: "120px" }}
+            sx={{ minWidth: "120px", textTransform: 'none' }}
           >
             Continuar Editando
           </Button>
           <Button
             onClick={voltarParaListagem}
             variant="contained"
-            sx={{ minWidth: "120px" }}
+            sx={{ minWidth: "120px", textTransform: 'none' }}
           >
             Voltar para Listagem
           </Button>

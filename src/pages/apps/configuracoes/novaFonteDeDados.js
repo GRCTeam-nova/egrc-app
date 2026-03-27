@@ -20,45 +20,73 @@ import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+
 // ==============================|| NOVA FONTE DE DADOS ||============================== //
 function NovaFonteDeDados() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { fonteDados } = location.state || {};
+  const { id } = useParams();
   
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrada");
   const [hasChanges, setHasChanges] = useState(false);
+
+  const [fonteDeDadosDados, setFonteDeDadosDados] = useState(location.state?.fonteDeDadosDados || null);
   
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
-  const tiposFonte = [
-  { id: 1, nome: "Sistema", valor: "sistema" },
-  { id: 2, nome: "Documento", valor: "documento" },
-  { id: 3, nome: "Medidor", valor: "medidor" },
-  { id: 4, nome: "Relatório", valor: "relatorio" },
-];
-
   const [formData, setFormData] = useState({
-    codigo_fonte_dados: "", // código da fonte de dados (número, ex: LT)
-    nome_fonte_dados: "", // nome da fonte de dados (alpha, ex: Litro)
+    id: "",
+    dataSourceCode: "",
+    dataSourceName: "",
+    active: true
   });
 
-  // Em caso de edição
+  // Fetch data if accessed directly by ID
   useEffect(() => {
-    if (fonteDados) {
+    const fetchDataSourceData = async () => {
+      if (id && !fonteDeDadosDados && token) {
+        try {
+          setLoading(true);
+          const res = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/DataSource`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const item = Array.isArray(res.data) ? res.data.find(d => d.id === id || d.dataSourceCode === id) : null;
+          if (item) {
+            setFonteDeDadosDados(item);
+          } else {
+            enqueueSnackbar("Fonte de dados não encontrada", { variant: "error" });
+          }
+        } catch (error) {
+          console.error("Erro ao buscar dados da fonte de dados:", error);
+          enqueueSnackbar("Não foi possível carregar os dados", { variant: "error" });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchDataSourceData();
+  }, [id, token]);
+
+  // Handle edit mode
+  useEffect(() => {
+    if (fonteDeDadosDados) {
       setRequisicao("Editar");
       setMensagemFeedback("editada");
-      // Aqui você carregaria os dados da fonte de dados para edição
-      // setFormData com os dados existentes
+      setFormData({
+        id: fonteDeDadosDados.id || "",
+        dataSourceCode: fonteDeDadosDados.dataSourceCode || "",
+        dataSourceName: fonteDeDadosDados.dataSourceName || "",
+        active: fonteDeDadosDados.active !== undefined ? fonteDeDadosDados.active : true
+      });
     }
-  }, [fonteDados]);
+  }, [fonteDeDadosDados]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -69,8 +97,8 @@ function NovaFonteDeDados() {
   };
 
   const [formValidation, setFormValidation] = useState({
-    codigo_fonte_dados: true,
-    nome_fonte_dados: true,
+    dataSourceCode: true,
+    dataSourceName: true,
   });
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -94,20 +122,20 @@ function NovaFonteDeDados() {
     const missingFields = [];
     let isValid = true;
     
-    if (!formData.codigo_fonte_dados.trim()) {
-      setFormValidation(prev => ({ ...prev, codigo_fonte_dados: false }));
+    if (!formData.dataSourceCode?.toString().trim()) {
+      setFormValidation(prev => ({ ...prev, dataSourceCode: false }));
       missingFields.push("Código da Fonte de Dados");
       isValid = false;
     } else {
-      setFormValidation(prev => ({ ...prev, codigo_fonte_dados: true }));
+      setFormValidation(prev => ({ ...prev, dataSourceCode: true }));
     }
     
-    if (!formData.nome_fonte_dados.trim()) {
-      setFormValidation(prev => ({ ...prev, nome_fonte_dados: false }));
+    if (!formData.dataSourceName?.toString().trim()) {
+      setFormValidation(prev => ({ ...prev, dataSourceName: false }));
       missingFields.push("Nome da Fonte de Dados");
       isValid = false;
     } else {
-      setFormValidation(prev => ({ ...prev, nome_fonte_dados: true }));
+      setFormValidation(prev => ({ ...prev, dataSourceName: true }));
     }
 
     if (!isValid) {
@@ -124,8 +152,27 @@ function NovaFonteDeDados() {
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const payload = requisicao === "Criar" 
+        ? { dataSourceCode: formData.dataSourceCode, dataSourceName: formData.dataSourceName }
+        : { 
+            id: formData.id, 
+            dataSourceCode: formData.dataSourceCode, 
+            dataSourceName: formData.dataSourceName, 
+            active: formData.active 
+          };
+
+      const config = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      if (requisicao === "Criar") {
+        await axios.post("https://api.egrc.homologacao.com.br/api/v1/DataSource", payload, config);
+      } else {
+        await axios.put("https://api.egrc.homologacao.com.br/api/v1/DataSource", payload, config);
+      }
       
       enqueueSnackbar(`Fonte de Dados ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -134,10 +181,10 @@ function NovaFonteDeDados() {
       if (requisicao === "Criar") {
         setSuccessDialogOpen(true);
       } else {
-        voltarParaCadastroMenu();
+        voltarParaListagem();
       }
     } catch (error) {
-      console.error(error.message);
+      console.error(error);
       enqueueSnackbar("Não foi possível salvar a fonte de dados.", {
         variant: "error",
       });
@@ -151,42 +198,41 @@ function NovaFonteDeDados() {
       <LoadingOverlay isActive={loading} />
       <Grid container spacing={3} marginTop={1}>
         <Grid item xs={12}>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom sx={{ color: '#1C5297', fontWeight: 600 }}>
             {requisicao === "Criar" ? "Nova Fonte de Dados" : "Editar Fonte de Dados"}
           </Typography>
           <Divider sx={{ mb: 3 }} />
         </Grid>
 
-        {/* Campos da Fonte de Dados */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
-            <InputLabel>Código da Fonte de Dados *</InputLabel>
+            <InputLabel sx={{ fontWeight: 600, fontSize: '13px' }}>Código da Fonte de Dados *</InputLabel>
             <TextField
               fullWidth
-              value={formData.codigo_fonte_dados}
-              onChange={(e) => handleInputChange('codigo_fonte_dados', e.target.value)}
-              error={!formValidation.codigo_fonte_dados}
+              value={formData.dataSourceCode}
+              onChange={(e) => handleInputChange('dataSourceCode', e.target.value)}
+              error={!formValidation.dataSourceCode}
+              disabled={requisicao === "Editar"}
               placeholder="Ex: LT"
-              helperText={!formValidation.codigo_fonte_dados ? "Campo obrigatório" : "Ex: LT"}
+              helperText={!formValidation.dataSourceCode ? "Campo obrigatório" : "Identificador curto"}
             />
           </Stack>
         </Grid>
 
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
-            <InputLabel>Nome da Fonte de Dados *</InputLabel>
+            <InputLabel sx={{ fontWeight: 600, fontSize: '13px' }}>Nome da Fonte de Dados *</InputLabel>
             <TextField
               fullWidth
-              value={formData.nome_fonte_dados}
-              onChange={(e) => handleInputChange('nome_fonte_dados', e.target.value)}
-              error={!formValidation.nome_fonte_dados}
+              value={formData.dataSourceName}
+              onChange={(e) => handleInputChange('dataSourceName', e.target.value)}
+              error={!formValidation.dataSourceName}
               placeholder="Ex: Sistema ambiental"
-              helperText={!formValidation.nome_fonte_dados ? "Campo obrigatório" : "Ex: Sistema ambiental"}
+              helperText={!formValidation.dataSourceName ? "Campo obrigatório" : "Nome detalhado"}
             />
           </Stack>
         </Grid>
 
-        {/* Botões de ação */}
         <Grid item xs={12}>
           <Divider sx={{ my: 3 }} />
           <Box
@@ -200,14 +246,15 @@ function NovaFonteDeDados() {
               variant="contained"
               color="primary"
               onClick={tratarSubmit}
-              sx={{ minWidth: 120 }}
+              disabled={requisicao === "Editar" ? !hasChanges : !(formData.dataSourceCode?.trim() && formData.dataSourceName?.trim())}
+              sx={{ minWidth: 120, borderRadius: '8px', textTransform: 'none' }}
             >
               {requisicao === "Criar" ? "Criar" : "Atualizar"}
             </Button>
             <Button
               variant="outlined"
               onClick={voltarParaCadastroMenu}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: 120, borderRadius: '8px', textTransform: 'none' }}
             >
               Cancelar
             </Button>
@@ -215,7 +262,6 @@ function NovaFonteDeDados() {
         </Grid>
       </Grid>
 
-      {/* Dialog de Sucesso */}
       <Dialog
         open={successDialogOpen}
         onClose={voltarParaListagem}
@@ -248,14 +294,14 @@ function NovaFonteDeDados() {
           <Button
             onClick={continuarEdicao}
             variant="outlined"
-            sx={{ minWidth: "120px" }}
+            sx={{ minWidth: "120px", textTransform: 'none' }}
           >
             Continuar Editando
           </Button>
           <Button
             onClick={voltarParaListagem}
             variant="contained"
-            sx={{ minWidth: "120px" }}
+            sx={{ minWidth: "120px", textTransform: 'none' }}
           >
             Voltar para Listagem
           </Button>
