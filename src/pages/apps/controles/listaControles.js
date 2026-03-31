@@ -81,7 +81,7 @@ import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 
 // assets
-import { PlusOutlined, DownloadOutlined } from "@ant-design/icons";
+import { PlusOutlined, DownloadOutlined, CheckOutlined } from "@ant-design/icons";
 import { faFilter } from "@fortawesome/free-solid-svg-icons";
 
 export const fuzzyFilter = (row, columnId, value) => {
@@ -196,6 +196,7 @@ function ReactTable({
     process: [],
     execution: [],
     classification: [],
+    meaningfulness: [],
     risks: [],
     platforms: [],
     informationActivities: [],
@@ -296,6 +297,8 @@ function ReactTable({
         type: "Classificação",
         values: draftFilters.classification,
       });
+    if (draftFilters.meaningfulness.length > 0)
+      newFilters.push({ type: "Chave", values: draftFilters.meaningfulness });
     if (draftFilters.risks.length > 0)
       newFilters.push({ type: "Riscos", values: draftFilters.risks });
     if (draftFilters.platforms.length > 0)
@@ -355,6 +358,7 @@ function ReactTable({
           Processo: "process",
           Execução: "execution",
           Classificação: "classification",
+          Chave: "meaningfulness",
           Riscos: "risks",
           Plataformas: "platforms",
           "Atividades de Informação": "informationActivities",
@@ -395,6 +399,7 @@ function ReactTable({
       process: [],
       execution: [],
       classification: [],
+      meaningfulness: [],
       risks: [],
       platforms: [],
       informationActivities: [],
@@ -461,6 +466,17 @@ function ReactTable({
           return filterValues.includes(item.execution);
         if (filterType === "Classificação")
           return filterValues.includes(item.classification);
+
+        if (filterType === "Chave") {
+          const showYes = filterValues.includes("Sim");
+          const showNo = filterValues.includes("Não");
+          const isKey = item.meaningfulness === true;
+
+          if (showYes && showNo) return true;
+          if (showYes) return isKey;
+          if (showNo) return !isKey;
+          return true;
+        }
 
         const arrayFilters = {
           Riscos: item.risks,
@@ -862,6 +878,27 @@ function ReactTable({
                     setDraftFilters((prev) => ({
                       ...prev,
                       classification: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Chave
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={["Sim", "Não"]}
+                  value={draftFilters.meaningfulness}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({
+                      ...prev,
+                      meaningfulness: value,
                     }))
                   }
                   renderInput={(params) => <TextField {...params} />}
@@ -1952,6 +1989,26 @@ const ListagemEmpresa = () => {
             {row.original.classification}
           </Typography>
         ),
+      },
+      {
+        header: () => (
+          <Box sx={{ width: "100%", textAlign: "center" }}>Chave</Box>
+        ),
+        accessorKey: "meaningfulness",
+        meta: { align: "center" },
+        cell: ({ row }) =>
+          row.original.meaningfulness === true ? (
+            <Box
+              sx={{
+                display: "flex",
+                width: "100%",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <CheckOutlined style={{ color: "#2e7d32", fontSize: 16 }} />
+            </Box>
+          ) : null,
       },
       {
         header: "Detectivo",
