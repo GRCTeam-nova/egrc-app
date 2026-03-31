@@ -135,6 +135,23 @@ const formatCurrencyBR = (val) => {
 
 // Aceita entradas como "1234", "1.234", "1.234,56" ou "1234,56"
 // e também números vindos da API (ex: 345.78)
+const INCIDENT_LEVEL_LABELS = {
+  primary: "Primário",
+  movement: "Movimentação",
+  "1": "Primário",
+  "2": "Movimentação",
+};
+
+const getIncidentLevelLabel = (level) => {
+  const normalizedLevel = String(level ?? "").trim();
+
+  if (!normalizedLevel || normalizedLevel === "0") return "";
+
+  return (
+    INCIDENT_LEVEL_LABELS[normalizedLevel.toLowerCase()] || normalizedLevel
+  );
+};
+
 const parseCurrencyBR = (raw) => {
   if (raw === null || raw === undefined || raw === "") return null;
 
@@ -183,6 +200,7 @@ const defaultVisibility = {
 
   category: true,
   incidentType: true,
+  incidentLevelLabel: true,
 
   origin: true,
   cause: true,
@@ -246,6 +264,7 @@ function ReactTable({
 
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [typeOptions, setTypeOptions] = useState([]);
+  const [levelOptions, setLevelOptions] = useState([]);
   const [deptOptions, setDeptOptions] = useState([]);
   const [riskOptions, setRiskOptions] = useState([]);
   const [processOptions, setProcessOptions] = useState([]);
@@ -255,6 +274,7 @@ function ReactTable({
     status: ["Ativo"],
     category: [],
     incidentType: [],
+    level: [],
 
     origin: [],
     cause: [],
@@ -278,6 +298,7 @@ function ReactTable({
       const values = data.flatMap((item) => {
         const val = item[key];
         if (isArray && Array.isArray(val)) return val;
+        if (key === "incidentLevelLabel" && val === "-") return [];
         return val ? [val] : [];
       });
       return [...new Set(values)].sort();
@@ -285,6 +306,7 @@ function ReactTable({
 
     setCategoryOptions(getUniqueValues("category"));
     setTypeOptions(getUniqueValues("incidentType"));
+    setLevelOptions(getUniqueValues("incidentLevelLabel"));
     setDeptOptions(getUniqueValues("departments", true));
     setRiskOptions(getUniqueValues("risks", true));
     setProcessOptions(getUniqueValues("processes", true));
@@ -308,6 +330,12 @@ function ReactTable({
 
     if (arr(draftFilters.incidentType).length > 0)
       newFilters.push({ type: "Tipo", values: arr(draftFilters.incidentType) });
+
+    if (arr(draftFilters.level).length > 0)
+      newFilters.push({
+        type: "Nível do incidente",
+        values: arr(draftFilters.level),
+      });
 
     if (arr(draftFilters.origin).length > 0)
       newFilters.push({ type: "Origem", values: arr(draftFilters.origin) });
@@ -372,6 +400,7 @@ function ReactTable({
           Status: "status",
           Categoria: "category",
           Tipo: "incidentType",
+          "Nível do incidente": "level",
           Origem: "origin",
           Causa: "cause",
           Departamentos: "departments",
@@ -408,6 +437,7 @@ function ReactTable({
 
       category: [],
       incidentType: [],
+      level: [],
 
       origin: [],
       cause: [],
@@ -440,6 +470,9 @@ function ReactTable({
 
           case "Tipo":
             return values.includes(item.incidentType);
+
+          case "Nível do incidente":
+            return values.includes(item.incidentLevelLabel);
 
           case "Origem":
             return values.includes(item.origin);
@@ -783,6 +816,24 @@ function ReactTable({
                       ...prev,
                       incidentType: value,
                     }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Nível do incidente
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={levelOptions}
+                  value={draftFilters.level}
+                  onChange={(event, value) =>
+                    setDraftFilters((prev) => ({ ...prev, level: value }))
                   }
                   renderInput={(params) => <TextField {...params} />}
                 />
@@ -1727,6 +1778,15 @@ const ListagemIncidente = () => {
     }));
   };
 
+  const tableData = useMemo(
+    () =>
+      (lists || []).map((item) => ({
+        ...item,
+        incidentLevelLabel: getIncidentLevelLabel(item.level) || "-",
+      })),
+    [lists],
+  );
+
   const columns = useMemo(
     () => [
       {
@@ -1753,6 +1813,11 @@ const ListagemIncidente = () => {
       },
       { header: "Código", accessorKey: "code" },
       { header: "Tipo", accessorKey: "incidentType" },
+      {
+        header: "Nível do incidente",
+        accessorKey: "incidentLevelLabel",
+        cell: ({ row }) => row.original.incidentLevelLabel || "â€”",
+      },
       {
         header: "Processos",
         accessorKey: "processes",
@@ -1903,7 +1968,7 @@ const ListagemIncidente = () => {
           {lists && (
             <ReactTable
               {...{
-                data: lists,
+                data: tableData,
                 columns,
                 modalToggler: () => {
                   setCustomerModal(true);
