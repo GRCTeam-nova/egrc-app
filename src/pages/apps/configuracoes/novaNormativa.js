@@ -296,6 +296,121 @@ function extractFilePaths(files) {
     .filter(Boolean);
 }
 
+function getApproverEmail(approver) {
+  return (
+    approver?.email ||
+    approver?.mail ||
+    approver?.emailAddress ||
+    approver?.approver?.email ||
+    approver?.collaborator?.email ||
+    ""
+  );
+}
+
+function normalizeNormativeApproverEntries(entries) {
+  return (entries || [])
+    .map((entry) => {
+      const email = getApproverEmail(entry);
+      const idApprover =
+        entry?.idApprover ||
+        entry?.approver?.idCollaborator ||
+        entry?.collaborator?.idCollaborator ||
+        entry?.idCollaborator ||
+        entry?.id ||
+        "";
+
+      if (!email && !idApprover) return null;
+
+      return {
+        idApprover,
+        email,
+        approved: Boolean(entry?.approved),
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildNormativeApproverEntries({
+  selectedApproverIds = null,
+  approverOptions = [],
+  currentApprovers = [],
+}) {
+  const normalizedCurrentApprovers =
+    normalizeNormativeApproverEntries(currentApprovers);
+  const hasSelectedApprovers = Array.isArray(selectedApproverIds);
+  const normalizedSelectedIds = hasSelectedApprovers
+    ? selectedApproverIds.filter(Boolean)
+    : [];
+
+  if (!hasSelectedApprovers) {
+    return normalizedCurrentApprovers;
+  }
+
+  if (normalizedSelectedIds.length === 0) {
+    return [];
+  }
+
+  const usedCurrentIndexes = new Set();
+
+  return normalizedSelectedIds
+    .map((selectedId, index) => {
+      const matchedOption =
+        approverOptions.find(
+          (option) => String(option.id) === String(selectedId),
+        ) || null;
+      const optionEmail = getApproverEmail(matchedOption);
+
+      let matchedCurrentIndex = normalizedCurrentApprovers.findIndex(
+        (approver, currentIndex) => {
+          if (usedCurrentIndexes.has(currentIndex)) return false;
+
+          if (
+            approver.idApprover &&
+            String(approver.idApprover) === String(selectedId)
+          ) {
+            return true;
+          }
+
+          return (
+            Boolean(optionEmail) &&
+            normalizeText(approver.email) === normalizeText(optionEmail)
+          );
+        },
+      );
+
+      if (
+        matchedCurrentIndex === -1 &&
+        normalizedCurrentApprovers[index] &&
+        !usedCurrentIndexes.has(index)
+      ) {
+        matchedCurrentIndex = index;
+      }
+
+      if (matchedCurrentIndex !== -1) {
+        usedCurrentIndexes.add(matchedCurrentIndex);
+      }
+
+      const matchedCurrentApprover =
+        matchedCurrentIndex === -1
+          ? null
+          : normalizedCurrentApprovers[matchedCurrentIndex];
+
+      return {
+        idApprover: selectedId,
+        email: matchedCurrentApprover?.email || optionEmail || "",
+        approved: Boolean(matchedCurrentApprover?.approved),
+      };
+    })
+    .filter((approver) => approver.idApprover || approver.email);
+}
+
+function serializeNormativeApproverEntries(entries) {
+  return normalizeNormativeApproverEntries(entries).map((entry) => ({
+    email: entry.email || "",
+    approved: Boolean(entry.approved),
+  }));
+}
+
 function mapNormativeToForm(record) {
   if (!record) return { ...INITIAL_FORM_DATA };
 
@@ -750,41 +865,50 @@ function ColumnsLayouts() {
     [formData.ultimaRevisao, formData.periodicidadeRevisao],
   );
 
-  const currentNotification = useMemo(() => {
-    if (!currentUserEmail) return null;
-    if (!Array.isArray(normativaDados?.normativeNotifications)) return null;
+  const normativeApproverEntries = useMemo(
+    () =>
+      buildNormativeApproverEntries({
+        selectedApproverIds: formData.aprovador,
+        approverOptions: aprovadores,
+        currentApprovers: normativaDados?.normativeApprovers,
+      }),
+    [aprovadores, formData.aprovador, normativaDados?.normativeApprovers],
+  );
 
-    return (
-      normativaDados.normativeNotifications.find(
-        (notification) =>
-          normalizeText(notification.email) === currentUserEmail,
-      ) || null
-    );
-  }, [currentUserEmail, normativaDados?.normativeNotifications]);
+  const currentPendingApprovalIndex = useMemo(
+    () => normativeApproverEntries.findIndex((approver) => !approver.approved),
+    [normativeApproverEntries],
+  );
 
-  const isApproverListed =
-    Array.isArray(formData.aprovador) &&
-    formData.aprovador.some((id) => String(id) === String(idUser));
+  const currentUserApprovalIndex = useMemo(
+    () =>
+      normativeApproverEntries.findIndex((approver) => {
+        if (
+          approver.idApprover &&
+          String(approver.idApprover) === String(idUser)
+        ) {
+          return true;
+        }
 
-  const isApprovalPendingForCurrentUser = Boolean(
-    currentNotification?.emailSent &&
-      !currentNotification?.emailReplied &&
-      !currentNotification?.returned,
+        return (
+          Boolean(currentUserEmail) &&
+          normalizeText(approver.email) === currentUserEmail
+        );
+      }),
+    [currentUserEmail, idUser, normativeApproverEntries],
   );
 
   const isFutureApprover = Boolean(
     currentStatus === STATUS.EM_APROVACAO &&
-      currentNotification &&
-      !currentNotification.emailSent &&
-      !currentNotification.emailReplied &&
-      !currentNotification.approved &&
-      !currentNotification.returned,
+      currentUserApprovalIndex !== -1 &&
+      currentPendingApprovalIndex !== -1 &&
+      currentUserApprovalIndex > currentPendingApprovalIndex,
   );
 
   const canReplyApproval =
     currentStatus === STATUS.EM_APROVACAO &&
-    (isApprovalPendingForCurrentUser ||
-      (!currentNotification && isApproverListed));
+    currentUserApprovalIndex !== -1 &&
+    currentUserApprovalIndex === currentPendingApprovalIndex;
 
   const isResponsible = String(formData.responsavel) === String(idUser);
   const isReviewer = String(formData.revisor) === String(idUser);
@@ -804,7 +928,7 @@ function ColumnsLayouts() {
     canEditReviewFields &&
     currentStatus === STATUS.VERSAO_FINAL &&
     !formData.ultimaRevisao;
-  const canEditRisk = canEditGeneralFields || canEditReviewFields;
+  const canEditRisk = canEditReviewFields;
   const canEditElaborationComment =
     (requisicao === "Criar" && !isExterno) ||
     ((currentStatus === STATUS.ELABORACAO ||
@@ -813,7 +937,7 @@ function ColumnsLayouts() {
   const canEditApprovalComment = canReplyApproval;
   const canRevogar =
     requisicao === "Editar" &&
-    currentStatus !== STATUS.REVOGADO &&
+    currentStatus === STATUS.VERSAO_FINAL &&
     isResponsible;
   const canAlterar =
     requisicao === "Editar" &&
@@ -885,6 +1009,13 @@ function ColumnsLayouts() {
     const computedRevision = shouldFillRevisionWorkflow
       ? calculateRevisionFields(base.ultimaRevisao, base.periodicidadeRevisao)
       : { limitDate: null, days: "", status: "" };
+    const approvalEntries = Array.isArray(base.normativeApprovers)
+      ? normalizeNormativeApproverEntries(base.normativeApprovers)
+      : buildNormativeApproverEntries({
+          selectedApproverIds: base.aprovador,
+          approverOptions: aprovadores,
+          currentApprovers: normativaDados?.normativeApprovers,
+        });
 
     return {
       idNormative: base.idNormative,
@@ -925,6 +1056,10 @@ function ColumnsLayouts() {
       idDestinies: base.normaDestino,
       idActionPlans: base.planoAcao,
       idApprovers: base.aprovador,
+      emailApprovers: approvalEntries
+        .map((approver) => approver.email)
+        .filter(Boolean),
+      normativeApprovers: serializeNormativeApproverEntries(approvalEntries),
       idCompanies: base.empresa,
       idDepartments: base.departamento,
       idProcesses: base.processo,
@@ -1358,32 +1493,40 @@ function ColumnsLayouts() {
   };
 
   const handleReplyApproval = async (isApproved) => {
-    if (!currentNormativeId) return;
+    if (!currentNormativeId || !canReplyApproval) return;
 
     setLoading(true);
 
     try {
-      if (draftComments.note.trim()) {
-        const sourceWithApprovalComment = applyDraftComments(
-          { ...formData },
-          ["note"],
-        );
+      const updatedApprovalEntries = normativeApproverEntries.map(
+        (approver, index) =>
+          index === currentUserApprovalIndex
+            ? { ...approver, approved: Boolean(isApproved) }
+            : approver,
+      );
+      const sourceWithApprovalComment = applyDraftComments(
+        {
+          ...formData,
+          normativeApprovers: updatedApprovalEntries,
+        },
+        draftComments.note.trim() ? ["note"] : [],
+      );
 
-        const syncedFiles = await uploadCurrentFiles(currentNormativeId);
-        const payload = buildUpdatePayload({
-          ...sourceWithApprovalComment,
-          files: syncedFiles,
-        });
+      const syncedFiles = await uploadCurrentFiles(currentNormativeId);
+      const payload = buildUpdatePayload({
+        ...sourceWithApprovalComment,
+        normativeApprovers: updatedApprovalEntries,
+        files: syncedFiles,
+      });
 
-        await axios.put(`${API_URL}normatives`, payload, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      await axios.put(`${API_URL}normatives`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        clearDraftComments(["note"]);
-        setDeletedFiles([]);
-      }
+      clearDraftComments(["note"]);
+      setDeletedFiles([]);
 
       await axios.put(
         `${API_URL}normatives/reply-pending-approval-status`,
@@ -1855,7 +1998,90 @@ function ColumnsLayouts() {
                   fontWeight="bold"
                   sx={{ color: "#555" }}
                 >
-                  2. Associações e relacionamentos
+                  2. Workflow e comentários
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <Stack spacing={1}>
+                  <InputLabel>Aprovadores</InputLabel>
+                  <Autocomplete
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...aprovadores,
+                    ]}
+                    getOptionLabel={(option) => option.nome}
+                    value={buildSelectedValues(formData.aprovador, aprovadores)}
+                    onChange={handleMultiSelectAll("aprovador", aprovadores)}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox
+                          checked={
+                            option.id === "all"
+                              ? formData.aprovador.length ===
+                                  aprovadores.length && aprovadores.length > 0
+                              : selected
+                          }
+                        />
+                        {option.nome}
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
+                    disabled={!canEditGeneralFields}
+                  />
+                </Stack>
+              </Grid>
+
+              {showElaborationComment ? (
+                <Grid item xs={12}>
+                  <CommentCard
+                    title="Comentário da elaboração"
+                    placeholder="Digite aqui seu comentário, justificativa ou observação da elaboração."
+                    draftValue={draftComments.description}
+                    historyValue={formData.description}
+                    onDraftChange={(value) =>
+                      setDraftComments((previous) => ({
+                        ...previous,
+                        description: value,
+                      }))
+                    }
+                    onSave={() => saveCommentField("description")}
+                    disabled={!canEditElaborationComment}
+                    loading={loading}
+                  />
+                </Grid>
+              ) : null}
+
+              {showApprovalComment ? (
+                <Grid item xs={12}>
+                  <CommentCard
+                    title="Comentário da aprovação"
+                    placeholder="Digite aqui o comentário da aprovação pendente."
+                    draftValue={draftComments.note}
+                    historyValue={formData.note}
+                    onDraftChange={(value) =>
+                      setDraftComments((previous) => ({
+                        ...previous,
+                        note: value,
+                      }))
+                    }
+                    onSave={() => saveCommentField("note")}
+                    disabled={!canEditApprovalComment}
+                    loading={loading}
+                  />
+                </Grid>
+              ) : null}
+
+              <Grid item xs={12} mt={2}>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ color: "#555" }}
+                >
+                  3. Associações e relacionamentos
                 </Typography>
               </Grid>
 
@@ -2090,7 +2316,7 @@ function ColumnsLayouts() {
                   fontWeight="bold"
                   sx={{ color: "#555" }}
                 >
-                  3. Classificação e prazos
+                  4. Classificação e prazos
                 </Typography>
               </Grid>
 
@@ -2167,89 +2393,6 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
-
-              <Grid item xs={12} mt={2}>
-                <Typography
-                  variant="subtitle1"
-                  fontWeight="bold"
-                  sx={{ color: "#555" }}
-                >
-                  4. Workflow e comentários
-                </Typography>
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <Stack spacing={1}>
-                  <InputLabel>Aprovadores</InputLabel>
-                  <Autocomplete
-                    multiple
-                    disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...aprovadores,
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={buildSelectedValues(formData.aprovador, aprovadores)}
-                    onChange={handleMultiSelectAll("aprovador", aprovadores)}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Checkbox
-                          checked={
-                            option.id === "all"
-                              ? formData.aprovador.length ===
-                                  aprovadores.length && aprovadores.length > 0
-                              : selected
-                          }
-                        />
-                        {option.nome}
-                      </li>
-                    )}
-                    renderInput={(params) => <TextField {...params} />}
-                    disabled={!canEditGeneralFields}
-                  />
-                </Stack>
-              </Grid>
-
-              {showElaborationComment ? (
-                <Grid item xs={12}>
-                  <CommentCard
-                    title="Comentário da elaboração"
-                    placeholder="Digite aqui seu comentário, justificativa ou observação da elaboração."
-                    draftValue={draftComments.description}
-                    historyValue={formData.description}
-                    onDraftChange={(value) =>
-                      setDraftComments((previous) => ({
-                        ...previous,
-                        description: value,
-                      }))
-                    }
-                    onSave={() => saveCommentField("description")}
-                    disabled={!canEditElaborationComment}
-                    loading={loading}
-                  />
-                </Grid>
-              ) : null}
-
-              {showApprovalComment ? (
-                <Grid item xs={12}>
-                  <CommentCard
-                    title="Comentário da aprovação"
-                    placeholder="Digite aqui o comentário da aprovação pendente."
-                    draftValue={draftComments.note}
-                    historyValue={formData.note}
-                    onDraftChange={(value) =>
-                      setDraftComments((previous) => ({
-                        ...previous,
-                        note: value,
-                      }))
-                    }
-                    onSave={() => saveCommentField("note")}
-                    disabled={!canEditApprovalComment}
-                    loading={loading}
-                  />
-                </Grid>
-              ) : null}
 
               <Grid item xs={12} mt={2}>
                 <Accordion
