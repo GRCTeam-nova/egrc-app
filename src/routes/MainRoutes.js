@@ -479,6 +479,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovoOds />
             },
+            {
+              path: 'editar/:id',
+              element: <NovoOds />
+            },
           ]
         },
         {
@@ -503,6 +507,10 @@ const MainRoutes = {
             },
             {
               path: 'criar',
+              element: <NovoGrupoTemas />
+            },
+            {
+              path: 'editar/:id',
               element: <NovoGrupoTemas />
             },
           ]
@@ -531,6 +539,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovoIndicador />
             },
+            {
+              path: 'editar/:id',
+              element: <NovoIndicador />
+            },
           ]
         },
         {
@@ -557,6 +569,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovaDimensao />
             },
+            {
+              path: 'editar/:id',
+              element: <NovaDimensao />
+            },
           ]
         },
         {
@@ -570,6 +586,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovaMedida />
             },
+            {
+              path: 'editar/:id',
+              element: <NovaMedida />
+            },
           ]
         },
         {
@@ -581,6 +601,10 @@ const MainRoutes = {
             },
             {
               path: 'criar',
+              element: <NovaFonteDeDados />
+            },
+            {
+              path: 'editar/:id',
               element: <NovaFonteDeDados />
             },
           ]

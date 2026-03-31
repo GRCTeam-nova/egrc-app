@@ -16,7 +16,7 @@ const icons = { PublicIcon, DollarOutlined, AssessmentIcon, CreateIcon, Bookmark
 
 // Injeta CSS para esconder o item de menu "Editar Cadastro"
 const css = `
-  [data-url="/apps/processos/editar-cadastro"], a[href="/apps/processos/editar-cadastro"], [data-url="/apps/processos/editar-cadastro"], [data-url="/processos/criar-ligado"], a[href="/apps/processos/editar-processo"] , a[href="/processos/criar-ligado"] {
+  [data-url="/apps/processos/editar-cadastro"], a[href="/apps/processos/editar-cadastro"], [data-url="/apps/processos/editar-cadastro"], [data-url="/processos/criar-ligado"], a[href="/apps/processos/editar-processo"] , a[href="/processos/criar-ligado"], [data-url="/grupoTemas/criar"], a[href="/grupoTemas/criar"], [data-url="/grupoTemas/editar/<<idThemeGroup>>"], a[href="/grupoTemas/editar/<<idThemeGroup>>"] {
       display: none;
   }
 `;
@@ -136,6 +136,18 @@ const pages = {
           type: 'item',
           url: '/fatoresEmissao/lista',
           
+        },
+        {
+          id: 'grupoTemasCriar',
+          title: <FormattedMessage id="Criar Grupo de Temas" />,
+          type: 'item',
+          url: '/grupoTemas/criar',
+        },
+        {
+          id: 'grupoTemasEditar',
+          title: <FormattedMessage id="Editar Grupo de Temas" />,
+          type: 'item',
+          url: '/grupoTemas/editar/<<idThemeGroup>>',
         },
       ]
     },
