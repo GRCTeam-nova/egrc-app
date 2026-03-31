@@ -1,9 +1,9 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { isValidElement, useState } from 'react';
 
 // material-ui
 import IconButton from '../../../components/@extended/IconButton';
-import { FormControl, ListItemText, MenuItem, Menu, Tooltip, SpeedDial, useTheme, Checkbox } from '@mui/material';
+import { Checkbox, FormControl, ListItemText, Menu, MenuItem, Tooltip, useTheme } from '@mui/material';
 
 const ITEM_HEIGHT = 78;
 const ITEM_PADDING_TOP = 8;
@@ -16,9 +16,63 @@ const MenuProps = {
   }
 };
 
+const getNodeText = (node) => {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getNodeText).filter(Boolean).join(' ').trim();
+  }
+
+  if (isValidElement(node)) {
+    return getNodeText(node.props.children);
+  }
+
+  return '';
+};
+
+const formatColumnLabel = (columnId = '') =>
+  columnId
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase());
+
+const getColumnLabel = (column) => {
+  if (typeof column.columnDef.header === 'string') {
+    return column.columnDef.header;
+  }
+
+  if (typeof column.columnDef.meta?.label === 'string' && column.columnDef.meta.label.trim()) {
+    return column.columnDef.meta.label.trim();
+  }
+
+  if (typeof column.columnDef.header === 'function') {
+    try {
+      const renderedHeader = column.columnDef.header();
+      const extractedLabel = getNodeText(renderedHeader);
+
+      if (extractedLabel) {
+        return extractedLabel;
+      }
+    } catch (error) {
+      // Fallback para colunas cujo header depende do contexto da tabela.
+    }
+  }
+
+  return formatColumnLabel(column.columnDef.accessorKey || column.id);
+};
+
 // ==============================|| COLUMN VISIBILITY - ICON BUTTON ||============================== //
 
-const SelectColumnVisibility = ({ getVisibleLeafColumns, getIsAllColumnsVisible, getToggleAllColumnsVisibilityHandler, getAllColumns }) => {
+const SelectColumnVisibility = ({
+  getVisibleLeafColumns,
+  getIsAllColumnsVisible,
+  getToggleAllColumnsVisibilityHandler,
+  getAllColumns
+}) => {
   const [anchorEl, setAnchorEl] = useState(null);
 
   const handleClick = (event) => {
@@ -68,21 +122,24 @@ const SelectColumnVisibility = ({ getVisibleLeafColumns, getIsAllColumnsVisible,
         PaperProps={{
           style: {
             maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
-            width: '25ch',
-          },
+            width: '25ch'
+          }
         }}
       >
-        {getAllColumns().map(
-          (column) =>
-            column.columnDef.header !== 'Ações' &&
-            column.id !== 'select' &&
-            column.columnDef.header !== 'Processo' && (
-              <MenuItem key={column.id} value={column.id} onClick={column.getToggleVisibilityHandler()}>
-                <Checkbox checked={column.getIsVisible()} />
-                <ListItemText primary={column.columnDef.header} />
-              </MenuItem>
-            )
-        )}
+        {getAllColumns().map((column) => {
+          const columnLabel = getColumnLabel(column);
+
+          if (columnLabel === 'Ações' || columnLabel === 'Processo' || column.id === 'select') {
+            return null;
+          }
+
+          return (
+            <MenuItem key={column.id} value={column.id} onClick={column.getToggleVisibilityHandler()}>
+              <Checkbox checked={column.getIsVisible()} />
+              <ListItemText primary={columnLabel} />
+            </MenuItem>
+          );
+        })}
       </Menu>
     </FormControl>
   );
