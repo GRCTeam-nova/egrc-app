@@ -14,6 +14,7 @@ import {
   DialogContentText,
   Tooltip,
   IconButton,
+  Typography,
 } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -58,6 +59,10 @@ function ColumnsLayouts() {
   const [riscos, setRiscos] = useState([]);
   const [incidentes, setIncidentes] = useState([]);
   const [contas, setContas] = useState([]);
+  const [contasFiltradas, setContasFiltradas] = useState([]);
+  const [incidentesFiltrados, setIncidentesFiltrados] = useState([]);
+  const [contaOrigemMap, setContaOrigemMap] = useState({});
+  const [incidenteOrigemMap, setIncidenteOrigemMap] = useState({});
   const [nomeDepartamento, setNome] = useState("");
   const [codigo, setCodigo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -182,18 +187,32 @@ function ColumnsLayouts() {
               ? data.processBottoms.map((u) => u.idProcessBottom)
               : [],
             kri: data.idKri || null,
-           processoAnterior: normalizeIdArray(data.idProcessPrevious, "idProcessPrevious"),
-  processoPosterior: normalizeIdArray(data.idProcessNext, "idProcessNext"),
+            processoAnterior: normalizeIdArray(
+              data.idProcessPrevious,
+              "idProcessPrevious",
+            ),
+            processoPosterior: normalizeIdArray(
+              data.idProcessNext,
+              "idProcessNext",
+            ),
             processoSuperior: data.idProcessSuperior || null,
             formatoUnidade: data.idProcessType || null,
-            dado: data.idLgpds || null,
-            risco: data.idRisks || null,
+            dado: Array.isArray(data.idLgpds) ? data.idLgpds : [],
+            risco: Array.isArray(data.idRisks) ? data.idRisks : [],
             responsavel: data.idResponsible || null,
-            planoAcao: data.idActionPlans,
+            planoAcao: Array.isArray(data.idActionPlans)
+              ? data.idActionPlans
+              : [],
             files: data.files || [],
-            deficiencia: data.idDeficiencies || null,
-            conta: data.idLedgerAccounts || null,
-            incidente: data.idIncidents || null,
+            deficiencia: Array.isArray(data.idDeficiencies)
+              ? data.idDeficiencies
+              : [],
+            conta: Array.isArray(data.idLedgerAccounts)
+              ? data.idLedgerAccounts
+              : [],
+            incidente: Array.isArray(data.idIncidents)
+              ? data.idIncidents
+              : [],
           }));
 
           setProcessosDados(data);
@@ -436,6 +455,137 @@ function ColumnsLayouts() {
     }
   };
 
+  useEffect(() => {
+    const atualizarContasPorEmpresa = async () => {
+      if (formData.empresa.length === 0) {
+        setContasFiltradas(contas);
+        setContaOrigemMap({});
+        return;
+      }
+
+      const idsContaPermitidos = new Set();
+      const novoMapaConta = {};
+
+      const promises = formData.empresa.map((id) =>
+        axios.get(`${process.env.REACT_APP_API_URL}companies/${id}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        }),
+      );
+
+      try {
+        const results = await Promise.all(promises);
+
+        results.forEach((response) => {
+          const nomeEmpresa = response.data.name;
+          const ledgerAccounts =
+            response.data.ledgerAccounts || response.data.idLedgerAccounts || [];
+
+          ledgerAccounts.forEach((ledger) => {
+            const idConta =
+              typeof ledger === "object"
+                ? ledger.idLedgerAccount || ledger.id
+                : ledger;
+
+            if (!idConta) return;
+
+            idsContaPermitidos.add(idConta);
+            if (!novoMapaConta[idConta]) novoMapaConta[idConta] = [];
+            if (!novoMapaConta[idConta].includes(nomeEmpresa)) {
+              novoMapaConta[idConta].push(nomeEmpresa);
+            }
+          });
+        });
+
+        setContasFiltradas(
+          contas.filter((conta) => idsContaPermitidos.has(conta.id)),
+        );
+        setContaOrigemMap(novoMapaConta);
+      } catch (error) {
+        console.error("Erro ao buscar dependências de empresa:", error);
+      }
+    };
+
+    if (contas.length > 0) {
+      atualizarContasPorEmpresa();
+    }
+  }, [formData.empresa, contas, authToken]);
+
+  useEffect(() => {
+    const atualizarIncidentesPorRisco = async () => {
+      if (formData.risco.length === 0) {
+        setIncidentesFiltrados(incidentes);
+        setIncidenteOrigemMap({});
+        return;
+      }
+
+      const idsIncidentePermitidos = new Set();
+      const novoMapaIncidente = {};
+
+      const promises = formData.risco.map((id) =>
+        axios.get(`${process.env.REACT_APP_API_URL}risks/${id}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        }),
+      );
+
+      try {
+        const results = await Promise.all(promises);
+
+        results.forEach((response) => {
+          const nomeRisco = response.data.name;
+          const incidentesDoRisco =
+            response.data.incidents || response.data.idIncidents || [];
+
+          incidentesDoRisco.forEach((incidente) => {
+            const idIncidente =
+              typeof incidente === "object"
+                ? incidente.idIncident || incidente.id
+                : incidente;
+
+            if (!idIncidente) return;
+
+            idsIncidentePermitidos.add(idIncidente);
+            if (!novoMapaIncidente[idIncidente]) {
+              novoMapaIncidente[idIncidente] = [];
+            }
+            if (!novoMapaIncidente[idIncidente].includes(nomeRisco)) {
+              novoMapaIncidente[idIncidente].push(nomeRisco);
+            }
+          });
+        });
+
+        const isOrphan = (item, keys) => {
+          let hasField = false;
+
+          for (const key of keys) {
+            if (item[key] !== undefined) {
+              hasField = true;
+              if (Array.isArray(item[key]) && item[key].length > 0) {
+                return false;
+              }
+            }
+          }
+
+          return hasField;
+        };
+
+        setIncidentesFiltrados(
+          incidentes.filter(
+            (incidente) =>
+              idsIncidentePermitidos.has(incidente.id) ||
+              isOrphan(incidente, ["risks", "idRisks"]),
+          ),
+        );
+        setIncidenteOrigemMap(novoMapaIncidente);
+      } catch (error) {
+        console.error("Erro ao buscar dependências de risco:", error);
+      }
+    };
+
+    if (incidentes.length > 0) {
+      atualizarIncidentesPorRisco();
+    }
+  }, [formData.risco, incidentes, authToken]);
+
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (
@@ -615,10 +765,13 @@ function ColumnsLayouts() {
 
   const handleSelectAllConta = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.conta.length === contas.length) {
+      if (allSelectedContas) {
         setFormData({ ...formData, conta: [] });
       } else {
-        setFormData({ ...formData, conta: contas.map((conta) => conta.id) });
+        setFormData({
+          ...formData,
+          conta: contasFiltradas.map((conta) => conta.id),
+        });
       }
     } else {
       tratarMudancaInputGeral(
@@ -630,12 +783,12 @@ function ColumnsLayouts() {
 
   const handleSelectAllIncidentes = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.incidente.length === incidentes.length) {
+      if (allSelectedIncidentes) {
         setFormData({ ...formData, incidente: [] });
       } else {
         setFormData({
           ...formData,
-          incidente: incidentes.map((incidente) => incidente.id),
+          incidente: incidentesFiltrados.map((incidente) => incidente.id),
         });
       }
     } else {
@@ -707,8 +860,18 @@ function ColumnsLayouts() {
   const allSelected4 =
     formData.deficiencia.length === deficiencias.length &&
     deficiencias.length > 0;
+  const contaIdsFiltrados = new Set(contasFiltradas.map((conta) => conta.id));
+  const incidenteIdsFiltrados = new Set(
+    incidentesFiltrados.map((incidente) => incidente.id),
+  );
   const allSelectedContas =
-    formData.conta.length === contas.length && contas.length > 0;
+    contasFiltradas.length > 0 &&
+    formData.conta.filter((id) => contaIdsFiltrados.has(id)).length ===
+      contasFiltradas.length;
+  const allSelectedIncidentes =
+    incidentesFiltrados.length > 0 &&
+    formData.incidente.filter((id) => incidenteIdsFiltrados.has(id)).length ===
+      incidentesFiltrados.length;
   const allSelectedPlanoAcao =
     formData.planoAcao.length === planosAcoes.length && planosAcoes.length > 0;
 
@@ -790,6 +953,7 @@ function ColumnsLayouts() {
         name: nomeDepartamento,
         code: codigo,
         idCompanies: formData.empresa,
+        idRisksCopy: formData.risco?.length ? formData.risco : null,
       };
     } else if (requisicao === "Editar") {
       url = `${process.env.REACT_APP_API_URL}processes`;
@@ -971,6 +1135,67 @@ function ColumnsLayouts() {
               />
             </Stack>
           </Grid>
+
+          {requisicao === "Criar" && (
+            <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+              <Stack spacing={1}>
+                <InputLabel>
+                  Risco{" "}
+                  <DrawerRisco
+                    buttonSx={{
+                      marginLeft: 1.5,
+                      height: "20px",
+                      minWidth: "20px",
+                    }}
+                    onRiscoCreated={handleRiskCreated}
+                  />
+                </InputLabel>
+                <Autocomplete
+                  noOptionsText={"Dados não encontrados"}
+                  multiple
+                  disableCloseOnSelect
+                  options={[
+                    { id: "all", nome: "Selecionar todas" },
+                    ...riscos,
+                  ]}
+                  getOptionLabel={(option) => option.nome}
+                  value={formData.risco.map(
+                    (id) => riscos.find((risco) => risco.id === id) || id,
+                  )}
+                  onChange={handleSelectAllRisco}
+                  isOptionEqualToValue={(option, value) =>
+                    option.id === value.id
+                  }
+                  renderOption={(props, option, { selected }) => (
+                    <li {...props}>
+                      <Grid container alignItems="center">
+                        <Grid item>
+                          <Checkbox
+                            checked={
+                              option.id === "all" ? allSelectedRiscos : selected
+                            }
+                          />
+                        </Grid>
+                        <Grid item xs>
+                          {option.nome}
+                        </Grid>
+                      </Grid>
+                    </li>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      error={
+                        (formData.risco.length === 0 ||
+                          formData.risco.every((val) => val === 0)) &&
+                        formValidation.risco === false
+                      }
+                    />
+                  )}
+                />
+              </Stack>
+            </Grid>
+          )}
 
           {requisicao === "Editar" && (
             <>
@@ -1509,10 +1734,14 @@ function ColumnsLayouts() {
                     noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...contas,
-                    ]}
+                    options={
+                      contasFiltradas.length > 0
+                        ? [
+                            { id: "all", nome: "Selecionar todas" },
+                            ...contasFiltradas,
+                          ]
+                        : []
+                    }
                     getOptionLabel={(option) => option.nome}
                     value={formData.conta.map(
                       (id) => contas.find((conta) => conta.id === id) || id,
@@ -1521,24 +1750,44 @@ function ColumnsLayouts() {
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedContas
-                                  : selected
-                              }
-                            />
+                    renderOption={(props, option, { selected }) => {
+                      const origens = contaOrigemMap[option.id]
+                        ? contaOrigemMap[option.id].join(", ")
+                        : "";
+
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox
+                                checked={
+                                  option.id === "all"
+                                    ? allSelectedContas
+                                    : selected
+                                }
+                              />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">
+                                {option.nome}
+                              </Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography
+                                  variant="caption"
+                                  display="block"
+                                  sx={{
+                                    color: "text.secondary",
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  Empresa(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -1570,10 +1819,14 @@ function ColumnsLayouts() {
                     noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...incidentes,
-                    ]}
+                    options={
+                      incidentesFiltrados.length > 0
+                        ? [
+                            { id: "all", nome: "Selecionar todos" },
+                            ...incidentesFiltrados,
+                          ]
+                        : []
+                    }
                     getOptionLabel={(option) => option.nome}
                     value={formData.incidente.map(
                       (id) =>
@@ -1584,24 +1837,44 @@ function ColumnsLayouts() {
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
-                    renderOption={(props, option, { selected }) => (
-                      <li {...props}>
-                        <Grid container alignItems="center">
-                          <Grid item>
-                            <Checkbox
-                              checked={
-                                option.id === "all"
-                                  ? allSelectedContas
-                                  : selected
-                              }
-                            />
+                    renderOption={(props, option, { selected }) => {
+                      const origens = incidenteOrigemMap[option.id]
+                        ? incidenteOrigemMap[option.id].join(", ")
+                        : "";
+
+                      return (
+                        <li {...props}>
+                          <Grid container alignItems="center">
+                            <Grid item>
+                              <Checkbox
+                                checked={
+                                  option.id === "all"
+                                    ? allSelectedIncidentes
+                                    : selected
+                                }
+                              />
+                            </Grid>
+                            <Grid item xs>
+                              <Typography variant="body1">
+                                {option.nome}
+                              </Typography>
+                              {option.id !== "all" && origens && (
+                                <Typography
+                                  variant="caption"
+                                  display="block"
+                                  sx={{
+                                    color: "text.secondary",
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  Risco(s): {origens}
+                                </Typography>
+                              )}
+                            </Grid>
                           </Grid>
-                          <Grid item xs>
-                            {option.nome}
-                          </Grid>
-                        </Grid>
-                      </li>
-                    )}
+                        </li>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
