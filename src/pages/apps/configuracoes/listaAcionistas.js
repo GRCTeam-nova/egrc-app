@@ -58,6 +58,7 @@ import CustomizedSteppers from "../../extra-pages/stepper";
 import CircularProgress from "@mui/material/CircularProgress";
 import Mark from "mark.js";
 import {
+  faFilter,
   faXmark,
   faBan,
   faTrash,
@@ -342,7 +343,10 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                                       placement="top"
                                     >
                                       <IconButton onClick={handleFilterClick}>
-                                        <MoreVertIcon />
+                                        <FontAwesomeIcon
+                                          icon={faFilter}
+                                          style={{ color: "#00000080" }}
+                                        />
                                       </IconButton>
                                     </Tooltip>
                                   )}
@@ -1046,12 +1050,13 @@ ActionCell.propTypes = {
 const ListagemAcionistas = () => {
   const theme = useTheme();
   const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
+  const { dadosApi } = location.state || {};
+  const companyId = dadosApi?.idCompany || localStorage.getItem("idCompany");
   const [formData, setFormData] = useState({ refreshCount: 0 });
   const {
     acoesJudiciais: lists,
     isLoading,
-  } = useGetEmpresa(formData, processoSelecionadoId);
+  } = useGetEmpresa(formData, companyId);
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerDeleteId] = useState("");

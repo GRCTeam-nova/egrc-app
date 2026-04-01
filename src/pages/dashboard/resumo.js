@@ -1,28 +1,22 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-// material-ui
-import { Box, Tabs, Tab, Grid, Stack, Typography, Button } from "@mui/material";
+import { Box, Tabs, Tab, Grid, Stack, Typography, Button } from '@mui/material';
 
-// project import
-import MainCard from "../../components/MainCard";
-import IncomeAreaChart from "../../sections/dashboard/default/IncomeAreaChart";
-import MonthlyBarChart from "../../sections/dashboard/default/MonthlyBarChart";
-import GovernanceOrgChart from "../../sections/dashboard/default/GovernanceOrgChart";
-import DepartmentOrgChart from "../../sections/dashboard/default/DepartmentOrgChart";
-import ProcessDashboard from "../../sections/dashboard/default/ProcessDashboard";
-import DataDashboard from "../../sections/dashboard/default/DataDashboard";
-import AccountsDashboard from "../../sections/dashboard/default/AccountsChart";
-import RiskDashboard from "../../sections/dashboard/default/RisksCharts";
-import ActiveDashboard from "../../sections/dashboard/default/ActivesCharts";
-import ControlDashboard from "../../sections/dashboard/default/ControlDashboard";
-
-// ==============================|| DASHBOARD COM TABS ||============================== //
+import MainCard from '../../components/MainCard';
+import IncomeAreaChart from '../../sections/dashboard/default/IncomeAreaChart';
+import MonthlyBarChart from '../../sections/dashboard/default/MonthlyBarChart';
+import GovernanceOrgChart from '../../sections/dashboard/default/GovernanceOrgChart';
+import DepartmentOrgChart from '../../sections/dashboard/default/DepartmentOrgChart';
+import ProcessDashboard from '../../sections/dashboard/default/ProcessDashboard';
+import DataDashboard from '../../sections/dashboard/default/DataDashboard';
+import AccountsDashboard from '../../sections/dashboard/default/AccountsChart';
+import RiskDashboard from '../../sections/dashboard/default/RisksCharts';
+import ActiveDashboard from '../../sections/dashboard/default/ActivesCharts';
+import ControlDashboard from '../../sections/dashboard/default/ControlDashboard';
 
 export default function DashboardWithTabs() {
-  // tab selection state
-  const [currentTab, setCurrentTab] = useState("dados");
-  // slot state for the area chart
-  const [slot, setSlot] = useState("week");
+  const [currentTab, setCurrentTab] = useState('dados');
+  const [slot, setSlot] = useState('week');
 
   const handleTabChange = (event, newTab) => {
     setCurrentTab(newTab);
@@ -30,7 +24,6 @@ export default function DashboardWithTabs() {
 
   return (
     <Box>
-      {/* Tabs no header */}
       <Tabs
         value={currentTab}
         onChange={handleTabChange}
@@ -47,57 +40,44 @@ export default function DashboardWithTabs() {
         <Tab label="Controle" value="controle" />
       </Tabs>
 
-      {/* Aba Empresas */}
       {currentTab === 'empresas' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
-          <Grid item xs={12}>
-            <Typography variant="h5">Estrutura de Governança</Typography>
-            <MainCard sx={{ mt: 1.5 }} content={false}>
-              <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de governança */}
-                <GovernanceOrgChart />
-              </Box>
-            </MainCard>
-          </Grid>
+          <GovernanceOrgChart />
         </Grid>
       )}
 
-      {/* Aba Departamento */}
       {currentTab === 'departamento' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12}>
             <Typography variant="h5">Organograma de Departamentos</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <DepartmentOrgChart />
               </Box>
             </MainCard>
           </Grid>
         </Grid>
       )}
-      
+
       {currentTab === 'processo' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12}>
             <Typography variant="h5">Processo</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <ProcessDashboard />
               </Box>
             </MainCard>
           </Grid>
         </Grid>
       )}
-      
+
       {currentTab === 'dados' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12}>
             <Typography variant="h5">Dados</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <DataDashboard />
               </Box>
             </MainCard>
@@ -111,49 +91,45 @@ export default function DashboardWithTabs() {
             <Typography variant="h5">Contas</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <AccountsDashboard />
               </Box>
             </MainCard>
           </Grid>
         </Grid>
       )}
-      
+
       {currentTab === 'ativos' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12}>
             <Typography variant="h5">Ativos</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <ActiveDashboard />
               </Box>
             </MainCard>
           </Grid>
         </Grid>
       )}
-      
+
       {currentTab === 'riscos' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12}>
             <Typography variant="h5">Riscos</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <RiskDashboard />
               </Box>
             </MainCard>
           </Grid>
         </Grid>
       )}
-      
+
       {currentTab === 'controle' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12}>
             <Typography variant="h5">Controle</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ p: 2 }}>
-                {/* Componente de organograma de departamento */}
                 <ControlDashboard />
               </Box>
             </MainCard>
@@ -161,7 +137,6 @@ export default function DashboardWithTabs() {
         </Grid>
       )}
 
-      {/* Conteúdo condicional por aba */}
       {currentTab === 'incidentes' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12} md={7} lg={8}>
@@ -173,17 +148,17 @@ export default function DashboardWithTabs() {
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <Button
                     size="small"
-                    onClick={() => setSlot("month")}
-                    color={slot === "month" ? "primary" : "secondary"}
-                    variant={slot === "month" ? "outlined" : "text"}
+                    onClick={() => setSlot('month')}
+                    color={slot === 'month' ? 'primary' : 'secondary'}
+                    variant={slot === 'month' ? 'outlined' : 'text'}
                   >
-                    Mês
+                    Mes
                   </Button>
                   <Button
                     size="small"
-                    onClick={() => setSlot("week")}
-                    color={slot === "week" ? "primary" : "secondary"}
-                    variant={slot === "week" ? "outlined" : "text"}
+                    onClick={() => setSlot('week')}
+                    color={slot === 'week' ? 'primary' : 'secondary'}
+                    variant={slot === 'week' ? 'outlined' : 'text'}
                   >
                     Semana
                   </Button>
@@ -243,10 +218,9 @@ export default function DashboardWithTabs() {
       {currentTab === 'outro' && (
         <Grid container rowSpacing={4.5} columnSpacing={2.75}>
           <Grid item xs={12} md={7} lg={8}>
-            <Typography variant="h5">Outro Gráfico</Typography>
+            <Typography variant="h5">Outro Grafico</Typography>
             <MainCard sx={{ mt: 1.5 }} content={false}>
               <Box sx={{ pt: 1, pr: 2 }}>
-                {/* Pode reutilizar componentes atuais ou importar novos */}
                 <IncomeAreaChart slot={slot} />
               </Box>
             </MainCard>
@@ -256,4 +230,3 @@ export default function DashboardWithTabs() {
     </Box>
   );
 }
-

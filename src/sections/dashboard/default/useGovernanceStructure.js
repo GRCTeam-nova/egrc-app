@@ -1,81 +1,90 @@
-import { useState, useEffect, useCallback } from "react";
-import { useToken } from "../../../api/TokenContext"; // Assumindo que TokenContext existe e fornece useToken
+import { useState, useEffect, useCallback } from 'react';
+import { useToken } from '../../../api/TokenContext';
 
-/**
- * Transforma a lista de empresas da API em uma estrutura de árvore para o react-d3-tree.
- * @param {Array} apiData - Dados brutos da API.
- * @returns {Array} Dados no formato de árvore.
- */
-const transformDataToTree = (apiData) => {
-  // 1. Criar um mapa de todas as empresas por idCompany para acesso rápido
+const transformDataToTree = (apiData = []) => {
+  if (!Array.isArray(apiData) || apiData.length === 0) {
+    return [];
+  }
+
   const companiesMap = apiData.reduce((acc, company) => {
     acc[company.idCompany] = {
+      id: company.idCompany,
       name: company.name,
+      active: company.active,
       attributes: {
         Documento: company.document,
-        Ativa: company.active ? 'Sim' : 'Não',
+        Ativa: company.active ? 'Sim' : 'Nao',
       },
       children: [],
-      // Adicionar o ID para rastreamento de raiz
-      id: company.idCompany, 
     };
+
     return acc;
   }, {});
 
-  // Conjunto para rastrear todos os IDs que são filhos de alguma empresa
   const allChildrenIds = new Set();
 
-  // 2. Construir as relações pai-filho
-  apiData.forEach(company => {
-    const parentId = company.idCompany;
-    const parentNode = companiesMap[parentId];
+  apiData.forEach((company) => {
+    const parentNode = companiesMap[company.idCompany];
 
-    if (parentNode) {
-      company.companyBottoms.forEach(bottomCompany => {
-        const childId = bottomCompany.idCompanyBottom;
-        allChildrenIds.add(childId);
-        
-        const childNode = companiesMap[childId];
-        
-        // Adicionar o filho ao array 'children' do pai, se o nó filho existir no mapa
-        if (childNode) {
-          // Verifica se o filho já foi adicionado para evitar duplicação (baseado no ID)
-          if (!parentNode.children.some(child => child.id === childId)) {
-            parentNode.children.push(childNode);
-          }
-        }
-      });
+    if (!parentNode) {
+      return;
     }
+
+    (company.companyBottoms || []).forEach((bottomCompany) => {
+      const childId = bottomCompany.idCompanyBottom;
+      const childNode = companiesMap[childId];
+
+      allChildrenIds.add(childId);
+
+      if (childNode && !parentNode.children.some((child) => child.id === childId)) {
+        parentNode.children.push(childNode);
+      }
+    });
   });
 
-  // 3. Identificar a(s) raiz(es): empresas que não estão no conjunto de filhos
-  const rootNodes = Object.values(companiesMap).filter(node => !allChildrenIds.has(node.id));
+  const rootNodes = Object.values(companiesMap).filter((node) => !allChildrenIds.has(node.id));
 
-  // 4. Se houver mais de uma raiz, criar um nó "fantasma" para uni-las
   if (rootNodes.length > 1) {
-    return [{
-      name: 'Estrutura Societária',
-      attributes: { Tipo: 'Raiz Agregadora' },
-      children: rootNodes,
-    }];
-  } else if (rootNodes.length === 1) {
-    return rootNodes;
-  } else {
-    // Caso não haja dados ou a estrutura seja totalmente circular/desconectada
-    return [];
+    return [
+      {
+        name: 'Estrutura Societaria',
+        isAggregator: true,
+        attributes: { Tipo: 'Raiz Agregadora' },
+        children: rootNodes,
+      },
+    ];
   }
+
+  if (rootNodes.length === 1) {
+    return rootNodes;
+  }
+
+  return [];
 };
 
-/**
- * Hook customizado para buscar a estrutura de governança e transformá-la em dados de árvore.
- * @param {string} endpoint - O endpoint da API.
- * @returns {{treeData: Array, isLoading: boolean, error: string | null}}
- */
+const hasMeaningfulGovernanceStructure = (treeData = []) => {
+  const hasActiveRelationship = (node) => {
+    if (!node || node.active === false) {
+      return false;
+    }
+
+    if (node.isAggregator) {
+      return (node.children || []).some(hasActiveRelationship);
+    }
+
+    const activeChildren = (node.children || []).filter((child) => child && child.active !== false);
+
+    return activeChildren.length > 0;
+  };
+
+  return treeData.some(hasActiveRelationship);
+};
+
 export function useGovernanceStructure(endpoint) {
   const [treeData, setTreeData] = useState([]);
-  const { setToken } = useToken(); // Para manter o padrão de empresa.js
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { setToken } = useToken();
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -83,8 +92,9 @@ export function useGovernanceStructure(endpoint) {
 
     try {
       const token = localStorage.getItem('access_token');
+
       if (!token) {
-        throw new Error("Token de acesso não encontrado no localStorage.");
+        throw new Error('Token de acesso nao encontrado no localStorage.');
       }
 
       const response = await fetch(endpoint, {
@@ -96,19 +106,17 @@ export function useGovernanceStructure(endpoint) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Erro ao buscar dados da estrutura de governança: ${response.status} - ${errorText}`);
+        throw new Error(`Erro ao buscar dados da estrutura de governanca: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      
-      // Transforma os dados brutos em formato de árvore
       const transformedData = transformDataToTree(data);
-      
-      setTreeData(transformedData);
-      setToken(token); // Atualiza o token no contexto, seguindo o padrão de empresa.js
 
+      setTreeData(transformedData);
+      setToken(token);
     } catch (err) {
-      console.error("Erro na busca ou transformação dos dados:", err);
+      console.error('Erro na busca ou transformacao dos dados:', err);
+      setTreeData([]);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -121,10 +129,10 @@ export function useGovernanceStructure(endpoint) {
 
   return {
     treeData,
+    hasMeaningfulStructure: hasMeaningfulGovernanceStructure(treeData),
     isLoading,
     error,
   };
 }
 
-// Exportar a função de transformação para testes ou uso externo, se necessário
-export { transformDataToTree };
+export { transformDataToTree, hasMeaningfulGovernanceStructure };
