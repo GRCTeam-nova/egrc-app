@@ -107,7 +107,7 @@ export const fuzzyFilter = (row, columnId, value) => {
 
 // ==============================|| REACT TABLE - LIST ||============================== //
 
-function ReactTable({ data, columns, processosTotal, isLoading }) {
+function ReactTable({ data, columns, processosTotal, isLoading, isLocked }) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
@@ -265,6 +265,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
               }}
             >
               <DrawerAcionista
+                disabled={isLocked}
                 buttonSx={{
                   marginLeft: 1.5,
                   height: "20px",
@@ -482,12 +483,13 @@ ReactTable.propTypes = {
   data: PropTypes.array,
   getHeaderProps: PropTypes.func,
   handleAdd: PropTypes.func,
+  isLocked: PropTypes.bool,
   modalToggler: PropTypes.func,
   renderRowSubComponent: PropTypes.any,
   refreshData: PropTypes.func,
 };
 
-function ActionCell({ row, refreshData, onEdit }) {
+function ActionCell({ row, refreshData, onEdit, isLocked }) {
   const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
   const [status, setStatus] = useState(row.original.active);
@@ -632,6 +634,7 @@ function ActionCell({ row, refreshData, onEdit }) {
         color="primary"
         onClick={handleClick}
         style={buttonStyle}
+        disabled={isLocked}
       >
         <MoreVertIcon />
       </IconButton>
@@ -654,6 +657,7 @@ function ActionCell({ row, refreshData, onEdit }) {
             }}
             color="primary"
             style={{ color: "#707070", fontWeight: 400 }}
+            disabled={isLocked}
           >
             Editar
           </Button>
@@ -664,6 +668,7 @@ function ActionCell({ row, refreshData, onEdit }) {
               else toggleStatus();
             }}
             style={{ color: "#707070", fontWeight: 400 }}
+            disabled={isLocked}
           >
             {row.original.active === true ? "Inativar" : "Ativar"}
           </Button>
@@ -1032,6 +1037,7 @@ function ActionCell({ row, refreshData, onEdit }) {
 }
 
 ActionCell.propTypes = {
+  isLocked: PropTypes.bool,
   row: PropTypes.object.isRequired,
   refreshData: PropTypes.func.isRequired,
 };
@@ -1039,7 +1045,7 @@ ActionCell.propTypes = {
 // ==============================|| LISTAGEM ||============================== //
 
 // Componente principal da página de listagem de registros
-const ListagemAcionistas = () => {
+const ListagemAcionistas = ({ readOnly = false }) => {
   const theme = useTheme();
   const location = useLocation();
   const { dadosApi } = location.state || {};
@@ -1085,6 +1091,7 @@ const ListagemAcionistas = () => {
   };
 
   const handleEditAcionista = (acionista) => {
+    if (readOnly) return;
     setSelectedAcionista(acionista);
     setDrawerOpen(true);
   };
@@ -1127,8 +1134,12 @@ const ListagemAcionistas = () => {
         accessorKey: "code",
         cell: ({ row, getValue }) => (
           <Typography
-            onClick={() => handleEditAcionista(row.original)}
-            sx={{ cursor: "pointer" }}
+            onClick={() => {
+              if (!readOnly) {
+                handleEditAcionista(row.original);
+              }
+            }}
+            sx={{ cursor: readOnly ? "default" : "pointer" }}
           >
             {getValue()}
           </Typography>
@@ -1178,11 +1189,12 @@ const ListagemAcionistas = () => {
             row={row}
             refreshData={refreshOrgaos}
             onEdit={handleEditAcionista}
+            isLocked={readOnly}
           />
         ),
       },
     ],
-    [theme]
+    [readOnly, theme]
   );
 
   useEffect(() => {
@@ -1218,6 +1230,7 @@ const ListagemAcionistas = () => {
                 columns,
                 processosTotal,
                 onFormDataChange: handleFormDataChange,
+                isLocked: readOnly,
                 isLoading,
                 refreshData: refreshOrgaos,
               }}
@@ -1231,6 +1244,7 @@ const ListagemAcionistas = () => {
         open={drawerOpen}
         onClose={handleCloseDrawer}
         acionista={selectedAcionista}
+        disabled={readOnly}
         hideButton={true}
       />
 

@@ -24,7 +24,12 @@ import IconButton from "@mui/material/IconButton";
 import { useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 
-function DrawerAcionista({ acionista, hideButton = false }) {
+function DrawerAcionista({
+  acionista,
+  hideButton = false,
+  disabled = false,
+  buttonSx = {},
+}) {
   // Estado interno para controlar se o drawer está aberto
   const [open, setOpen] = useState(false);
   const { token } = useToken();
@@ -148,6 +153,14 @@ function DrawerAcionista({ acionista, hideButton = false }) {
     let url = "";
     let method = "";
     let payload = {};
+
+    if (disabled) {
+      enqueueSnackbar(
+        "Não é possível alterar trechos enquanto a normativa está em aprovação.",
+        { variant: "warning" }
+      );
+      return;
+    }
 
     if (!nome.trim() || !descricao.trim()) {
       enqueueSnackbar("Preencha os campos obrigatórios!", { variant: "error" });
@@ -289,6 +302,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   };
 
   const handleOpen = () => {
+    if (disabled) return;
     setNome("");
     setDescricao("");
     setFormData({ risco: [] });
@@ -307,7 +321,8 @@ function DrawerAcionista({ acionista, hideButton = false }) {
             variant="contained"
             onClick={handleOpen}
             startIcon={<PlusOutlined />}
-            style={{ borderRadius: "20px", height: "32px" }}
+            style={{ borderRadius: "20px", height: "32px", ...buttonSx }}
+            disabled={disabled}
           >
             Novo
           </Button>
@@ -354,6 +369,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
                     onChange={(event) => setNome(event.target.value)}
                     fullWidth
                     value={nome}
+                    disabled={disabled}
                   />
                 </Stack>
               </Grid>
@@ -368,6 +384,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
                     fullWidth
                     value={descricao}
                     onChange={(event) => setDescricao(event.target.value)}
+                    disabled={disabled}
                   />
                 </Stack>
               </Grid>
@@ -391,6 +408,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
+                    disabled={disabled}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
@@ -418,7 +436,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
             <Button onClick={handleClose} variant="outlined">
               Cancelar
             </Button>
-            <Button variant="contained" onClick={tratarSubmit}>
+            <Button variant="contained" onClick={tratarSubmit} disabled={disabled}>
               Salvar
             </Button>
           </Stack>
