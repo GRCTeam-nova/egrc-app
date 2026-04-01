@@ -1652,8 +1652,31 @@ const ListagemProcessos = () => {
     }));
   };
 
+  const handleOpenProcess = (dadosApi) => {
+    navigation(`/processos/criar`, {
+      state: { indoPara: "NovoProcesso", dadosApi },
+    });
+  };
+
   const columns = useMemo(
     () => [
+      {
+        header: "C\u00F3digo",
+        accessorKey: "code",
+        cell: ({ row }) => (
+          <Typography
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
+            onClick={() => handleOpenProcess(row.original)}
+          >
+            {row.original.code}
+          </Typography>
+        ),
+      },
       {
         header: "Processo",
         accessorKey: "name",
@@ -1665,22 +1688,10 @@ const ListagemProcessos = () => {
               fontWeight: 600,
               color: theme.palette.primary.main,
             }}
-            onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/processos/criar`, {
-                state: { indoPara: "NovoProcesso", dadosApi },
-              });
-            }}
+            onClick={() => handleOpenProcess(row.original)}
           >
             {row.original.name}
           </Typography>
-        ),
-      },
-      {
-        header: "Código",
-        accessorKey: "code",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
         ),
       },
       {
