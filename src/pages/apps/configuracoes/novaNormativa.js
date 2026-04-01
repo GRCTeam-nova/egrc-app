@@ -25,7 +25,7 @@ import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
@@ -135,15 +135,45 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
+function buildLocalDate(year, month, day) {
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+
 function toDate(value) {
   if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? null
+      : buildLocalDate(
+          value.getFullYear(),
+          value.getMonth() + 1,
+          value.getDate(),
+        );
+  }
+
+  if (typeof value === "string") {
+    const dateMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if (dateMatch) {
+      const [, year, month, day] = dateMatch;
+      return buildLocalDate(Number(year), Number(month), Number(day));
+    }
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? null
+    : buildLocalDate(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 function toIso(value) {
   const date = toDate(value);
   return date ? date.toISOString() : null;
+}
+
+function getTodayDate() {
+  return toDate(new Date());
 }
 
 function getEntityId(item) {
@@ -188,6 +218,14 @@ function toIdArray(value, fallback = []) {
 function resolveRiskValue(value) {
   const numericValue = Number(value);
   return [1, 2, 3].includes(numericValue) ? numericValue : null;
+}
+
+function resolveFrequencyRevisionValue(frequencyRevision, riskValue = null) {
+  const derivedFromRisk = resolveRiskValue(riskValue);
+  if (derivedFromRisk) return derivedFromRisk;
+
+  const numericValue = Number(frequencyRevision);
+  return [1, 2, 3].includes(numericValue) ? numericValue : "";
 }
 
 function appendCommentHistory(currentValue, newValue, userName) {
@@ -414,6 +452,12 @@ function serializeNormativeApproverEntries(entries) {
 function mapNormativeToForm(record) {
   if (!record) return { ...INITIAL_FORM_DATA };
 
+  const normalizedRisk = resolveRiskValue(record.normativeRisk);
+  const resolvedFrequencyRevision = resolveFrequencyRevisionValue(
+    record.frequencyRevision,
+    normalizedRisk,
+  );
+
   return {
     idNormative: record.idNormative || record.id || "",
     code: record.code || "",
@@ -439,8 +483,8 @@ function mapNormativeToForm(record) {
     tipoNorma:
       record.idNormativeType || record.normativeType?.idNormativeType || "",
     regulador: record.idRegulatory || record.regulatory?.idRegulatory || "",
-    riscoNorma: resolveRiskValue(record.normativeRisk),
-    periodicidadeRevisao: record.frequencyRevision || "",
+    riscoNorma: normalizedRisk,
+    periodicidadeRevisao: resolvedFrequencyRevision,
     statuRevisao: record.normativeRevisionStatus || "",
     normaOrigem: Array.isArray(record.idOrigins)
       ? record.idOrigins.filter(Boolean)
@@ -666,6 +710,7 @@ function ColumnsLayouts() {
   const [hasChanges, setHasChanges] = useState(false);
   const [initialResponsibleApplied, setInitialResponsibleApplied] =
     useState(false);
+  const topAnchorRef = useRef(null);
   const [formValidation, setFormValidation] = useState({
     code: true,
     name: true,
@@ -695,6 +740,22 @@ function ColumnsLayouts() {
         : { ...previous, ...updater },
     );
   };
+
+  const keepViewportAtTop = useCallback(({ focusTop = false } = {}) => {
+    if (typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+      if (focusTop && topAnchorRef.current?.focus) {
+        try {
+          topAnchorRef.current.focus({ preventScroll: true });
+        } catch (error) {
+          topAnchorRef.current.focus();
+        }
+      }
+    });
+  }, []);
 
   const clearFieldError = (field) => {
     setFieldErrorMessages((previous) =>
@@ -817,7 +878,7 @@ function ColumnsLayouts() {
           await loadNormative(idNormativeFromRoute);
         }
 
-        window.scrollTo(0, 0);
+        keepViewportAtTop();
       } catch (error) {
         console.error(error);
         enqueueSnackbar("Não foi possível carregar os catálogos da tela.", {
@@ -829,7 +890,7 @@ function ColumnsLayouts() {
     };
 
     loadInitialData();
-  }, [idNormativeFromRoute, loadNormative, loadOptions, token]);
+  }, [idNormativeFromRoute, keepViewportAtTop, loadNormative, loadOptions, token]);
 
   useEffect(() => {
     if (initialResponsibleApplied) return;
@@ -841,14 +902,17 @@ function ColumnsLayouts() {
     );
 
     setInitialResponsibleApplied(true);
-    if (formData.responsavel || !userIsResponsible) return;
+    if (!userIsResponsible) return;
+    if (formData.responsavel && formData.revisor) return;
 
     setFormData((previous) => ({
       ...previous,
-      responsavel: idUser,
+      responsavel: previous.responsavel || idUser,
+      revisor: previous.revisor || idUser,
     }));
   }, [
     formData.responsavel,
+    formData.revisor,
     idUser,
     initialResponsibleApplied,
     requisicao,
@@ -865,14 +929,22 @@ function ColumnsLayouts() {
   const currentStatus = formData.statusNorma || "";
   const currentNormativeId = formData.idNormative || idNormativeFromRoute;
   const currentUserEmail = normalizeText(user?.email);
+  const resolvedFrequencyRevision = useMemo(
+    () =>
+      resolveFrequencyRevisionValue(
+        formData.periodicidadeRevisao,
+        formData.riscoNorma,
+      ),
+    [formData.periodicidadeRevisao, formData.riscoNorma],
+  );
 
   const revisionData = useMemo(
     () =>
       calculateRevisionFields(
         formData.ultimaRevisao,
-        formData.periodicidadeRevisao,
+        resolvedFrequencyRevision,
       ),
-    [formData.ultimaRevisao, formData.periodicidadeRevisao],
+    [formData.ultimaRevisao, resolvedFrequencyRevision],
   );
 
   const normativeApproverEntries = useMemo(
@@ -1012,12 +1084,18 @@ function ColumnsLayouts() {
     };
 
     const normalizedRisk = resolveRiskValue(base.riscoNorma);
+    const normalizedFrequencyRevision = resolveFrequencyRevisionValue(
+      base.periodicidadeRevisao,
+      normalizedRisk,
+    );
     const normalizedStatus = Number(base.statusNorma) || null;
     const shouldFillRevisionWorkflow =
-      normalizedStatus === STATUS.VERSAO_FINAL && normalizedRisk !== null;
+      normalizedStatus === STATUS.VERSAO_FINAL &&
+      normalizedRisk !== null &&
+      Boolean(normalizedFrequencyRevision);
 
     const computedRevision = shouldFillRevisionWorkflow
-      ? calculateRevisionFields(base.ultimaRevisao, base.periodicidadeRevisao)
+      ? calculateRevisionFields(base.ultimaRevisao, normalizedFrequencyRevision)
       : { limitDate: null, days: "", status: "" };
     const approvalEntries = Array.isArray(base.normativeApprovers)
       ? normalizeNormativeApproverEntries(base.normativeApprovers)
@@ -1039,7 +1117,7 @@ function ColumnsLayouts() {
       lastRevision: toIso(base.ultimaRevisao),
       conclusion: base.descriptionReviewer || null,
       frequencyRevision: shouldFillRevisionWorkflow
-        ? Number(base.periodicidadeRevisao) || null
+        ? Number(normalizedFrequencyRevision) || null
         : null,
       limitDateRevision: shouldFillRevisionWorkflow
         ? toIso(computedRevision.limitDate)
@@ -1321,6 +1399,7 @@ function ColumnsLayouts() {
       });
 
       await loadNormative(createdId);
+      keepViewportAtTop();
 
       enqueueSnackbar(`Normativa ${feedbackLabel} com sucesso!`, {
         variant: "success",
@@ -1459,16 +1538,22 @@ function ColumnsLayouts() {
     const finalStatus =
       targetStatus ||
       (hasApprovers ? STATUS.EM_APROVACAO : STATUS.VERSAO_FINAL);
-
-    const shouldStampLastRevision =
-      finalStatus === STATUS.VERSAO_FINAL && !formData.ultimaRevisao;
+    const nextLastRevision =
+      finalStatus === STATUS.VERSAO_FINAL && !formData.ultimaRevisao
+        ? getTodayDate()
+        : formData.ultimaRevisao;
+    const nextFrequencyRevision =
+      finalStatus === STATUS.VERSAO_FINAL ? resolvedFrequencyRevision : "";
 
     const updated = await updateNormative({
       overrides: {
         statusNorma: finalStatus,
-        ultimaRevisao: shouldStampLastRevision
-          ? new Date()
-          : formData.ultimaRevisao,
+        ultimaRevisao: nextLastRevision,
+        periodicidadeRevisao: nextFrequencyRevision,
+        statuRevisao:
+          finalStatus === STATUS.VERSAO_FINAL && nextFrequencyRevision
+            ? 1
+            : formData.statuRevisao,
       },
       commentFields: ["description"],
       successMessage:
@@ -1587,8 +1672,9 @@ function ColumnsLayouts() {
 
     const updated = await updateNormative({
       overrides: {
-        ultimaRevisao: new Date(),
+        ultimaRevisao: getTodayDate(),
         statuRevisao: 1,
+        periodicidadeRevisao: resolvedFrequencyRevision,
       },
       commentFields: ["descriptionReviewer"],
       successMessage: "Revisão registrada com sucesso!",
@@ -1600,6 +1686,11 @@ function ColumnsLayouts() {
         ultimaRevisao: true,
       }));
     }
+  };
+
+  const handleContinueEditing = () => {
+    setSuccessDialogOpen(false);
+    keepViewportAtTop({ focusTop: true });
   };
 
   const handleSubmit = async () => {
@@ -1759,7 +1850,7 @@ function ColumnsLayouts() {
     null;
   const selectedFrequency =
     FREQUENCY_OPTIONS.find(
-      (item) => item.id === Number(formData.periodicidadeRevisao),
+      (item) => item.id === Number(resolvedFrequencyRevision),
     ) || null;
   const selectedRevisionStatus =
     REVISION_STATUS_OPTIONS.find(
@@ -1772,6 +1863,7 @@ function ColumnsLayouts() {
       <LoadingOverlay isActive={loading} />
 
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
+        <Box ref={topAnchorRef} tabIndex={-1} sx={{ outline: 0 }} />
         <Grid container spacing={3} sx={{ padding: 3 }}>
           {requisicao === "Editar" ? (
             <Grid
@@ -2002,7 +2094,9 @@ function ColumnsLayouts() {
 
           {requisicao === "Editar" ? (
             <>
-              <Grid item xs={12} mt={2}>
+              {requisicao === "Editar" ? (
+                <>
+                <Grid item xs={12} mt={2}>
                 <Typography
                   variant="subtitle1"
                   fontWeight="bold"
@@ -2084,6 +2178,8 @@ function ColumnsLayouts() {
                   />
                 </Grid>
               ) : null}
+                </>
+              ) : null}
 
               <Grid item xs={12} mt={2}>
                 <Typography
@@ -2093,7 +2189,7 @@ function ColumnsLayouts() {
                 >
                   3. Associações e relacionamentos
                 </Typography>
-              </Grid>
+                </Grid>
 
               <Grid item xs={12} sm={6}>
                 <Stack spacing={1}>
@@ -2328,7 +2424,7 @@ function ColumnsLayouts() {
                 >
                   4. Classificação e prazos
                 </Typography>
-              </Grid>
+                </Grid>
 
               <Grid item xs={12} sm={4}>
                 <Stack spacing={1}>
@@ -2419,14 +2515,6 @@ function ColumnsLayouts() {
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
-                      <Grid item xs={12}>
-                        <Alert severity="info" sx={{ mb: 1 }}>
-                          Apenas o revisor pode alterar os campos desta seção.
-                          Quando a norma nasce em versão final, a primeira data
-                          de última revisão deve ser preenchida aqui.
-                        </Alert>
-                      </Grid>
-
                       <Grid item xs={12} sm={6}>
                         <Stack spacing={1}>
                           <InputLabel>Última revisão</InputLabel>
@@ -2492,14 +2580,9 @@ function ColumnsLayouts() {
                             options={FREQUENCY_OPTIONS}
                             getOptionLabel={(option) => option.nome}
                             value={selectedFrequency}
-                            onChange={(_, newValue) =>
-                              withDirty({
-                                periodicidadeRevisao: newValue ? newValue.id : "",
-                              })
-                            }
                             isOptionEqualToValue={(option, value) => option.id === value.id}
                             renderInput={(params) => <TextField {...params} />}
-                            disabled={!canEditReviewFields}
+                            disabled
                           />
                         </Stack>
                       </Grid>
@@ -2530,7 +2613,8 @@ function ColumnsLayouts() {
                         </Stack>
                       </Grid>
 
-                      <Grid item xs={12}>
+                      {requisicao === "Editar" ? (
+                        <Grid item xs={12}>
                         <CommentCard
                           title="Comentário da revisão"
                           placeholder="Digite aqui o comentário da revisão periódica."
@@ -2546,13 +2630,15 @@ function ColumnsLayouts() {
                           disabled={!canEditReviewFields}
                           loading={loading}
                         />
-                      </Grid>
+                        </Grid>
+                      ) : null}
                     </Grid>
                   </AccordionDetails>
                 </Accordion>
               </Grid>
 
-              <Grid item xs={12} mt={2}>
+              {requisicao === "Editar" ? (
+                <Grid item xs={12} mt={2}>
                 <Accordion
                   sx={{
                     backgroundColor: "#fff5f5",
@@ -2605,7 +2691,8 @@ function ColumnsLayouts() {
                     </Grid>
                   </AccordionDetails>
                 </Accordion>
-              </Grid>
+                </Grid>
+              ) : null}
 
               <Grid item xs={12} mt={2}>
                 <Typography
@@ -2638,7 +2725,8 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              <Grid item xs={12}>
+              {requisicao === "Editar" ? (
+                <Grid item xs={12}>
                 <Accordion sx={{ border: "1px solid #e0e0e0", boxShadow: "none" }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Typography variant="subtitle1" fontWeight="bold">
@@ -2646,10 +2734,16 @@ function ColumnsLayouts() {
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <ListagemTrecho />
+                    <ListagemTrecho
+                      readOnly={
+                        currentStatus === STATUS.EM_APROVACAO ||
+                        currentStatus === STATUS.REVOGADO
+                      }
+                    />
                   </AccordionDetails>
                 </Accordion>
-              </Grid>
+                </Grid>
+              ) : null}
             </>
           ) : null}
 
@@ -2677,6 +2771,7 @@ function ColumnsLayouts() {
         <Dialog
           open={successDialogOpen}
           onClose={() => setSuccessDialogOpen(false)}
+          disableRestoreFocus
           sx={{
             "& .MuiDialog-paper": {
               padding: "24px",
@@ -2714,7 +2809,7 @@ function ColumnsLayouts() {
               Voltar para a listagem
             </Button>
             <Button
-              onClick={() => setSuccessDialogOpen(false)}
+              onClick={handleContinueEditing}
               variant="contained"
               sx={{ backgroundColor: "#007bff", fontWeight: 600 }}
             >
