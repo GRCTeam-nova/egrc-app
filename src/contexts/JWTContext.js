@@ -8,6 +8,7 @@ import authReducer from '../contexts/auth-reducer/auth';
 
 import Loader from '../components/Loader';
 import axios from '../utils/axios';
+import { AUTH_REDIRECT_REASON, clearAuthRedirectReason, setAuthRedirectReason } from '../utils/authRedirect';
 
 const initialState = {
   isLoggedIn: false,
@@ -47,6 +48,7 @@ export const JWTProvider = ({ children }) => {
       try {
         const serviceToken = window.localStorage.getItem('access_token');
         if (serviceToken && verifyToken(serviceToken)) {
+          clearAuthRedirectReason();
           setSession(serviceToken);
           const idUser = localStorage.getItem('id_user');
           
@@ -84,6 +86,7 @@ export const JWTProvider = ({ children }) => {
   }, []);
 
   const directLogin = (token, userData) => {
+    clearAuthRedirectReason();
     setSession(token);
     dispatch({
       type: LOGIN,
@@ -95,10 +98,12 @@ export const JWTProvider = ({ children }) => {
   };
 
   const logout = () => {
+    setAuthRedirectReason(AUTH_REDIRECT_REASON.LOGOUT);
     setSession(null);
     localStorage.removeItem('access_token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('id_user');
+    localStorage.removeItem('selected_tenant');
     localStorage.removeItem('username');
     dispatch({ type: LOGOUT });
   };

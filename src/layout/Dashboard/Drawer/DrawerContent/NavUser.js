@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 // material-ui
 import { styled, useTheme } from '@mui/material/styles';
@@ -35,7 +35,6 @@ const ExpandMore = styled(IconButton, { shouldForwardProp: (prop) => prop !== 't
 
 const NavUser = () => {
   const theme = useTheme();
-  const navigate = useNavigate();
 
   const { menuMaster } = useGetMenuMaster();
   const drawerOpen = menuMaster.isDashboardDrawerOpened;
@@ -43,13 +42,8 @@ const NavUser = () => {
   const { logout, user } = useAuth();
   const handleLogout = async () => {
     try {
-      localStorage.clear();
+      handleClose();
       await logout();
-      navigate(`/login`, {
-        state: {
-          from: ''
-        }
-      });
     } catch (err) {
       console.error(err);
     }

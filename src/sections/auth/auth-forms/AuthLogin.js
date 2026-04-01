@@ -29,6 +29,8 @@ import AnimateButton from "../../../components/@extended/AnimateButton";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useToken } from "../../../api/TokenContext";
+import { APP_DEFAULT_PATH } from "../../../config";
+import { AUTH_REDIRECT_REASON } from "../../../utils/authRedirect";
 
 import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 
@@ -41,20 +43,23 @@ const AuthLogin = ({ isDemo = false }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { setToken } = useToken();
-  const [loginMessage, setLoginMessage] = useState("");
+  const [, setLoginMessage] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (location.state && location.state.from) {
+    const shouldShowLoginMessage =
+      location.state?.reason === AUTH_REDIRECT_REASON.AUTH_REQUIRED &&
+      Boolean(location.state?.from);
+
+    if (shouldShowLoginMessage) {
       setLoginMessage(
         "Você precisa efetuar o login para visualizar este questionário.",
       );
+    } else {
+      setLoginMessage("");
     }
-    if (params.get("sessionExpired") === "true") {
-      setShowExpiredAlert(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setShowExpiredAlert(params.get("sessionExpired") === "true");
+  }, [location.search, location.state]);
 
   useEffect(() => {
     const timer = setTimeout(() => {}, 10000);
@@ -129,11 +134,13 @@ const AuthLogin = ({ isDemo = false }) => {
 
       login(finalToken, userData);
 
-      if (location.state && location.state.from) {
-        navigate(location.state.from);
-      } else {
-        navigate("/dashboard/resumo");
-      }
+      const redirectPath =
+        location.state?.reason === AUTH_REDIRECT_REASON.AUTH_REQUIRED &&
+        location.state?.from
+          ? location.state.from
+          : APP_DEFAULT_PATH;
+
+      navigate(redirectPath, { replace: true });
     } catch (error) {
       console.error("Erro no processo de login:", error);
     }

@@ -5,20 +5,22 @@ import { useLocation, useNavigate } from 'react-router-dom';
 // project import
 import { APP_DEFAULT_PATH } from '../../config';
 import useAuth from '../../hooks/useAuth';
+import { AUTH_REDIRECT_REASON } from '../authRedirect';
 
 // ==============================|| GUEST GUARD ||============================== //
 
 const GuestGuard = ({ children }) => {
   const { isLoggedIn } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Ensure that the effect only runs when the login status changes, not on every render
-    if (isLoggedIn) {
-      navigate('/login');
+    const isAuthRedirect = location.state?.reason === AUTH_REDIRECT_REASON.AUTH_REQUIRED;
+
+    if (isLoggedIn && !isAuthRedirect) {
+      navigate(APP_DEFAULT_PATH, { replace: true });
     }
-  }, [isLoggedIn]); // Only listen to isLoggedIn
+  }, [isLoggedIn, location.state, navigate]);
 
   return children;
 };

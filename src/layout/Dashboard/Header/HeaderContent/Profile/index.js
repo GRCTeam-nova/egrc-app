@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -22,6 +21,7 @@ import {
 import MainCard from '../../../../../components/MainCard';
 import Transitions from '../../../../../components/@extended/Transitions';
 import ProfileTab from './ProfileTab';
+import useAuth from '../../../../../hooks/useAuth';
 
 // assets
 import { LogoutOutlined } from '@ant-design/icons';
@@ -30,9 +30,9 @@ import { LogoutOutlined } from '@ant-design/icons';
 
 const Profile = () => {
   const theme = useTheme();
-  const navigate = useNavigate();
   const anchorRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const { logout } = useAuth();
 
   const handleToggle = () => {
     setOpen((prevOpen) => !prevOpen);
@@ -47,8 +47,8 @@ const Profile = () => {
 
   const handleLogout = () => {
     // Remova os dados do usuário e o token do localStorage
-    localStorage.clear();
-    navigate('/login', { replace: true });
+    setOpen(false);
+    logout();
   };
 
   const iconBackColorOpen = 'grey.300';

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 // project import
 import useAuth from '../../hooks/useAuth';
+import { AUTH_REDIRECT_REASON, consumeAuthRedirectReason } from '../authRedirect';
 
 // ==============================|| AUTH GUARD ||============================== //
 
@@ -12,17 +13,29 @@ const AuthGuard = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-useEffect(() => {
+  useEffect(() => {
     if (!isLoggedIn) {
-      navigate('login', {
+      const redirectReason = consumeAuthRedirectReason();
+
+      if (redirectReason === AUTH_REDIRECT_REASON.LOGOUT) {
+        navigate('/login', {
+          state: {
+            reason: AUTH_REDIRECT_REASON.LOGOUT
+          },
+          replace: true
+        });
+        return;
+      }
+
+      navigate('/login', {
         state: {
-          // CORREÇÃO AQUI: Concatenar location.search para manter os parâmetros ?id=...
-          from: location.pathname + location.search 
+          from: location.pathname + location.search,
+          reason: AUTH_REDIRECT_REASON.AUTH_REQUIRED
         },
         replace: true
       });
     }
-  }, [isLoggedIn, navigate, location]);
+  }, [isLoggedIn, location.pathname, location.search, navigate]);
 
   return children;
 };
