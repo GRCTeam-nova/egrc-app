@@ -28,6 +28,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   const { token } = useToken();
   const location = useLocation();
   const { dadosApi } = location.state || {};
+  const companyId = dadosApi?.idCompany || localStorage.getItem("idCompany");
 
   const [nome, setNome] = useState("");
   
@@ -118,13 +119,16 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           throw new Error("Erro ao enviar os dados do acionista.");
         }
       } else {
-        
+        if (!companyId) {
+          throw new Error("Empresa não identificada para cadastrar o participante.");
+        }
+
         url = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
         method = "POST";
         payload = {
           name: nome,
           document: documento,
-          idCompany: dadosApi.idCompany,
+          idCompany: companyId,
           idActionType: idActionType || null,
         };
 

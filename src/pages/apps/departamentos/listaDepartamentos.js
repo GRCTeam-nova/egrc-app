@@ -1201,12 +1201,32 @@ const ListagemEmpresa = () => {
     setFormData(newFormData);
   };
 
+  const handleOpenDepartamento = (dadosApi) => {
+    navigation(`/departamentos/criar`, {
+      state: {
+        indoPara: "NovoDepartamento",
+        dadosApi,
+      },
+    });
+  };
+
   // Definição das colunas da tabela
   const columns = useMemo(
     () => [
       {
         header: "Código",
         accessorKey: "code",
+        cell: ({ row }) => (
+          <Typography
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+            }}
+            onClick={() => handleOpenDepartamento(row.original)}
+          >
+            {row.original.code}
+          </Typography>
+        ),
       },
       {
         header: "Departamentos",
@@ -1217,15 +1237,7 @@ const ListagemEmpresa = () => {
               fontSize: '13px',
               cursor: "pointer",
             }}
-            onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/departamentos/criar`, {
-                state: {
-                  indoPara: "NovoDepartamento",
-                  dadosApi,
-                },
-              });
-            }}
+            onClick={() => handleOpenDepartamento(row.original)}
           >
             {row.original.name}
           </Typography>
