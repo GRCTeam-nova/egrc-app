@@ -1136,67 +1136,6 @@ function ColumnsLayouts() {
             </Stack>
           </Grid>
 
-          {requisicao === "Criar" && (
-            <Grid item xs={6} sx={{ paddingBottom: 5 }}>
-              <Stack spacing={1}>
-                <InputLabel>
-                  Risco{" "}
-                  <DrawerRisco
-                    buttonSx={{
-                      marginLeft: 1.5,
-                      height: "20px",
-                      minWidth: "20px",
-                    }}
-                    onRiscoCreated={handleRiskCreated}
-                  />
-                </InputLabel>
-                <Autocomplete
-                  noOptionsText={"Dados não encontrados"}
-                  multiple
-                  disableCloseOnSelect
-                  options={[
-                    { id: "all", nome: "Selecionar todas" },
-                    ...riscos,
-                  ]}
-                  getOptionLabel={(option) => option.nome}
-                  value={formData.risco.map(
-                    (id) => riscos.find((risco) => risco.id === id) || id,
-                  )}
-                  onChange={handleSelectAllRisco}
-                  isOptionEqualToValue={(option, value) =>
-                    option.id === value.id
-                  }
-                  renderOption={(props, option, { selected }) => (
-                    <li {...props}>
-                      <Grid container alignItems="center">
-                        <Grid item>
-                          <Checkbox
-                            checked={
-                              option.id === "all" ? allSelectedRiscos : selected
-                            }
-                          />
-                        </Grid>
-                        <Grid item xs>
-                          {option.nome}
-                        </Grid>
-                      </Grid>
-                    </li>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      error={
-                        (formData.risco.length === 0 ||
-                          formData.risco.every((val) => val === 0)) &&
-                        formValidation.risco === false
-                      }
-                    />
-                  )}
-                />
-              </Stack>
-            </Grid>
-          )}
-
           {requisicao === "Editar" && (
             <>
               <Grid item xs={6} mb={5}>
