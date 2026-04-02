@@ -51,7 +51,7 @@ const LoginRoutes = {
           element: <AuthCheckMail />,
         },
         {
-          path: "app/api/v1/accounts/reset-password",
+          path: "trocar-senha",
           element: <AuthResetPassword />,
         },
         {
