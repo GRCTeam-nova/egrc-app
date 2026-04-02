@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Chip,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -37,6 +38,17 @@ import InputMask from "react-input-mask";
 import { useToken } from "../../../api/TokenContext";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import {
+  areAllVisibleOptionsSelected,
+  buildActiveOptionsWithSelected,
+  buildInactiveSelectionHelperText,
+  dedupeOptionsById,
+  findSelectedOption,
+  findSelectedOptions,
+  getOptionDisplayLabel,
+  SELECT_ALL_AUTOCOMPLETE_ID,
+  withSelectAllOption,
+} from "../../../utils/activeAutocomplete";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -117,6 +129,9 @@ function ColumnsLayouts() {
           }
 
           const data = await response.json();
+          const empresaInferiorIds = Array.isArray(data.companyBottoms)
+            ? [...new Set(data.companyBottoms.map((u) => u.idCompanyBottom).filter(Boolean))]
+            : [];
           setRequisicao("Editar");
           setMensagemFeedback("editada");
           setNomeOrgao(data.name);
@@ -135,9 +150,7 @@ function ColumnsLayouts() {
 
             return {
               ...prev,
-              empresaInferior: Array.isArray(data.companyBottoms)
-                ? data.companyBottoms.map((u) => u.idCompanyBottom)
-                : [],
+              empresaInferior: empresaInferiorIds,
               empresaSuperior: data.idCompanySuperior || null,
               responsavel: data.idResponsible || null,
               processo: idProcs,
@@ -259,7 +272,7 @@ function ColumnsLayouts() {
         ...item, // Mantém os outros campos intactos
       }));
 
-      setState(transformedData);
+      setState(dedupeOptionsById(transformedData));
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     }
@@ -337,11 +350,11 @@ function ColumnsLayouts() {
     }
 
     // Atualiza a lista de empresas inferiores removendo aquelas cujo nome conflita
-    const inferioresAtualizadas = formData.empresaInferior.filter((id) => {
+    const inferioresAtualizadas = [...new Set(formData.empresaInferior)].filter((id) => {
       const empresaInferior = empresasInferiores.find(
         (empresa) => empresa.id === id,
       );
-      if (!empresaInferior) return false;
+      if (!empresaInferior) return true;
       return formatarNome(empresaInferior.nome) !== nomeDigitado;
     });
     if (inferioresAtualizadas.length !== formData.empresaInferior.length) {
@@ -635,9 +648,68 @@ function ColumnsLayouts() {
     nomeEmpresa: true,
   });
 
-  const allSelected =
-    formData.empresaInferior.length === empresasInferiores.length &&
-    empresasInferiores.length > 0;
+  const empresaSuperiorSelecionada = findSelectedOption(
+    empresasSuperiores,
+    formData.empresaSuperior,
+  );
+  const empresasInferioresSelecionadas = findSelectedOptions(
+    empresasInferiores,
+    formData.empresaInferior,
+  );
+  const empresasSuperioresDisponiveis = buildActiveOptionsWithSelected(
+    empresasSuperiores,
+    formData.empresaSuperior,
+    (empresa) =>
+      !formData.empresaInferior.includes(empresa.id) &&
+      formatarNome(empresa.nome) !== formatarNome(nomeEmpresa),
+  );
+  const empresasInferioresDisponiveis = buildActiveOptionsWithSelected(
+    empresasInferiores,
+    formData.empresaInferior,
+    (empresa) =>
+      empresa.id !== formData.empresaSuperior &&
+      formatarNome(empresa.nome) !== formatarNome(nomeEmpresa),
+  );
+  const empresaSuperiorHelperText = buildInactiveSelectionHelperText(
+    empresaSuperiorSelecionada ? [empresaSuperiorSelecionada] : [],
+    {
+      singular:
+        "Empresa superior selecionada est\u00e1 inativa. Voc\u00ea pode mant\u00ea-la ou remov\u00ea-la.",
+    },
+  );
+  const empresasInferioresHelperText = buildInactiveSelectionHelperText(
+    empresasInferioresSelecionadas,
+    {
+      singular:
+        "Empresa inferior selecionada est\u00e1 inativa. Voc\u00ea pode mant\u00ea-la ou remov\u00ea-la.",
+      plural:
+        "Algumas empresas inferiores selecionadas est\u00e3o inativas. Voc\u00ea pode mant\u00ea-las ou remov\u00ea-las.",
+    },
+  );
+  const handleSelectAllEmpresasInferiores = (event, newValue) => {
+    if (
+      newValue.length > 0 &&
+      newValue[newValue.length - 1].id === SELECT_ALL_AUTOCOMPLETE_ID
+    ) {
+      if (allSelected) {
+        setFormData({ ...formData, empresaInferior: [] });
+      } else {
+        setFormData({
+          ...formData,
+          empresaInferior: empresasInferioresDisponiveis.map(
+            (empresaInferior) => empresaInferior.id,
+          ),
+        });
+      }
+      return;
+    }
+
+    handleSelectAll(event, newValue);
+  };
+  const allSelected = areAllVisibleOptionsSelected(
+    empresasInferioresDisponiveis,
+    formData.empresaInferior,
+  );
   const allSelectedOrgaoRegulador =
     formData.orgaoRegulador.length === orgaosReguladores.length &&
     orgaosReguladores.length > 0;
@@ -1053,18 +1125,11 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Empresa superior</InputLabel>
                   <Autocomplete
-                    options={empresasSuperiores.filter(
-                      (empresa) =>
-                        !formData.empresaInferior.includes(empresa.id) &&
-                        formatarNome(empresa.nome) !==
-                          formatarNome(nomeEmpresa),
-                    )}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      empresasSuperiores.find(
-                        (empresa) => empresa.id === formData.empresaSuperior,
-                      ) || null
+                    options={empresasSuperioresDisponiveis}
+                    getOptionLabel={(option) =>
+                      getOptionDisplayLabel(option, "Inativa")
                     }
+                    value={empresaSuperiorSelecionada}
                     onChange={(event, newValue) => {
                       setFormData((prev) => {
                         // Remove a empresa selecionada dos inferiores, caso exista
@@ -1085,6 +1150,7 @@ function ColumnsLayouts() {
                           !formData.empresaSuperior &&
                           formValidation.empresaSuperior === false
                         }
+                        helperText={empresaSuperiorHelperText}
                       />
                     )}
                   />
@@ -1097,25 +1163,41 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...empresasInferiores.filter(
-                        (empresa) =>
-                          empresa.id !== formData.empresaSuperior &&
-                          formatarNome(empresa.nome) !==
-                            formatarNome(nomeEmpresa),
-                      ),
-                    ]}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.empresaInferior.map(
-                      (id) =>
-                        empresasInferiores.find(
-                          (empresa) => empresa.id === id,
-                        ) || id,
+                    options={withSelectAllOption(
+                      empresasInferioresDisponiveis,
+                      "Selecionar todas",
                     )}
-                    onChange={handleSelectAll}
+                    getOptionLabel={(option) =>
+                      option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                        ? option.nome
+                        : getOptionDisplayLabel(option, "Inativa")
+                    }
+                    value={empresasInferioresSelecionadas}
+                    onChange={handleSelectAllEmpresasInferiores}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
+                    }
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => {
+                        const isInativa = option.active === false;
+
+                        return (
+                          <Chip
+                            label={getOptionDisplayLabel(option, "Inativa")}
+                            {...getTagProps({ index })}
+                            color={isInativa ? "error" : "default"}
+                            variant={isInativa ? "outlined" : "filled"}
+                            sx={
+                              isInativa
+                                ? {
+                                    borderColor: "error.main",
+                                    color: "error.main",
+                                  }
+                                : {}
+                            }
+                          />
+                        );
+                      })
                     }
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
@@ -1123,12 +1205,16 @@ function ColumnsLayouts() {
                           <Grid item>
                             <Checkbox
                               checked={
-                                option.id === "all" ? allSelected : selected
+                                option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                                  ? allSelected
+                                  : selected
                               }
                             />
                           </Grid>
                           <Grid item xs>
-                            {option.nome}
+                            {option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                              ? option.nome
+                              : getOptionDisplayLabel(option, "Inativa")}
                           </Grid>
                         </Grid>
                       </li>
@@ -1143,6 +1229,7 @@ function ColumnsLayouts() {
                             )) &&
                           formValidation.empresaInferior === false
                         }
+                        helperText={empresasInferioresHelperText}
                       />
                     )}
                   />
