@@ -635,6 +635,42 @@ ReactTable.propTypes = {
   refreshData: PropTypes.func,
 };
 
+const normalizeCompanyRelationIds = (items, idKey) =>
+  Array.isArray(items)
+    ? [...new Set(items.map((item) => item?.[idKey]).filter(Boolean))]
+    : [];
+
+const normalizeUploadedFiles = (files) =>
+  Array.isArray(files)
+    ? files.map((file) => {
+        if (typeof file === "string") return file;
+        if (file?.path) return file.path;
+        return file;
+      })
+    : [];
+
+const buildCompanyUpdatePayload = (companyData, nextActive) => ({
+  idCompany: companyData.idCompany,
+  name: companyData.name,
+  document: companyData.document,
+  startDate: companyData.startDate ?? null,
+  active: nextActive,
+  idCompanySuperior: companyData.idCompanySuperior ?? null,
+  idResponsible: companyData.idResponsible ?? null,
+  idCompanyBottoms: normalizeCompanyRelationIds(
+    companyData.companyBottoms,
+    "idCompanyBottom",
+  ),
+  idProcess: companyData.idProcesses ?? companyData.idProcess ?? [],
+  idLedgerAccounts: companyData.idLedgerAccounts ?? [],
+  files: normalizeUploadedFiles(companyData.files),
+  idBusinessLine: companyData.idBusinessLine ?? null,
+  idRegulatories: companyData.idRegulatories ?? [],
+  idClassification: companyData.idClassification ?? null,
+  idLegalNature: companyData.idLegalNature ?? null,
+  idTaxRegime: companyData.idTaxRegime ?? null,
+});
+
 function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
   const { token } = useToken();
@@ -666,9 +702,14 @@ function ActionCell({ row, refreshData }) {
     handleClose();
   };
 
+  useEffect(() => {
+    setStatus(row.original.active);
+  }, [row.original.active]);
+
   const toggleStatus = async () => {
     const idCompany = row.original.idCompany;
-    const newStatus = status === true ? "Inativo" : "Ativo";
+    const nextActive = !Boolean(status);
+    const newStatus = nextActive ? "Ativo" : "Inativo";
     
     try {
       // Buscar os dados do departamento pelo ID
@@ -680,8 +721,11 @@ function ActionCell({ row, refreshData }) {
   
       const dadosEndpoint = getResponse.data;
   
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
+      // Mantém o contrato do PUT alinhado com a tela de edição da empresa.
+      const dadosAtualizados = buildCompanyUpdatePayload(
+        dadosEndpoint,
+        nextActive,
+      );
   
       // Enviar os dados atualizados via PUT
       await axios.put(`${process.env.REACT_APP_API_URL}companies`, dadosAtualizados, {
@@ -692,7 +736,7 @@ function ActionCell({ row, refreshData }) {
       });
   
       // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
+      setStatus(nextActive);
       const message = `Empresa ${row.original.name} ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {
