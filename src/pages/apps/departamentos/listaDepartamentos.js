@@ -606,6 +606,49 @@ ReactTable.propTypes = {
   refreshData: PropTypes.func,
 };
 
+const normalizeDepartmentRelationIds = (items, idKey) =>
+  Array.isArray(items)
+    ? [...new Set(items.map((item) => item?.[idKey]).filter(Boolean))]
+    : [];
+
+const normalizeUploadedFiles = (files) =>
+  Array.isArray(files)
+    ? files.map((file) => {
+        if (typeof file === "string") return file;
+        if (file?.path) return file.path;
+        return file;
+      })
+    : [];
+
+const buildDepartmentUpdatePayload = (departmentData, nextActive) => ({
+  idDepartment: departmentData.idDepartment,
+  active: nextActive,
+  name: departmentData.name,
+  code: departmentData.code,
+  temporary: departmentData.temporary ?? false,
+  collegiate: departmentData.collegiate ?? false,
+  description: departmentData.description ?? "",
+  files: normalizeUploadedFiles(departmentData.files),
+  idNormatives: departmentData.idNormatives ?? [],
+  idLgpds: departmentData.idLgpds ?? [],
+  idResponsible: departmentData.idResponsible ?? null,
+  idDepartmentSuperior: departmentData.idDepartmentSuperior ?? null,
+  idDepartmentBottoms: normalizeDepartmentRelationIds(
+    departmentData.departmentBottoms,
+    "idDepartmentBottom",
+  ),
+  idDepartmentSides: normalizeDepartmentRelationIds(
+    departmentData.departmentSides,
+    "idDepartmentSide",
+  ),
+  idIncidents: departmentData.idIncidents ?? [],
+  idUnitFormat: departmentData.idUnitFormat ?? null,
+  idRisks: departmentData.idRisks ?? [],
+  idResponsabilityType: departmentData.idResponsabilityType ?? null,
+  idProcesses: departmentData.idProcesses ?? [],
+  idActionPlans: departmentData.idActionPlans ?? [],
+});
+
 function ActionCell({ row, refreshData }) {
   const { token } = useToken();
   const navigation = useNavigate();
@@ -637,9 +680,14 @@ function ActionCell({ row, refreshData }) {
     handleClose();
   };
 
+  useEffect(() => {
+    setStatus(row.original.active);
+  }, [row.original.active]);
+
   const toggleStatus = async () => {
     const idDepartment = row.original.idDepartment;
-    const newStatus = status === true ? "Inativo" : "Ativo";
+    const nextActive = !Boolean(status);
+    const newStatus = nextActive ? "Ativo" : "Inativo";
     
     try {
       // Buscar os dados do departamento pelo ID
@@ -651,8 +699,11 @@ function ActionCell({ row, refreshData }) {
   
       const departmentData = getResponse.data;
   
-      // Definir o novo status do campo "active"
-      const updatedDepartmentData = { ...departmentData, active: newStatus === "Ativo" };
+      // Mantém o contrato do PUT alinhado com a tela de edição.
+      const updatedDepartmentData = buildDepartmentUpdatePayload(
+        departmentData,
+        nextActive,
+      );
   
       // Enviar os dados atualizados via PUT
       await axios.put(`${process.env.REACT_APP_API_URL}departments`, updatedDepartmentData, {
@@ -663,7 +714,7 @@ function ActionCell({ row, refreshData }) {
       });
   
       // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
+      setStatus(nextActive);
       const message = `Departamento ${row.original.name} ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {

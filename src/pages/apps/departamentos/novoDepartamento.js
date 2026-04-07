@@ -10,6 +10,7 @@ import {
   Stack,
   Typography,
   Checkbox,
+  Chip,
   InputLabel,
   DialogTitle,
   Dialog,
@@ -33,6 +34,17 @@ import DrawerRisco from "../configuracoes/novoRiscoDrawerDepartamento";
 import DrawerIncidente from "../configuracoes/novoIncidenteDrawerDepartamento";
 import DrawerPlanos from "../configuracoes/novoPlanoDrawerDepartamento";
 import FileUploader from "../configuracoes/FileUploader";
+import {
+  areAllVisibleOptionsSelected,
+  buildActiveOptionsWithSelected,
+  buildInactiveSelectionHelperText,
+  dedupeOptionsById,
+  findSelectedOption,
+  findSelectedOptions,
+  getOptionDisplayLabel,
+  SELECT_ALL_AUTOCOMPLETE_ID,
+  withSelectAllOption,
+} from "../../../utils/activeAutocomplete";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -205,7 +217,7 @@ function ColumnsLayouts() {
         ...item,
       }));
 
-      setState(transformedData);
+      setState(dedupeOptionsById(transformedData));
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     }
@@ -223,18 +235,18 @@ function ColumnsLayouts() {
       setFormData((prev) => ({ ...prev, departamentoSuperior: null }));
     }
 
-    const inferioresAtualizadas = formData.departamentoInferior.filter((id) => {
+    const inferioresAtualizadas = [...new Set(formData.departamentoInferior)].filter((id) => {
       const departamentoInferior = departamentosInferiores.find((departamento) => departamento.id === id);
-      if (!departamentoInferior) return false;
+      if (!departamentoInferior) return true;
       return formatarNome(departamentoInferior.nome) !== nomeDigitado;
     });
     if (inferioresAtualizadas.length !== formData.departamentoInferior.length) {
       setFormData((prev) => ({ ...prev, departamentoInferior: inferioresAtualizadas }));
     }
 
-    const lateraisAtualizadas = formData.departamentoLateral.filter((id) => {
+    const lateraisAtualizadas = [...new Set(formData.departamentoLateral)].filter((id) => {
       const departamentoLateral = departamentosLateral.find((departamento) => departamento.id === id);
-      if (!departamentoLateral) return false;
+      if (!departamentoLateral) return true;
       return formatarNome(departamentoLateral.nome) !== nomeDigitado;
     });
     if (lateraisAtualizadas.length !== formData.departamentoLateral.length) {
@@ -452,52 +464,52 @@ function ColumnsLayouts() {
     }));
   };
 
-  const handleSelectAll = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      const filteredInferiores = departamentosInferiores.filter((departamento) => {
-        const superiorId = formData.departamentoSuperior;
-        const lateralIds = formData.departamentoLateral || [];
-        return (
-          departamento.id !== superiorId &&
-          !lateralIds.includes(departamento.id) &&
-          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
-        );
-      });
-      if (formData.departamentoInferior.length === filteredInferiores.length) {
+  const handleSelectAllDepartamentosInferiores = (event, newValue) => {
+    if (
+      newValue.length > 0 &&
+      newValue[newValue.length - 1].id === SELECT_ALL_AUTOCOMPLETE_ID
+    ) {
+      if (allSelectedDepartamentosInferiores) {
         setFormData({ ...formData, departamentoInferior: [] });
       } else {
         setFormData({
           ...formData,
-          departamentoInferior: filteredInferiores.map((departamento) => departamento.id),
+          departamentoInferior: departamentosInferioresDisponiveis.map(
+            (departamento) => departamento.id,
+          ),
         });
       }
-    } else {
-      tratarMudancaInputGeral("departamentoInferior", newValue.map((item) => item.id));
+      return;
     }
+
+    tratarMudancaInputGeral(
+      "departamentoInferior",
+      newValue.map((item) => item.id),
+    );
   };
 
   const handleSelectDepartamentoLateral = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      const filteredLaterais = departamentosLateral.filter((departamento) => {
-        const superiorId = formData.departamentoSuperior;
-        const inferiorIds = formData.departamentoInferior || [];
-        return (
-          departamento.id !== superiorId &&
-          !inferiorIds.includes(departamento.id) &&
-          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
-        );
-      });
-      if (formData.departamentoLateral.length === filteredLaterais.length) {
+    if (
+      newValue.length > 0 &&
+      newValue[newValue.length - 1].id === SELECT_ALL_AUTOCOMPLETE_ID
+    ) {
+      if (allSelectedDepartamentosLaterais) {
         setFormData({ ...formData, departamentoLateral: [] });
       } else {
         setFormData({
           ...formData,
-          departamentoLateral: filteredLaterais.map((departamento) => departamento.id),
+          departamentoLateral: departamentosLateraisDisponiveis.map(
+            (departamento) => departamento.id,
+          ),
         });
       }
-    } else {
-      tratarMudancaInputGeral("departamentoLateral", newValue.map((item) => item.id));
+      return;
     }
+
+    tratarMudancaInputGeral(
+      "departamentoLateral",
+      newValue.map((item) => item.id),
+    );
   };
 
   // --- HANDLERS COM INTERCEPTAÇÃO E AVISO ---
@@ -618,12 +630,76 @@ function ColumnsLayouts() {
     codigo: true,
   });
 
-  const allSelected =
-    formData.departamentoInferior.length === departamentosInferiores.length &&
-    departamentosInferiores.length > 0;
-  const allSelectedDepartamentoLateral =
-    formData.departamentoLateral.length === departamentosLateral.length &&
-    departamentosLateral.length > 0;
+  const departamentoSuperiorSelecionado = findSelectedOption(
+    departamentosSuperiores,
+    formData.departamentoSuperior,
+  );
+  const departamentosInferioresSelecionados = findSelectedOptions(
+    departamentosInferiores,
+    formData.departamentoInferior,
+  );
+  const departamentosLateraisSelecionados = findSelectedOptions(
+    departamentosLateral,
+    formData.departamentoLateral,
+  );
+  const departamentosSuperioresDisponiveis = buildActiveOptionsWithSelected(
+    departamentosSuperiores,
+    formData.departamentoSuperior,
+    (departamento) =>
+      !formData.departamentoInferior.includes(departamento.id) &&
+      !formData.departamentoLateral.includes(departamento.id) &&
+      formatarNome(departamento.nome) !== formatarNome(nomeDepartamento),
+  );
+  const departamentosInferioresDisponiveis = buildActiveOptionsWithSelected(
+    departamentosInferiores,
+    formData.departamentoInferior,
+    (departamento) =>
+      departamento.id !== formData.departamentoSuperior &&
+      !formData.departamentoLateral.includes(departamento.id) &&
+      formatarNome(departamento.nome) !== formatarNome(nomeDepartamento),
+  );
+  const departamentosLateraisDisponiveis = buildActiveOptionsWithSelected(
+    departamentosLateral,
+    formData.departamentoLateral,
+    (departamento) =>
+      departamento.id !== formData.departamentoSuperior &&
+      !formData.departamentoInferior.includes(departamento.id) &&
+      formatarNome(departamento.nome) !== formatarNome(nomeDepartamento),
+  );
+  const departamentoSuperiorHelperText = buildInactiveSelectionHelperText(
+    departamentoSuperiorSelecionado ? [departamentoSuperiorSelecionado] : [],
+    {
+      singular:
+        "Departamento superior selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+    },
+  );
+  const departamentosInferioresHelperText = buildInactiveSelectionHelperText(
+    departamentosInferioresSelecionados,
+    {
+      singular:
+        "Departamento inferior selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+      plural:
+        "Alguns departamentos inferiores selecionados estão inativos. Você pode mantê-los ou removê-los.",
+    },
+  );
+  const departamentosLateraisHelperText = buildInactiveSelectionHelperText(
+    departamentosLateraisSelecionados,
+    {
+      singular:
+        "Departamento lateral selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+      plural:
+        "Alguns departamentos laterais selecionados estão inativos. Você pode mantê-los ou removê-los.",
+    },
+  );
+
+  const allSelectedDepartamentosInferiores = areAllVisibleOptionsSelected(
+    departamentosInferioresDisponiveis,
+    formData.departamentoInferior,
+  );
+  const allSelectedDepartamentosLaterais = areAllVisibleOptionsSelected(
+    departamentosLateraisDisponiveis,
+    formData.departamentoLateral,
+  );
   
   const allSelectedProcessos =
     formData.processo.length === processos.length && processos.length > 0;
@@ -735,13 +811,22 @@ function ColumnsLayouts() {
         idNormatives: formData.normativa?.length ? formData.normativa : null,
         idLgpds: formData.dado?.length ? formData.dado : null,
         idResponsible: formData.responsavel === "" ? null : formData.responsavel,
-        idDepartmentSuperior: formData.departamentoSuperior?.length ? formData.departamentoSuperior : null,
+        idDepartmentSuperior:
+          formData.departamentoSuperior === "" || formData.departamentoSuperior === null
+            ? null
+            : formData.departamentoSuperior,
         idDepartmentBottoms: formData.departamentoInferior?.length ? formData.departamentoInferior : null,
         idDepartmentSides: formData.departamentoLateral?.length ? formData.departamentoLateral : null,
         idIncidents: formData.incidente?.length ? formData.incidente : null,
-        idUnitFormat: formData.formatoUnidade?.length ? formData.formatoUnidade : null,
+        idUnitFormat:
+          formData.formatoUnidade === "" || formData.formatoUnidade === null
+            ? null
+            : formData.formatoUnidade,
         idRisks: formData.risco?.length ? formData.risco : null,
-        idResponsabilityType: formData.tipoResponsabilidade?.length ? formData.tipoResponsabilidade : null,
+        idResponsabilityType:
+          formData.tipoResponsabilidade === "" || formData.tipoResponsabilidade === null
+            ? null
+            : formData.tipoResponsabilidade,
         idProcesses: formData.processo?.length ? formData.processo : null,
         idActionPlans: formData.planoAcao?.length ? formData.planoAcao : null,
       };
@@ -893,24 +978,11 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Departamento superior</InputLabel>
                   <Autocomplete
-                    options={departamentosSuperiores.filter((departamento) => {
-                      const selectedInferior = formData.departamentoInferior || [];
-                      const selectedLateral = formData.departamentoLateral || [];
-                      const selectedIds = [...selectedInferior, ...selectedLateral];
-
-                      if (formData.departamentoSuperior === departamento.id) return true;
-
-                      return (
-                        !selectedIds.includes(departamento.id) &&
-                        formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
-                      );
-                    })}
-                    getOptionLabel={(option) => option.nome || ""}
-                    value={
-                      departamentosSuperiores.find(
-                        (departamento) => departamento.id === formData.departamentoSuperior
-                      ) || null
+                    options={departamentosSuperioresDisponiveis}
+                    getOptionLabel={(option) =>
+                      getOptionDisplayLabel(option, "Inativo")
                     }
+                    value={departamentoSuperiorSelecionado}
                     onChange={(event, newValue) => {
                       setFormData((prev) => {
                         const updatedInferior = prev.departamentoInferior.filter((id) =>
@@ -927,6 +999,7 @@ function ColumnsLayouts() {
                       <TextField
                         {...params}
                         error={!formData.departamentoSuperior && formValidation.departamentoSuperior === false}
+                        helperText={departamentoSuperiorHelperText}
                       />
                     )}
                   />
@@ -939,35 +1012,56 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...departamentosInferiores.filter((departamento) => {
-                        const superiorId = formData.departamentoSuperior;
-                        const lateralIds = formData.departamentoLateral || [];
-
-                        if (formData.departamentoInferior.includes(departamento.id)) return true;
+                    options={withSelectAllOption(
+                      departamentosInferioresDisponiveis,
+                      "Selecionar todos",
+                    )}
+                    getOptionLabel={(option) =>
+                      option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                        ? option.nome
+                        : getOptionDisplayLabel(option, "Inativo")
+                    }
+                    value={departamentosInferioresSelecionados}
+                    onChange={handleSelectAllDepartamentosInferiores}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => {
+                        const isInativo = option.active === false;
 
                         return (
-                          departamento.id !== superiorId &&
-                          !lateralIds.includes(departamento.id) &&
-                          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
+                          <Chip
+                            label={getOptionDisplayLabel(option, "Inativo")}
+                            {...getTagProps({ index })}
+                            color={isInativo ? "error" : "default"}
+                            variant={isInativo ? "outlined" : "filled"}
+                            sx={
+                              isInativo
+                                ? {
+                                    borderColor: "error.main",
+                                    color: "error.main",
+                                  }
+                                : {}
+                            }
+                          />
                         );
-                      }),
-                    ]}
-                    getOptionLabel={(option) => option.nome || ""}
-                    value={formData.departamentoInferior
-                      .map((id) => departamentosInferiores.find((departamento) => departamento.id === id))
-                      .filter(Boolean)}
-                    onChange={handleSelectAll}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                      })
+                    }
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox checked={option.id === "all" ? allSelected : selected} />
+                            <Checkbox
+                              checked={
+                                option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                                  ? allSelectedDepartamentosInferiores
+                                  : selected
+                              }
+                            />
                           </Grid>
                           <Grid item xs>
-                            {option.nome}
+                            {option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                              ? option.nome
+                              : getOptionDisplayLabel(option, "Inativo")}
                           </Grid>
                         </Grid>
                       </li>
@@ -980,6 +1074,7 @@ function ColumnsLayouts() {
                             formData.departamentoInferior.every((val) => val === 0)) &&
                           formValidation.departamentoInferior === false
                         }
+                        helperText={departamentosInferioresHelperText}
                       />
                     )}
                   />
@@ -992,35 +1087,56 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...departamentosLateral.filter((departamento) => {
-                        const superiorId = formData.departamentoSuperior;
-                        const inferiorIds = formData.departamentoInferior || [];
-
-                        if (formData.departamentoLateral.includes(departamento.id)) return true;
-
-                        return (
-                          departamento.id !== superiorId &&
-                          !inferiorIds.includes(departamento.id) &&
-                          formatarNome(departamento.nome) !== formatarNome(nomeDepartamento)
-                        );
-                      }),
-                    ]}
-                    getOptionLabel={(option) => option.nome || ""}
-                    value={formData.departamentoLateral
-                      .map((id) => departamentosLateral.find((departamento) => departamento.id === id))
-                      .filter(Boolean)}
+                    options={withSelectAllOption(
+                      departamentosLateraisDisponiveis,
+                      "Selecionar todos",
+                    )}
+                    getOptionLabel={(option) =>
+                      option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                        ? option.nome
+                        : getOptionDisplayLabel(option, "Inativo")
+                    }
+                    value={departamentosLateraisSelecionados}
                     onChange={handleSelectDepartamentoLateral}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => {
+                        const isInativo = option.active === false;
+
+                        return (
+                          <Chip
+                            label={getOptionDisplayLabel(option, "Inativo")}
+                            {...getTagProps({ index })}
+                            color={isInativo ? "error" : "default"}
+                            variant={isInativo ? "outlined" : "filled"}
+                            sx={
+                              isInativo
+                                ? {
+                                    borderColor: "error.main",
+                                    color: "error.main",
+                                  }
+                                : {}
+                            }
+                          />
+                        );
+                      })
+                    }
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox checked={option.id === "all" ? allSelectedDepartamentoLateral : selected} />
+                            <Checkbox
+                              checked={
+                                option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                                  ? allSelectedDepartamentosLaterais
+                                  : selected
+                              }
+                            />
                           </Grid>
                           <Grid item xs>
-                            {option.nome}
+                            {option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                              ? option.nome
+                              : getOptionDisplayLabel(option, "Inativo")}
                           </Grid>
                         </Grid>
                       </li>
@@ -1033,6 +1149,7 @@ function ColumnsLayouts() {
                             formData.departamentoLateral.every((val) => val === 0)) &&
                           formValidation.departamentoInferior === false
                         }
+                        helperText={departamentosLateraisHelperText}
                       />
                     )}
                   />
