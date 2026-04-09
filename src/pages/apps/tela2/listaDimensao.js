@@ -39,7 +39,6 @@ import ScrollX from "../../../components/ScrollX";
 import CloseIcon from '@mui/icons-material/Close';
 import Mark from "mark.js";
 import {
-  faTrash,
   faFilter
 } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -120,6 +119,7 @@ function ReactTable({ data, columns, processosTotal, isLoading, refreshData }) {
     globalFilterFn: fuzzyFilter,
   });
 
+  const tableRows = table.getRowModel().rows;
   useEffect(() => {
     const markInstance = new Mark(tableRef.current);
     if (globalFilter) {
@@ -127,7 +127,7 @@ function ReactTable({ data, columns, processosTotal, isLoading, refreshData }) {
     } else {
       markInstance.unmark();
     }
-  }, [globalFilter, table.getRowModel().rows]);
+  }, [globalFilter, tableRows]);
 
   return (
     <>
@@ -302,19 +302,6 @@ function ActionCell({ row, refreshData }) {
     handleClose();
   };
 
-  const handleDelete = async () => {
-    try {
-      await axios.delete(`https://api.egrc.homologacao.com.br/api/v1/Dimension/${row.original.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      enqueueSnackbar(`Excluído com sucesso!`, { variant: "success" });
-      refreshData();
-    } catch (error) {
-      enqueueSnackbar(`Erro ao excluir: ${error.message}`, { variant: "error" });
-    }
-    handleClose();
-  };
-
   return (
     <>
       <IconButton onClick={handleClick} size="small"><MoreVertIcon /></IconButton>
@@ -324,9 +311,6 @@ function ActionCell({ row, refreshData }) {
             navigation(`/dimensao/editar/${row.original.dimensionCode || row.original.id}`, { state: { dimensaoDados: row.original } });
             handleClose();
           }} sx={{ textTransform: 'none', color: 'text.secondary' }}>Editar</Button>
-          <Button startIcon={<FontAwesomeIcon icon={faTrash} />} onClick={() => {
-            if (window.confirm("Deseja realmente excluir?")) handleDelete();
-          }} color="error" sx={{ textTransform: 'none' }}>Excluir</Button>
           <Button onClick={toggleStatus} sx={{ textTransform: 'none', color: 'text.secondary' }}>
             {row.original.active ? "Inativar" : "Ativar"}
           </Button>

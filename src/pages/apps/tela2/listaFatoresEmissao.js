@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import { API_URL } from 'config';
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -8,8 +8,6 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/planos";
-import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
 import emitter from "./eventEmitter";
@@ -65,8 +63,6 @@ import Mark from "mark.js";
 import {
   faXmark,
   faBan,
-  faTrash,
-  faExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 
 import {
@@ -136,18 +132,15 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const toggleDrawer = () => setDrawerOpen(!drawerOpen);
 
   useEffect(() => {
-    const planos = [...new Set(data.map((item) => item.name))];
-    setEmpresaOptions(planos);
+    const names = [...new Set(data.filter(item => item.emissionFactorESGName).map((item) => item.emissionFactorESGName))];
+    setEmpresaOptions(names);
   }, [data]);
 
   // Aplica os filtros selecionados
   const applyFilters = () => {
     const newFilters = [];
     if (draftFilters.plano.length > 0) {
-      newFilters.push({ type: "Plano de ação", values: draftFilters.plano });
-    }
-    if (draftFilters.cnpj.length > 0) {
-      newFilters.push({ type: "CNPJ", values: draftFilters.cnpj });
+      newFilters.push({ type: "Nome", values: draftFilters.plano });
     }
     if (draftFilters.status.length > 0) {
       newFilters.push({ type: "Status", values: draftFilters.status.map((s) => s.value) });
@@ -164,15 +157,12 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
       // Atualiza os filtros no drawer com base no tipo de filtro removido
       setDraftFilters((prevDraft) => {
         const updatedDraft = { ...prevDraft };
-        if (filterToRemove.type === "Plano de ação") {
+        if (filterToRemove.type === "Nome") {
           updatedDraft.plano = updatedDraft.plano.filter(
             (value) => !filterToRemove.values.includes(value)
           );
-        } else if (filterToRemove.type === "CNPJ") {
-          updatedDraft.cnpj = updatedDraft.cnpj.filter(
-            (value) => !filterToRemove.values.includes(value)
-          );
-        } else if (filterToRemove.type === "Status") {
+        }
+ else if (filterToRemove.type === "Status") {
           updatedDraft.status = updatedDraft.status.filter(
             (value) => !filterToRemove.values.includes(value.value)
           );
@@ -195,8 +185,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
   const filteredData = useMemo(() => {
     return data.filter((item) => {
       return selectedFilters.every((filter) => {
-        if (filter.type === "Plano de ação") return filter.values.includes(item.name);
-        if (filter.type === "CNPJ") return filter.values.includes(item.document);
+        if (filter.type === "Nome") return filter.values.includes(item.emissionFactorESGName);
         if (filter.type === "Status") return filter.values.includes(item.active);
         return true;
       });
@@ -348,12 +337,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
             >
               <Button
                 variant="contained"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigation(`/fatoresEmissao/criar`, {
-                    state: { indoPara: "NovaColeta" },
-                  });
-                }}
+                onClick={() => navigation(`/fatoresEmissao/criar`)}
                 startIcon={<PlusOutlined />}
                 style={{ borderRadius: "20px", height: "32px" }}
               >
@@ -419,7 +403,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
 
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Plano de ação</InputLabel>
+              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Nome</InputLabel>
               <FormControl fullWidth margin="normal">
                 <Autocomplete
                   multiple
@@ -624,8 +608,6 @@ function ActionCell({ row, refreshData }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [status, setStatus] = useState(row.original.active);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [openErrorDialog, setOpenErrorDialog] = useState(false);
 
   const handleClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -635,98 +617,42 @@ function ActionCell({ row, refreshData }) {
     setAnchorEl(null);
   };
 
-  const handleDialogOpen = () => {
-    setOpenDialog(true);
-  };
-
   const handleDialogClose = () => {
     setOpenDialog(false);
     handleClose();
   };
 
-  const handleDeleteDialogClose = () => {
-    setOpenDeleteDialog(false);
-    handleClose();
-  };
-
   const toggleStatus = async () => {
-    const idActionPlan = row.original.idActionPlan;
-    const newStatus = status === true ? "Inativo" : "Ativo";
+    const newStatus = !status;
+    const url = `${API_URL}EmissionFactorESG`;
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}action-plans/${idActionPlan}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-  
-      const dadosEndpoint = getResponse.data;
-  
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
-  
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}action-plans`, dadosAtualizados, {
+      await axios.put(url, {
+        ...row.original,
+        active: newStatus
+      }, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
-  
-      // Atualizar o estado e exibir mensagem de sucesso
+
       setStatus(newStatus);
-      const message = `Plano de ação ${row.original.name} ${newStatus.toLowerCase()}.`;
-  
+      const message = `Fator de emissão ${row.original.emissionFactorESGName} ${newStatus ? "ativado" : "inativado"} com sucesso.`;
+
       enqueueSnackbar(message, {
         variant: "success",
         autoHideDuration: 3000,
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        },
+        anchorOrigin: { vertical: "top", horizontal: "center" },
       });
-  
+
       refreshData();
     } catch (error) {
       console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, { variant: "error" });
+      enqueueSnackbar(`Erro ao atualizar status: ${error.response?.data?.title || error.message}`, { variant: "error" });
     }
-  
+
     handleDialogClose();
-  };
-
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (response.ok) {
-        enqueueSnackbar(`Plano de ação ${row.original.nome} excluído.`, {
-          variant: "success",
-          autoHideDuration: 3000,
-          anchorOrigin: {
-            vertical: "top",
-            horizontal: "center",
-          },
-        });
-        refreshData();
-      } else {
-        const errorBody = await response.text();
-        throw new Error(
-          `Falha ao excluir o plano: ${response.status} ${response.statusText} - ${errorBody}`
-        );
-      }
-    } catch (error) {
-      console.error("Erro:", error);
-      setOpenErrorDialog(true);
-    }
-
-    handleDeleteDialogClose();
   };
 
   const buttonStyle = {
@@ -767,12 +693,8 @@ function ActionCell({ row, refreshData }) {
         <Stack>
           <Button
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/fatoresEmissao/criar`, {
-                state: {
-                  indoPara: "NovaColeta",
-                  dadosApi,
-                },
+              navigation(`/fatoresEmissao/editar/${row.original.emissionFactorESGCode}`, {
+                state: { fatorEmissao: row.original },
               });
               handleClose();
             }}
@@ -784,7 +706,7 @@ function ActionCell({ row, refreshData }) {
 
           <Button
             onClick={() => {
-              if (row.original.active === true) handleDialogOpen();
+              if (row.original.active) setOpenDialog(true);
               else toggleStatus();
             }}
             style={{ color: "#707070", fontWeight: 400 }}
@@ -871,13 +793,13 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja inativar a plano "{row.original.name}"?
+            Tem certeza que deseja inativar o fator de emissão "{row.original.emissionFactorESGName}"?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Ao inativar, essa plano não aparecerá mais no cadastro manual.
+            Ao inativar, esse fator de emissão não aparecerá mais no cadastro manual.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -919,239 +841,6 @@ function ActionCell({ row, refreshData }) {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog
-        open={openDeleteDialog}
-        onClose={handleDeleteDialogClose}
-        sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            background: "#ED5565",
-            width: "auto",
-            height: "42px",
-            borderRadius: "4px 4px 0px 0px",
-            display: "flex",
-            alignItems: "center",
-            padding: "10px",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              aria-label="delete"
-              sx={{
-                fontSize: "16px",
-                marginRight: "2px",
-                color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
-              }}
-            >
-              <FontAwesomeIcon icon={faTrash} />
-            </IconButton>
-
-            <Typography
-              variant="body1"
-              sx={{
-                fontFamily: '"Open Sans", Helvetica, sans-serif',
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
-                color: "rgba(255, 255, 255, 1)",
-                flexGrow: 1,
-              }}
-            >
-              Excluir
-            </Typography>
-          </div>
-          <IconButton
-            aria-label="close"
-            onClick={handleDeleteDialogClose}
-            sx={{
-              color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
-            }}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Tem certeza que deseja excluir o plano "{row.original.nome}"?
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            Esse plano não será mais disponibilizado ao cadastrar um novo
-            processo.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleDelete}
-            color="primary"
-            autoFocus
-            style={{
-              marginTop: "-55px",
-              width: "162px",
-              height: "32px",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              background: "#ED5565",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              textTransform: "none",
-            }}
-          >
-            Sim, excluir
-          </Button>
-          <Button
-            onClick={handleDeleteDialogClose}
-            style={{
-              marginTop: "-55px",
-              padding: "8px 16px",
-              width: "91px",
-              height: "32px",
-              borderRadius: "4px",
-              border: "1px solid rgba(0, 0, 0, 0.40)",
-              background: "#FFF",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
-            }}
-          >
-            Cancelar
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={openErrorDialog}
-        onClose={() => setOpenErrorDialog(false)}
-        sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            background: "#F69B50",
-            width: "auto",
-            height: "42px",
-            borderRadius: "4px 4px 0px 0px",
-            display: "flex",
-            alignItems: "center",
-            padding: "10px",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              aria-label="delete"
-              sx={{
-                fontSize: "16px",
-                marginRight: "2px",
-                color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
-              }}
-            >
-              <FontAwesomeIcon icon={faExclamation} />
-            </IconButton>
-
-            <Typography
-              variant="body1"
-              sx={{
-                fontFamily: '"Open Sans", Helvetica, sans-serif',
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
-                color: "rgba(255, 255, 255, 1)",
-                flexGrow: 1,
-              }}
-            >
-              Exclusão não permitida
-            </Typography>
-          </div>
-          <IconButton
-            aria-label="close"
-            onClick={() => setOpenErrorDialog(false)}
-            sx={{
-              color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
-            }}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Não é possível excluir o Plano de ação.
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            O plano não pode ser excluído pois está vinculado a processos. É
-            possível inativar o plano nas configurações de edição.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setOpenErrorDialog(false)}
-            style={{
-              marginTop: "-55px",
-              width: "64px",
-              height: "32px",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              background: "#F69B50",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              textTransform: "none",
-            }}
-          >
-            OK
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }
@@ -1167,29 +856,43 @@ ActionCell.propTypes = {
 const ListagemEmpresa = () => {
   const theme = useTheme();
   const navigation = useNavigate();
-  const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
+  const { token } = useToken();
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-    refetch,
-  } = useGetPlanos(formData, processoSelecionadoId);
-  const processosTotal = lists ? lists.length : 0;
+  const [lists, setLists] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const processosTotal = lists.length;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
   const [selectedCustomer] = useState(null);
   const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Handler para atualizar 'formData' e disparar uma nova consulta
   const refreshOrgaos = () => {
     setFormData((currentData) => ({
       ...currentData,
-      refreshCount: currentData.refreshCount + 1,
+      refreshCount: (currentData.refreshCount || 0) + 1,
     }));
-    
   };
+
+  const fetchFatores = async () => {
+    if (!token) return;
+    try {
+      setIsLoading(true);
+      const res = await axios.get(`${API_URL}EmissionFactorESG`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLists(res.data || []);
+    } catch (e) {
+      console.error(e);
+      enqueueSnackbar("Erro ao carregar fatores de emissão.", { variant: "error" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFatores();
+  }, [token, formData.refreshCount]);
 
   useEffect(() => {
     const refreshHandler = () => {
@@ -1218,24 +921,20 @@ const ListagemEmpresa = () => {
     () => [
       {
         header: "Fatores de Emissão",
-        accessorKey: "name",
+        accessorKey: "emissionFactorESGName",
         cell: ({ row }) => (
           <Typography
-          sx={{
-            fontSize: '13px',
-            cursor: "pointer",
-          }}
+            sx={{
+              fontSize: '13px',
+              cursor: "pointer",
+            }}
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/fatoresEmissao/criar`, {
-                state: {
-                  indoPara: "NovaColeta",
-                  dadosApi,
-                },
+              navigation(`/fatoresEmissao/editar/${row.original.emissionFactorESGCode}`, {
+                state: { fatorEmissao: row.original },
               });
             }}
           >
-            {row.original.name}
+            {row.original.emissionFactorESGName}
           </Typography>
         ),
       },

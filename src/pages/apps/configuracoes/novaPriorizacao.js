@@ -70,8 +70,9 @@ import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
+import { API_URL } from "config";
 import { useToken } from "../../../api/TokenContext";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Chart from "react-apexcharts";
@@ -316,14 +317,87 @@ function NovoCicloPriorizacao() {
     temas: temasMock
   });
 
-  // Em caso de edição
+  const { id } = useParams();
+  const [temasOptions, setTemasOptions] = useState([]);
+  const [colaboradoresOptions, setColaboradoresOptions] = useState([]);
+  const [ciclosAnterioresOptions, setCiclosAnterioresOptions] = useState([]);
+  const [perfisEsgOptions, setPerfisEsgOptions] = useState([]);
+
   useEffect(() => {
-    if (cicloDados) {
-      setRequisicao("Editar");
-      setMensagemFeedback("editado");
-      // Aqui você carregaria os dados do ciclo para edição
-    }
-  }, [cicloDados]);
+    let unmounted = false;
+    const fetchOptions = async () => {
+      if (!token) return;
+      try {
+        const [temasRes, colabRes, ciclosRes, perfisRes] = await Promise.all([
+          axios.get(`${API_URL}Theme`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}collaborators`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}PrioritizationCycle`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}ProfileESG`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        if (unmounted) return;
+        setTemasOptions(temasRes.data || []);
+        
+        const ativosColab = (colabRes.data || []).map(c => ({
+          ...c, 
+          id: c.idCollaborator || c.id,
+          nome: c.collaboratorName || c.name || c.nome || c.idCollaborator || c.id
+        }));
+        setColaboradoresOptions(ativosColab);
+        
+        setCiclosAnterioresOptions((ciclosRes.data || []).map(c => ({
+          ...c, nome: c.prioritizationCycleName || c.nome || c.id
+        })));
+        
+        const perfisData = Array.isArray(perfisRes.data) ? perfisRes.data : (perfisRes.data?.data || []);
+        setPerfisEsgOptions(perfisData.map(p => ({
+          ...p, nome: p.profileESGName || p.nome || p.id
+        })));
+      } catch (err) {
+        console.error('Erro ao buscar dados relacionados', err);
+      }
+    };
+    fetchOptions();
+    return () => { unmounted = true; };
+  }, [token]);
+
+  useEffect(() => {
+    let unmounted = false;
+    const fetchEdit = async () => {
+      if (!token || !id || id === 'criar') return;
+      try {
+        setLoading(true);
+        const res = await axios.get(`${API_URL}PrioritizationCycle/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (unmounted) return;
+        const d = res.data;
+        setRequisicao('Editar');
+        setMensagemFeedback('editado');
+        setFormData(prev => ({
+          ...prev,
+          nomeCiclo: d.prioritizationCycleName || '',
+          descricaoCiclo: d.prioritizationCycleDescription || '',
+          dataInicio: d.startDate ? new Date(d.startDate) : null,
+          dataFim: d.endDate ? new Date(d.endDate) : null,
+          priorizador: d.responsibleId ? { id: d.responsibleId, nome: 'Vínculo ID: ' + d.responsibleId } : null,
+          revisores: d.reviewerIds ? d.reviewerIds.map(rid => ({ id: rid, nome: 'ID ' + rid })) : [],
+          comentarioPriorizador: d.responsibleComment || '',
+          statusPriorizacao: d.prioritizationCycleStats || 1,
+          perfilPriorizacao: d.levelListId || null,
+          cicloAnterior: d.predecessorIds && d.predecessorIds.length > 0 ? d.predecessorIds[0] : null,
+          temas: d.themeIds ? d.themeIds.map(tid => ({ id: tid, codigo: tid, tema: 'Tema ID ' + tid, status: 'Monitorado' })) : [],
+          id: d.id,
+          isDisabled: d.isDisabled
+        }));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!unmounted) setLoading(false);
+      }
+    };
+    fetchEdit();
+    return () => { unmounted = true; };
+  }, [id, token]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -334,14 +408,16 @@ function NovoCicloPriorizacao() {
   };
 
   const handleSelectAllRevisores = (event, newValue) => {
+    const availableRevisores = colaboradoresOptions.filter(c => c.id !== formData.priorizador);
+
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.revisores.length === colaboradores.length) {
+      if (formData.revisores.length === availableRevisores.length) {
         handleInputChange("revisores", []);
       } else {
-        handleInputChange("revisores", colaboradores.map(colaborador => colaborador.id));
+        handleInputChange("revisores", availableRevisores.map(colaborador => colaborador.id));
       }
     } else {
-      handleInputChange("revisores", newValue.map(item => item.id));
+      handleInputChange("revisores", newValue.map(item => item.id).filter(id => id !== "all"));
     }
   };
 
@@ -442,8 +518,39 @@ function NovoCicloPriorizacao() {
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const reviewerCommentsMapped = formData.revisores.length > 0 
+        ? formData.revisores.map(r => ({
+            reviewerId: r.id || r,
+            comment: formData.comentarioRevisores || null
+          }))
+        : [];
+
+      const payload = {
+        prioritizationCycleName: formData.nomeCiclo,
+        startDate: formData.dataInicio ? formData.dataInicio.toISOString() : null,
+        endDate: formData.dataFim ? formData.dataFim.toISOString() : null,
+        levelListId: formData.perfilPriorizacao || null,
+        prioritizationCycleDescription: formData.descricaoCiclo,
+        prioritizationCycleStats: formData.statusPriorizacao || 1,
+        predecessorIds: formData.cicloAnterior ? [formData.cicloAnterior] : [],
+        responsibleId: formData.priorizador || null,
+        reviewerIds: formData.revisores.map(r => r.id ? r.id : r),
+        responsibleComment: formData.comentarioPriorizador || null,
+        reviewerComments: reviewerCommentsMapped,
+        themeIds: formData.temas.map(t => t.id || t)
+      };
+
+      if (requisicao === 'Editar') {
+        payload.id = formData.id;
+        payload.isDisabled = formData.isDisabled !== undefined ? formData.isDisabled : true;
+        await axios.put(`${API_URL}PrioritizationCycle`, payload, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+      } else {
+        await axios.post(`${API_URL}PrioritizationCycle`, payload, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+      }
       
       enqueueSnackbar(`Ciclo de Priorização ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -464,7 +571,7 @@ function NovoCicloPriorizacao() {
     }
   };
 
-  const allSelectedRevisores = formData.revisores.length === colaboradores.length && colaboradores.length > 0;
+  const allSelectedRevisores = formData.revisores.length === colaboradoresOptions.length && colaboradoresOptions.length > 0;
 
   // Preparar dados para os gráficos com verificações de segurança
   const prepareMatrizData = () => {
@@ -806,9 +913,10 @@ function NovoCicloPriorizacao() {
             <Stack spacing={1}>
               <InputLabel>Perfil de Priorização ESG *</InputLabel>
               <Autocomplete
-                options={perfisEsg}
-                getOptionLabel={(option) => option.nome}
-                value={perfisEsg.find(perfil => perfil.id === formData.perfilPriorizacao) || null}
+                options={perfisEsgOptions}
+                getOptionLabel={(option) => option?.nome || option?.profileESGName || option?.id || "Sem Nome"}
+                isOptionEqualToValue={(option, value) => option.id === value?.id}
+                value={perfisEsgOptions.find(perfil => perfil.id === formData.perfilPriorizacao) || null}
                 onChange={(event, newValue) => {
                   handleInputChange('perfilPriorizacao', newValue ? newValue.id : null);
                 }}
@@ -876,9 +984,9 @@ function NovoCicloPriorizacao() {
             <Stack spacing={1}>
               <InputLabel>Ciclo de Priorização Anterior</InputLabel>
               <Autocomplete
-                options={ciclosAnteriores}
+                options={ciclosAnterioresOptions}
                 getOptionLabel={(option) => option.nome}
-                value={ciclosAnteriores.find(ciclo => ciclo.id === formData.cicloAnterior) || null}
+                value={ciclosAnterioresOptions.find(ciclo => ciclo.id === formData.cicloAnterior) || null}
                 onChange={(event, newValue) => {
                   handleInputChange('cicloAnterior', newValue ? newValue.id : null);
                 }}
@@ -916,7 +1024,11 @@ function NovoCicloPriorizacao() {
     </Card>
   );
 
-  const renderResponsaveis = () => (
+  const renderResponsaveis = () => {
+    const availableRevisores = colaboradoresOptions.filter(colab => colab.id !== formData.priorizador);
+    const availablePriorizadores = colaboradoresOptions.filter(colab => !formData.revisores.includes(colab.id));
+
+    return (
     <Card sx={{ mb: 3 }}>
       <CardContent>
         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -928,9 +1040,10 @@ function NovoCicloPriorizacao() {
             <Stack spacing={1}>
               <InputLabel>Priorizador *</InputLabel>
               <Autocomplete
-                options={colaboradores}
-                getOptionLabel={(option) => option.nome}
-                value={colaboradores.find(colab => colab.id === formData.priorizador) || null}
+                options={availablePriorizadores}
+                getOptionLabel={(option) => option?.nome || option?.id || "Sem nome"}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                value={availablePriorizadores.find(colab => colab.id === formData.priorizador) || null}
                 onChange={(event, newValue) => {
                   handleInputChange('priorizador', newValue ? newValue.id : null);
                 }}
@@ -942,8 +1055,8 @@ function NovoCicloPriorizacao() {
                 )}
                 renderOption={(props, option) => (
                   <Box component="li" {...props}>
-                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                      {option.avatar}
+                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main', width: 32, height: 32, fontSize: '0.875rem' }}>
+                      {option.nome ? option.nome.substring(0, 2).toUpperCase() : 'JS'}
                     </Avatar>
                     {option.nome}
                   </Box>
@@ -959,34 +1072,37 @@ function NovoCicloPriorizacao() {
                 multiple
                 disableCloseOnSelect
                 options={[
-                  { id: "all", nome: "Selecionar todos", avatar: "ALL" },
-                  ...colaboradores,
+                  { id: "all", nome: "Selecionar todos" },
+                  ...availableRevisores,
                 ]}
-                getOptionLabel={(option) => option.nome}
+                getOptionLabel={(option) => option?.nome || option?.id || "Sem nome"}
                 value={formData.revisores.map(
-                  (id) => colaboradores.find((colab) => colab.id === id) || id
-                )}
+                  (id) => colaboradoresOptions.find((colab) => colab.id === id) || { id, nome: id }
+                ).filter(val => val.id !== 'all')}
                 onChange={handleSelectAllRevisores}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                renderOption={(props, option, { selected }) => (
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                renderOption={(props, option, { selected }) => {
+                  const isAll = option.id === "all";
+                  const isChecked = isAll ? formData.revisores.length === availableRevisores.length && availableRevisores.length > 0 : selected;
+                  return (
                   <li {...props}>
                     <Grid container alignItems="center">
                       <Grid item>
-                        <Checkbox
-                          checked={option.id === "all" ? allSelectedRevisores : selected}
-                        />
+                        <Checkbox checked={isChecked} />
                       </Grid>
-                      <Grid item>
-                        <Avatar sx={{ mr: 2, bgcolor: 'secondary.main' }}>
-                          {option.avatar}
-                        </Avatar>
-                      </Grid>
+                      {!isAll && (
+                        <Grid item>
+                          <Avatar sx={{ mr: 2, bgcolor: 'secondary.main', width: 32, height: 32, fontSize: '0.875rem' }}>
+                            {option.nome ? option.nome.substring(0, 2).toUpperCase() : 'US'}
+                          </Avatar>
+                        </Grid>
+                      )}
                       <Grid item xs>
                         {option.nome}
                       </Grid>
                     </Grid>
                   </li>
-                )}
+                )}}
                 renderInput={(params) => <TextField {...params} />}
               />
             </Stack>
@@ -1035,12 +1151,12 @@ function NovoCicloPriorizacao() {
               {formData.priorizador && (
                 <ListItem>
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: 'primary.main' }}>
-                      {colaboradores.find(c => c.id === formData.priorizador)?.avatar}
+                    <Avatar sx={{ bgcolor: 'primary.main', fontSize: '0.875rem' }}>
+                      {colaboradoresOptions.find(c => c.id === formData.priorizador)?.nome?.substring(0, 2).toUpperCase() || 'P'}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
-                    primary={colaboradores.find(c => c.id === formData.priorizador)?.nome}
+                    primary={colaboradoresOptions.find(c => c.id === formData.priorizador)?.nome || 'Sem Nome'}
                     secondary="Priorizador"
                   />
                   <ListItemSecondaryAction>
@@ -1049,16 +1165,16 @@ function NovoCicloPriorizacao() {
                 </ListItem>
               )}
               {formData.revisores.map(revisorId => {
-                const revisor = colaboradores.find(c => c.id === revisorId);
+                const revisor = colaboradoresOptions.find(c => c.id === revisorId);
                 return revisor ? (
                   <ListItem key={revisorId}>
                     <ListItemAvatar>
-                      <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                        {revisor.avatar}
+                      <Avatar sx={{ bgcolor: 'secondary.main', fontSize: '0.875rem' }}>
+                        {revisor.nome ? revisor.nome.substring(0, 2).toUpperCase() : 'R'}
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={revisor.nome}
+                      primary={revisor.nome || 'Sem Nome'}
                       secondary="Revisor"
                     />
                     <ListItemSecondaryAction>
@@ -1073,6 +1189,7 @@ function NovoCicloPriorizacao() {
       </CardContent>
     </Card>
   );
+};
 
   const renderTabelaTemas = () => (
     <Card sx={{ mb: 3 }}>
@@ -1085,6 +1202,50 @@ function NovoCicloPriorizacao() {
           <Badge badgeContent={formData.temas.length} color="primary">
             <Chip label="Temas Cadastrados" variant="outlined" />
           </Badge>
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <Stack spacing={1}>
+            <InputLabel>Adicionar Temas ESG</InputLabel>
+            <Autocomplete
+              multiple
+              options={temasOptions}
+              getOptionLabel={(option) => option.themeName || option.nomeTema || option.tema || option.id || "Sem nome"}
+              isOptionEqualToValue={(option, value) => option.id === (value.id || value)}
+              value={formData.temas.map(t => temasOptions.find(opt => opt.id === (t.id || t.codigo || t)) || { id: t.codigo || t.id || t, themeName: t.tema || 'Carregando...' })}
+              onChange={(event, newValue) => {
+                const newTemas = newValue.map(temaObj => {
+                  const existing = formData.temas.find(t => (t.id || t.codigo || t) === temaObj.id);
+                  if (existing && existing.tema !== 'Carregando...') return existing;
+                  
+                  const axisMap = { 1: "Ambiental", 2: "Social", 3: "Governança" };
+                  const eixoStr = axisMap[temaObj.esgAxis] || "Ambiental";
+
+                  return {
+                    id: temaObj.id,
+                    codigo: temaObj.themeCode || (typeof temaObj.id === 'string' ? temaObj.id.substring(0, 8) : temaObj.id),
+                    tema: temaObj.themeName || temaObj.id,
+                    eixo: eixoStr,
+                    impactosPositivos: [],
+                    impactosNegativos: [],
+                    probabilidade: 0,
+                    intensidade: 0,
+                    abrangencia: 0,
+                    urgencia: 0,
+                    significanciaImpacto: 0,
+                    significanciaFinanceira: 0,
+                    importanciaPI: 0,
+                    priorizacao: 0,
+                    status: "Monitorado"
+                  };
+                });
+                handleInputChange('temas', newTemas);
+              }}
+              renderInput={(params) => (
+                <TextField {...params} placeholder="Pesquise por nome do tema..." />
+              )}
+            />
+          </Stack>
         </Box>
 
         {/* Resumo por status */}

@@ -9,7 +9,6 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/planos";
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
@@ -623,7 +622,7 @@ function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
   const { token } = useToken();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [status, setStatus] = useState(row.original.active);
+  const [status, setStatus] = useState(!row.original.isDisabled);
   const [openDialog, setOpenDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openErrorDialog, setOpenErrorDialog] = useState(false);
@@ -651,12 +650,11 @@ function ActionCell({ row, refreshData }) {
   };
 
   const toggleStatus = async () => {
-    const idActionPlan = row.original.idActionPlan;
+    const idActionPlan = row.original.id;
     const newStatus = status === true ? "Inativo" : "Ativo";
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}action-plans/${idActionPlan}`, {
+      const getResponse = await axios.get(`${API_URL}PrioritizationCycle/${idActionPlan}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -664,20 +662,17 @@ function ActionCell({ row, refreshData }) {
   
       const dadosEndpoint = getResponse.data;
   
-      // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
+      const dadosAtualizados = { ...dadosEndpoint, isDisabled: newStatus === "Inativo" };
   
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}action-plans`, dadosAtualizados, {
+      await axios.put(`${API_URL}PrioritizationCycle`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
   
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(newStatus);
-      const message = `Plano de ação ${row.original.name} ${newStatus.toLowerCase()}.`;
+      setStatus(newStatus === "Ativo");
+      const message = `Ciclo ${row.original.prioritizationCycleName || 'Atualizado'} ${newStatus.toLowerCase()}.`;
   
       enqueueSnackbar(message, {
         variant: "success",
@@ -697,10 +692,11 @@ function ActionCell({ row, refreshData }) {
     handleDialogClose();
   };
 
+
   const handleDelete = async () => {
     try {
       const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+        `${API_URL}PrioritizationCycle/${row.original.id}`,
         {
           method: "DELETE",
         }
@@ -768,11 +764,10 @@ function ActionCell({ row, refreshData }) {
         <Stack>
           <Button
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/priorizacao/criar`, {
+              navigation(`/priorizacao/editar/${row.original.id}`, {
                 state: {
                   indoPara: "NovoPlano",
-                  dadosApi,
+                  dadosApi: row.original,
                 },
               });
               handleClose();
@@ -785,12 +780,12 @@ function ActionCell({ row, refreshData }) {
 
           <Button
             onClick={() => {
-              if (row.original.active === true) handleDialogOpen();
+              if (status === true) handleDialogOpen();
               else toggleStatus();
             }}
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            {row.original.active === true ? "Inativar" : "Ativar"}
+            {status === true ? "Inativar" : "Ativar"}
           </Button>
           
         </Stack>
@@ -1169,13 +1164,30 @@ const ListagemEmpresa = () => {
   const theme = useTheme();
   const navigation = useNavigate();
   const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-    refetch,
-  } = useGetPlanos(formData, processoSelecionadoId);
+  const { token } = useToken();
+  const [lists, setLists] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchPriorizations = async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}PrioritizationCycle`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLists(res.data || []);
+    } catch (err) {
+      console.error(err);
+      enqueueSnackbar('Erro ao carregar os ciclos de priorização.', { variant: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPriorizations();
+  }, [token, formData.refreshCount]);
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1219,7 +1231,7 @@ const ListagemEmpresa = () => {
     () => [
       {
         header: "Ciclo",
-        accessorKey: "name",
+        accessorKey: "prioritizationCycleName",
         cell: ({ row }) => (
           <Typography
           sx={{
@@ -1236,17 +1248,17 @@ const ListagemEmpresa = () => {
               });
             }}
           >
-            {row.original.name}
+            {row.original.prioritizationCycleName}
           </Typography>
         ),
       },
       {
         header: "Status",
-        accessorKey: "active",
+        accessorKey: "isDisabled",
         cell: ({ row }) => (
           <Chip
-            label={row.original.active === true ? "Ativo" : "Inativo"}
-            color={row.original.active === true ? "success" : "error"}
+            label={row.original.isDisabled !== true ? "Ativo" : "Inativo"}
+            color={row.original.isDisabled !== true ? "success" : "error"}
             sx={{
               backgroundColor: "transparent",
               color: "#00000099",
@@ -1255,7 +1267,7 @@ const ListagemEmpresa = () => {
               height: "28px",
               "& .MuiChip-icon": {
                 color:
-                  row.original.active === true ? "success.main" : "error.main",
+                  row.original.isDisabled !== true ? "success.main" : "error.main",
                 marginLeft: "4px",
               },
             }}
@@ -1263,7 +1275,7 @@ const ListagemEmpresa = () => {
               <span
                 style={{
                   backgroundColor:
-                    row.original.active === true ? "green" : "red",
+                    row.original.isDisabled !== true ? "green" : "red",
                   borderRadius: "50%",
                   display: "inline-block",
                   width: "8px",
