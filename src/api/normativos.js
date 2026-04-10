@@ -1,13 +1,11 @@
-import { useState, useEffect } from "react";
-import { API_URL } from 'config';
-import { useToken } from "./TokenContext";
+import { useEffect, useState } from "react";
+import { API_URL } from "config";
 
-// Hook para buscar os dados de empresas
-export function useGetNormativos(formData) {
+export function useGetNormativos(formData = {}) {
   const [acoesJudiciais, setCustomers] = useState(null);
-  const { setToken } = useToken();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { GenerateExcel, refreshCount } = formData;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -15,25 +13,47 @@ export function useGetNormativos(formData) {
       setError(null);
 
       try {
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem("access_token");
+        let url = `${API_URL}normatives/reports`;
 
-        // Usar o token para acessar a API de empresas
-        const response = await fetch(
-          `${API_URL}normatives`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Erro ao buscar os dados de empresas");
+        if (GenerateExcel === true) {
+          url += "?GenerateExcel=true";
         }
 
-        const data = await response.json();
-        setCustomers(data);
-        setToken(token);
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Erro ao buscar os dados de normativos");
+        }
+
+        if (GenerateExcel === true) {
+          const blob = await response.blob();
+          const contentDisposition = response.headers.get("Content-Disposition");
+          let filename = "Normativos.xlsx";
+
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1];
+            }
+          }
+
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(downloadUrl);
+        } else {
+          const data = await response.json();
+          setCustomers(data.reportNormatives || []);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -42,7 +62,7 @@ export function useGetNormativos(formData) {
     };
 
     fetchData();
-  }, [formData]);
+  }, [GenerateExcel, refreshCount]);
 
   return {
     acoesJudiciais,
