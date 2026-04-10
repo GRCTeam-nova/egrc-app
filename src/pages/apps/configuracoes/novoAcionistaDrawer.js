@@ -23,6 +23,48 @@ import IconButton from "@mui/material/IconButton";
 import { useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 
+const normalizeActionTypeId = (value) => {
+  if (value === "" || value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    return Number(value);
+  }
+
+  return value;
+};
+
+const getActionTypesList = (responseData) => {
+  if (Array.isArray(responseData)) return responseData;
+  if (Array.isArray(responseData?.data)) return responseData.data;
+  if (Array.isArray(responseData?.data?.items)) return responseData.data.items;
+  if (Array.isArray(responseData?.data?.actionTypes)) {
+    return responseData.data.actionTypes;
+  }
+  if (Array.isArray(responseData?.actionTypes)) return responseData.actionTypes;
+  if (Array.isArray(responseData?.items)) return responseData.items;
+  return [];
+};
+
+const normalizeActionTypes = (responseData) =>
+  getActionTypesList(responseData)
+    .map((item) => {
+      const id = normalizeActionTypeId(
+        item?.idActionType ?? item?.id ?? item?.actionTypeId ?? item?.value,
+      );
+      const label =
+        item?.name ?? item?.nome ?? item?.description ?? item?.label ?? `${id}`;
+
+      if (id === "") {
+        return null;
+      }
+
+      return { id, label };
+    })
+    .filter(Boolean);
+
+
 function DrawerAcionista({ acionista, hideButton = false }) {
   const [open, setOpen] = useState(false);
   const { token } = useToken();
@@ -35,6 +77,8 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   const [quantidade, setQuantidade] = useState("");
   const [documento, setDocumento] = useState("");
   const [idActionType, setIdActionType] = useState("");
+  const [actionTypes, setActionTypes] = useState([]);
+  const [loadingActionTypes, setLoadingActionTypes] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +87,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
     if (acionista) {
       setNome(acionista.name || "");
       setDocumento(acionista.document || "");
-      setIdActionType(acionista.idActionType || "");
+      setIdActionType(normalizeActionTypeId(acionista.idActionType));
 
       
       setQuantidade(
@@ -64,6 +108,40 @@ function DrawerAcionista({ acionista, hideButton = false }) {
       setIdActionType("");
     }
   }, [open, acionista]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const fetchActionTypes = async () => {
+      try {
+        setLoadingActionTypes(true);
+
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL}companies/shared-holders/action-types`,
+          {
+            headers: {
+              Authorization: `Bearer ${token || localStorage.getItem("access_token")}`,
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Erro ao carregar os tipos de participacao.");
+        }
+
+        const responseData = await response.json();
+        setActionTypes(normalizeActionTypes(responseData));
+      } catch (error) {
+        enqueueSnackbar(error.message, { variant: "error" });
+      } finally {
+        setLoadingActionTypes(false);
+      }
+    };
+
+    fetchActionTypes();
+  }, [open, token]);
 
   const handleDocumentoChange = (event) => {
     const value = event.target.value.replace(/\D/g, "");
@@ -157,7 +235,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
             document: documento,
             percentage: Number(quantidade), 
             active: true,
-            idActionType: null, 
+            idActionType: idActionType || null, 
           };
 
           const editResponse = await fetch(editUrl, {
@@ -201,6 +279,12 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   const handleClose = () => {
     setOpen(false);
   };
+
+  const selectedActionTypeValue =
+    idActionType === "" ||
+    actionTypes.some((actionType) => actionType.id === idActionType)
+      ? idActionType
+      : "";
 
   return (
     <>
@@ -279,18 +363,26 @@ function DrawerAcionista({ acionista, hideButton = false }) {
                     Tipo de participação
                   </InputLabel>
                   <Select
-                    value={idActionType}
-                    onChange={(e) => setIdActionType(e.target.value)}
+                    value={selectedActionTypeValue}
+                    onChange={(e) =>
+                      setIdActionType(normalizeActionTypeId(e.target.value))
+                    }
                     displayEmpty
                     fullWidth
+                    disabled={loadingActionTypes || actionTypes.length === 0}
                   >
                     <MenuItem value="" disabled>
-                      Selecione...
+                      {loadingActionTypes
+                        ? "Carregando tipos..."
+                        : actionTypes.length === 0
+                          ? "Nenhum tipo encontrado"
+                          : "Selecione..."}
                     </MenuItem>
-                    <MenuItem value={1}>Cotista</MenuItem>
-                    <MenuItem value={2}>Acionista</MenuItem>
-                    <MenuItem value={3}>Procurador</MenuItem>
-                    <MenuItem value={4}>Diretor Estatutário</MenuItem>
+                    {actionTypes.map((actionType) => (
+                      <MenuItem key={actionType.id} value={actionType.id}>
+                        {actionType.label}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </Stack>
               </Grid>
