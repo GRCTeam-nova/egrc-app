@@ -1,5 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Button,
   Box,
   TextField,
@@ -17,6 +20,7 @@ import {
   DialogTitle,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
@@ -36,6 +40,7 @@ import DrawerDeficiencia from "../configuracoes/novaDeficienciaDrawerControles";
 import DrawerObjetivo from "../configuracoes/novoObjetivoDrawerControle";
 import DrawerIpe from "../configuracoes/novoIpeDrawerControle";
 import FileUploader from "../configuracoes/FileUploader";
+import ListaControleTestes from "./listaControleTestes";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -683,6 +688,7 @@ useEffect(() => {
     formData.carv.length === carvs.length && carvs.length > 0;
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const controleAtualId = controleDados?.idControl || dadosApi?.id || null;
 
   const tratarSubmit = async () => {
     let url = "";
@@ -1809,16 +1815,18 @@ useEffect(() => {
                 </Stack>
               </Grid>
 
-              {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                              <Accordion>
-                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                  <Typography variant="h6">Testes</Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                  <ListagemTestes />
-                                </AccordionDetails>
-                              </Accordion>
-                            </Grid> */}
+              {controleAtualId && (
+                <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">Testes</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ px: 0 }}>
+                      <ListaControleTestes controlId={controleAtualId} />
+                    </AccordionDetails>
+                  </Accordion>
+                </Grid>
+              )}
             </>
           )}
 
