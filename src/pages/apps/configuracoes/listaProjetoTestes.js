@@ -38,7 +38,7 @@ import {
   EmptyTable,
   TablePagination,
 } from "../../../components/third-party/react-table";
-import { useGetTestesByControle } from "../../../api/controleTestes";
+import { useGetTestesByProjeto } from "../../../api/testes";
 
 export const fuzzyFilter = (row, columnId, value) => {
   let cellValue = row.getValue(columnId);
@@ -65,7 +65,7 @@ function ReactTable({ data, columns, totalItems, isLoading, onCreateNovo }) {
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
   const tableRef = useRef(null);
-  const [sorting, setSorting] = useState([{ id: "baseDate", desc: true }]);
+  const [sorting, setSorting] = useState([{ id: "date", desc: true }]);
   const [globalFilter, setGlobalFilter] = useState("");
 
   const table = useReactTable({
@@ -377,12 +377,12 @@ ActionCell.propTypes = {
   row: PropTypes.object.isRequired,
 };
 
-const ListaControleTestes = ({ controlId }) => {
+const ListaProjetoTestes = ({ projectId }) => {
   const navigation = useNavigate();
   const [formData] = useState({ refreshCount: 0 });
-  const { acoesJudiciais: lists = [], isLoading } = useGetTestesByControle(
+  const { acoesJudiciais: lists = [], isLoading } = useGetTestesByProjeto(
     formData,
-    controlId,
+    projectId,
   );
 
   const formatDate = (value) => {
@@ -419,15 +419,6 @@ const ListaControleTestes = ({ controlId }) => {
             }}
           >
             {row.original.code || "-"}
-          </Typography>
-        ),
-      },
-      {
-        header: "Nome",
-        accessorKey: "name",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>
-            {row.original.name || "-"}
           </Typography>
         ),
       },
@@ -489,7 +480,7 @@ const ListaControleTestes = ({ controlId }) => {
     navigation("/testes/criar", {
       state: {
         indoPara: "NovoTeste",
-        idControl: controlId,
+        idProject: projectId,
       },
     });
   };
@@ -505,8 +496,8 @@ const ListaControleTestes = ({ controlId }) => {
   );
 };
 
-ListaControleTestes.propTypes = {
-  controlId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+ListaProjetoTestes.propTypes = {
+  projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
-export default ListaControleTestes;
+export default ListaProjetoTestes;

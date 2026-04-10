@@ -52,3 +52,67 @@ export function useGetTeste(formData, projectId) {
     customersEmpty: !acoesJudiciais?.length,
   };
 }
+
+export function useGetTestesByProjeto(formData, idProject) {
+  const [acoesJudiciais, setCustomers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!idProject) {
+      setCustomers([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const token = localStorage.getItem("access_token");
+
+        const response = await fetch(`${API_URL}projects/${idProject}/tests`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Erro ao buscar os dados de testes por projeto");
+        }
+
+        const data = await response.json();
+        const normalizedData = Array.isArray(data)
+          ? data
+          : data?.reportTests || data?.data || [];
+
+        const sortedData = [...normalizedData]
+          .map((item) => ({
+            ...item,
+            id: item.idTest || item.id,
+          }))
+          .sort((testA, testB) => {
+            const timestampA = new Date(testA.baseDate || testA.date || 0).getTime();
+            const timestampB = new Date(testB.baseDate || testB.date || 0).getTime();
+            return timestampB - timestampA;
+          });
+
+        setCustomers(sortedData);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [formData?.refreshCount, idProject]);
+
+  return {
+    acoesJudiciais,
+    isLoading,
+    error,
+    customersEmpty: !acoesJudiciais?.length,
+  };
+}
