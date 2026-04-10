@@ -1920,7 +1920,22 @@ const ListagemEmpresa = () => {
         header: "Código",
         accessorKey: "code",
         cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>{row.original.code}</Typography>
+          <Typography
+            sx={{
+              fontSize: "13px",
+              cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
+            }}
+            onClick={() => {
+              const dadosApi = row.original;
+              navigation(`/controles/criar`, {
+                state: { indoPara: "NovoControle", dadosApi },
+              });
+            }}
+          >
+            {row.original.code}
+          </Typography>
         ),
       },
       {

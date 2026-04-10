@@ -33,7 +33,7 @@ import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import FileUploader from "./FileUploader";
-import ListagemTestes from "./listaTeste";
+import ListaProjetoTestes from "./listaProjetoTestes";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
@@ -230,6 +230,7 @@ function ColumnsLayouts() {
   });
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const projetoAtualId = projetoDados?.idProject || dadosApi?.idProject || null;
 
   const tratarSubmit = async () => {
     let url = "";
@@ -566,7 +567,7 @@ function ColumnsLayouts() {
                         // Se o projeto posterior selecionado for o mesmo do novo valor, zera-o
                         projetoPosterior:
                           prev.projetoPosterior ===
-                          (newValue ? newValue.id : "")
+                            (newValue ? newValue.id : "")
                             ? ""
                             : prev.projetoPosterior,
                       }));
@@ -702,16 +703,18 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
-              {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="h6">Testes</Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <ListagemTestes />
-                  </AccordionDetails>
-                </Accordion>
-              </Grid> */}
+              {projetoAtualId && (
+                <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">Testes</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ px: 0 }}>
+                      <ListaProjetoTestes projectId={projetoAtualId} />
+                    </AccordionDetails>
+                  </Accordion>
+                </Grid>
+              )}
             </>
           )}
 

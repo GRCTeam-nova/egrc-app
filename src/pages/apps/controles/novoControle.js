@@ -1,5 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Button,
   Box,
   TextField,
@@ -17,6 +20,7 @@ import {
   DialogTitle,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
@@ -27,6 +31,7 @@ import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { CONTROL_FREQUENCY_OPTIONS } from "../../../utils/controlFrequency";
 import DrawerProcesso from "../configuracoes/novoProcessoDrawerControles";
 import DrawerConta from "../configuracoes/novaContaDrawerControles";
 import DrawerRisco from "../configuracoes/novoRiscoDrawerControles";
@@ -35,6 +40,7 @@ import DrawerDeficiencia from "../configuracoes/novaDeficienciaDrawerControles";
 import DrawerObjetivo from "../configuracoes/novoObjetivoDrawerControle";
 import DrawerIpe from "../configuracoes/novoIpeDrawerControle";
 import FileUploader from "../configuracoes/FileUploader";
+import ListaControleTestes from "./listaControleTestes";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -214,20 +220,7 @@ function ColumnsLayouts() {
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
-    const frequencias = [
-      { id: 1, nome: "Várias vezes ao dia" },
-      { id: 2, nome: "Diário" },
-      { id: 3, nome: "Semanal" },
-      { id: 4, nome: "Quinzenal" },
-      { id: 5, nome: "Mensal" },
-      { id: 6, nome: "Bimestral" },
-      { id: 7, nome: "Trimestral" },
-      { id: 8, nome: "Semestral" },
-      { id: 9, nome: "Anual" },
-      { id: 10, nome: "Bienal" },
-      { id: 11, nome: "Quinquenal" },
-    ];
-    setFrequencias(frequencias);
+    setFrequencias(CONTROL_FREQUENCY_OPTIONS);
     window.scrollTo(0, 0);
   }, []);
 
@@ -695,6 +688,7 @@ useEffect(() => {
     formData.carv.length === carvs.length && carvs.length > 0;
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const controleAtualId = controleDados?.idControl || dadosApi?.id || null;
 
   const tratarSubmit = async () => {
     let url = "";
@@ -1821,16 +1815,18 @@ useEffect(() => {
                 </Stack>
               </Grid>
 
-              {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                              <Accordion>
-                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                  <Typography variant="h6">Testes</Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                  <ListagemTestes />
-                                </AccordionDetails>
-                              </Accordion>
-                            </Grid> */}
+              {controleAtualId && (
+                <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">Testes</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ px: 0 }}>
+                      <ListaControleTestes controlId={controleAtualId} />
+                    </AccordionDetails>
+                  </Accordion>
+                </Grid>
+              )}
             </>
           )}
 
