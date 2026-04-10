@@ -129,7 +129,7 @@ const SelectColumnVisibility = ({
         {getAllColumns().map((column) => {
           const columnLabel = getColumnLabel(column);
 
-          if (columnLabel === 'Ações' || columnLabel === 'Processo' || column.id === 'select') {
+          if (!column.getCanHide() || column.id === 'select') {
             return null;
           }
 

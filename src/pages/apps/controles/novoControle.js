@@ -27,6 +27,7 @@ import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { CONTROL_FREQUENCY_OPTIONS } from "../../../utils/controlFrequency";
 import DrawerProcesso from "../configuracoes/novoProcessoDrawerControles";
 import DrawerConta from "../configuracoes/novaContaDrawerControles";
 import DrawerRisco from "../configuracoes/novoRiscoDrawerControles";
@@ -214,20 +215,7 @@ function ColumnsLayouts() {
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
-    const frequencias = [
-      { id: 1, nome: "Várias vezes ao dia" },
-      { id: 2, nome: "Diário" },
-      { id: 3, nome: "Semanal" },
-      { id: 4, nome: "Quinzenal" },
-      { id: 5, nome: "Mensal" },
-      { id: 6, nome: "Bimestral" },
-      { id: 7, nome: "Trimestral" },
-      { id: 8, nome: "Semestral" },
-      { id: 9, nome: "Anual" },
-      { id: 10, nome: "Bienal" },
-      { id: 11, nome: "Quinquenal" },
-    ];
-    setFrequencias(frequencias);
+    setFrequencias(CONTROL_FREQUENCY_OPTIONS);
     window.scrollTo(0, 0);
   }, []);
 
