@@ -1,610 +1,93 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
-import { Fragment, useMemo, useState, useEffect } from "react";
-import Popover from "@mui/material/Popover";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import CustomerModal from "../../../sections/apps/customer/CustomerModal";
+import axios from "axios";
+import Mark from "mark.js";
 import { enqueueSnackbar } from "notistack";
-import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetDepartamentos } from "../../../api/departamentos";
-import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useRef } from "react";
-import emitter from "../tela2/eventEmitter";
-// project import
-import MainCard from "../../../components/MainCard";
-
-// material-ui
-import { useTheme } from "@mui/material/styles";
-
+import { faBan, faFilter, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { DownloadOutlined, PlusOutlined } from "@ant-design/icons";
+import CloseIcon from "@mui/icons-material/Close";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
+  Autocomplete,
   Box,
-  Grid,
   Button,
-  FormControl,
+  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Chip,
   Divider,
+  Drawer,
+  FormControl,
+  Grid,
+  InputLabel,
+  Popover,
   Stack,
   Table,
-  InputLabel,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
   useMediaQuery,
 } from "@mui/material";
-
-// third-party
+import { useTheme } from "@mui/material/styles";
 import {
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
   getFilteredRowModel,
-  getExpandedRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 
-// project-import
-import ScrollX from "../../../components/ScrollX";
+import { useGetDepartamentos } from "../../../api/departamentos";
+import { useToken } from "../../../api/TokenContext";
 import IconButton from "../../../components/@extended/IconButton";
-import CircularProgress from "@mui/material/CircularProgress";
-import Drawer from "@mui/material/Drawer";
-import Autocomplete from "@mui/material/Autocomplete";
-import TextField from "@mui/material/TextField";
-import CloseIcon from '@mui/icons-material/Close';
-import Mark from "mark.js";
-import {
-  faXmark,
-  faBan,
-  faTrash,
-  faExclamation,
-} from "@fortawesome/free-solid-svg-icons";
-
+import MainCard from "../../../components/MainCard";
+import ScrollX from "../../../components/ScrollX";
 import {
   DebouncedInput,
-  HeaderSort,
   EmptyTable,
+  HeaderSort,
   RowSelection,
+  SelectColumnVisibility,
   TablePagination,
-} from "../../../components/third-party/react-table"; import axios from "axios";
-import { useToken } from "../../../api/TokenContext";
+} from "../../../components/third-party/react-table";
+import emitter from "../tela2/eventEmitter";
 
-// assets
-import { PlusOutlined } from "@ant-design/icons";
-import {
-  faFilter,
-} from "@fortawesome/free-solid-svg-icons";
+const COLUMN_VISIBILITY_STORAGE_KEY = "egrc_table_visibility_departamentos";
 
-export const fuzzyFilter = (row, columnId, value) => {
-  let cellValue = row.getValue(columnId);
-
-  // Se o valor da busca estiver vazio, mostra a linha
-  if (!value) return true;
-  
-  // Se o valor da célula for nulo ou indefinido, não há o que comparar
-  if (cellValue === null || cellValue === undefined) return false;
-
-  const normalizeText = (text) => {
-    return text
-      .toString()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-  };
-
-  const cellValueStr = normalizeText(cellValue);
-  const valueStr = normalizeText(value);
-
-  return cellValueStr.includes(valueStr);
+const defaultVisibility = {
+  code: true,
+  name: true,
+  type: true,
+  unit: true,
+  active: true,
+  actions: true,
 };
 
-// ==============================|| REACT TABLE - LIST ||============================== //
+const tableStatusOptions = ["Ativo", "Inativo"];
 
-function ReactTable({ data, columns, processosTotal, isLoading }) {
-  const theme = useTheme();
-  const isDarkMode = theme.palette.mode === "dark";
-  const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
-  const [columnVisibility, setColumnVisibility] = useState({});
-  const recordType = "Departamentos";
-  const tableRef = useRef(null);
-  const [sorting, setSorting] = useState([{ id: "nome", asc: true }]);
-  const [rowSelection, setRowSelection] = useState({});
-  const [globalFilter, setGlobalFilter] = useState("");
-  const navigation = useNavigate();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState([]);
-  const [departamentoOptions, setDepartamentoOptions] = useState([]);
-  const [statusOptions] = useState([
-    { label: "Ativo", value: true },
-    { label: "Inativo", value: false },
-  ]);
-  const [draftFilters, setDraftFilters] = useState({ departamento: [], status: [], });
+const getDepartmentId = (department) =>
+  department?.idDepartment ?? department?.id ?? null;
 
-  // Abre ou fecha o drawer
-  const toggleDrawer = () => setDrawerOpen(!drawerOpen);
+const normalizeText = (value) =>
+  String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 
-  useEffect(() => {
-    const departamentos = [...new Set(data.map((item) => item.name))];
-    setDepartamentoOptions(departamentos);
-  }, [data]);
+const formatFieldValue = (value) =>
+  value === null || value === undefined || value === "" ? "-" : String(value);
 
-  // Aplica os filtros selecionados
-  const applyFilters = () => {
-    const newFilters = [];
-    if (draftFilters.departamento.length > 0) {
-      newFilters.push({ type: "Departamento", values: draftFilters.departamento });
-    }
-    if (draftFilters.status.length > 0) {
-      newFilters.push({ type: "Status", values: draftFilters.status.map((s) => s.value) });
-    }
-    setSelectedFilters(newFilters);
-    toggleDrawer();
-  };
-
-  // Remove filtro selecionado
-  const removeFilter = (index) => {
-    setSelectedFilters((prev) => {
-      const filterToRemove = prev[index];
-      
-      setDraftFilters((prevDraft) => {
-        const updatedDraft = { ...prevDraft };
-        if (filterToRemove.type === "Departamento") {
-          updatedDraft.departamento = updatedDraft.departamento.filter(
-            (value) => !filterToRemove.values.includes(value)
-          );
-        } else if (filterToRemove.type === "Status") {
-          updatedDraft.status = updatedDraft.status.filter(
-            (value) => !filterToRemove.values.includes(value.value)
-          );
-        }
-        return updatedDraft;
-      });
-  
-      // Remove o filtro da lista de filtros selecionados
-      return prev.filter((_, i) => i !== index);
-    });
-  };
-
-  const handleRemoveAllFilters = () => {
-    setSelectedFilters([]);
-    setGlobalFilter("");
-    setDraftFilters({ departamento: [], status: [] });
-  };
-
-  // Filtra os dados com base nos filtros selecionados
-  const filteredData = useMemo(() => {
-    return data.filter((item) => {
-      return selectedFilters.every((filter) => {
-        if (filter.type === "Departamento") return filter.values.includes(item.name);
-        if (filter.type === "Status") return filter.values.includes(item.active);
-        return true;
-      });
-    });
-  }, [data, selectedFilters]);
-
-  const table = useReactTable({
-    data: filteredData,
-    columns,
-    state: { sorting, rowSelection, globalFilter, columnVisibility },
-    enableRowSelection: true,
-    onSortingChange: setSorting,
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    onGlobalFilterChange: setGlobalFilter,
-    getRowCanExpand: () => true,
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    globalFilterFn: fuzzyFilter,
-    debugTable: true,
-  });
-
-  useEffect(
-    () =>
-      setColumnVisibility({
-        comarca: false,
-        instancia: false,
-        dataDistribuicao: false,
-        orgao: false,
-        valorCausa: false,
-        acao: false,
-        posicaoProcessual: false,
-        area: false,
-      }),
-    []
-  );
-
-  const verticalDividerStyle = {
-    width: "0.5px",
-    height: "37px",
-    backgroundColor: "#98B3C3",
-    opacity: "0.75",
-    flexShrink: "0",
-    marginRight: "0px",
-    marginLeft: "7px",
-  };
-
-  let headers = [];
-  table.getVisibleLeafColumns().map((columns) =>
-    headers.push({
-      label:
-        typeof columns.columnDef.header === "string"
-          ? columns.columnDef.header
-          : "#",
-      key: columns.columnDef.accessorKey,
-    })
-  );
-
-  // Função para realizar a marcação de texto
-  useEffect(() => {
-    const markInstance = new Mark(tableRef.current);
-
-    if (globalFilter) {
-      markInstance.unmark({
-        done: () => {
-          markInstance.mark(globalFilter);
-        },
-      });
-    } else {
-      markInstance.unmark();
-    }
-  }, [globalFilter, table.getRowModel().rows]);
-
-  return (
-    <>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{
-          backgroundColor: "#F1F1F1E5",
-          paddingBottom: 2,
-          paddingTop: 2,
-          paddingRight: 2,
-          paddingLeft: 2,
-          marginBottom: 3,
-          ...(matchDownSM && {
-            "& .MuiOutlinedInput-root, & .MuiFormControl-root": {
-              width: "110%",
-            },
-          }),
-        }}
-      >
-        <Stack direction="row" spacing={1} alignItems="center">
-          <DebouncedInput
-            value={globalFilter ?? ""}
-            onFilterChange={(value) => setGlobalFilter(String(value))}
-            placeholder={`Pesquise pelo nome`}
-            style={{
-              width: "350px",
-              height: "33px",
-              borderRadius: "8px",
-              border: "0.3px solid #00000010",
-              backgroundColor: "#FFFFFF",
-            }}
-          />
-          <Button
-            onClick={() => toggleDrawer(true)}
-            startIcon={
-              <FontAwesomeIcon icon={faFilter} style={{ color: "#00000080" }} />
-            }
-            style={{
-              width: "90px",
-              color: "#00000080",
-              backgroundColor: 'white',
-              fontSize: "13px",
-              marginLeft: 24,
-              fontWeight: 400,
-              height: "33px",
-              borderRadius: "8px",
-              border: "0.6px solid #00000040 ",
-            }}
-          >
-            Filtros
-          </Button>
-        </Stack>
-
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          alignItems="center"
-          sx={{ width: { xs: "100%", sm: "auto" } }}
-        >
-          <div style={verticalDividerStyle}></div>
-
-          <Stack direction="row" spacing={2} alignItems="center">
-            {/* Inserir o botão aqui */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                flexShrink: 0,
-                ml: 0.75,
-              }}
-            >
-              <Button
-                variant="contained"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigation(`/departamentos/criar`, {
-                    state: { indoPara: "NovoDepartamento" },
-                  });
-                }}
-                startIcon={<PlusOutlined />}
-                style={{ borderRadius: "20px", height: "32px" }}
-              >
-                Novo
-              </Button>
-            </Box>
-          </Stack>
-        </Stack>
-      </Stack>
-
-      <Box mb={2}>
-        {selectedFilters.map((filter, index) => (
-          <Chip
-            key={index}
-            label={
-              <Box display="flex" alignItems="center">
-                <Typography
-                  sx={{ color: "#1C5297", fontWeight: 600, marginRight: "4px" }}
-                >
-                  {filter.type}:
-                </Typography>
-                <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
-                  {filter.values
-                    .map((v) => (v === true ? "Ativo" : v === false ? "Inativo" : v))
-                    .join(", ")}
-                </Typography>
-              </Box>
-            }
-            onDelete={() => removeFilter(index)}
-            sx={{
-              margin: 0.5,
-              backgroundColor: "#1C52971A",
-              border: "0.7px solid #1C529733",
-            }}
-          />
-        ))}
-        {selectedFilters.length > 0 && (
-          <Chip
-            label="Limpar Filtros"
-            onClick={handleRemoveAllFilters}
-            sx={{
-              margin: 0.5,
-              backgroundColor: "transparent",
-              color: "#1C5297",
-              fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-            }}
-          />
-        )}
-      </Box>
-
-
-      {/* Drawer para filtros */}
-      <Drawer anchor="right" open={drawerOpen} onClose={toggleDrawer} PaperProps={{ sx: { width: 670 } }}>
-        <Box sx={{ width: 650, p: 3 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-            <Box component="h2" sx={{ color: '#1C5297', fontWeight: 600, fontSize: '16px' }}>Filtros</Box>
-            <IconButton onClick={toggleDrawer}>
-              <CloseIcon sx={{ color: '#1C5297', fontSize: '18px' }} />
-            </IconButton>
-          </Stack>
-
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Departamento</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  disableCloseOnSelect
-                  options={departamentoOptions}
-                  value={draftFilters.departamento}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, departamento: value }))}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12}>
-              <InputLabel sx={{ fontSize: '12px', fontWeight: 600 }}>Status</InputLabel>
-              <FormControl fullWidth margin="normal">
-                <Autocomplete
-                  multiple
-                  options={statusOptions}
-                  value={draftFilters.status}
-                  onChange={(event, value) => setDraftFilters((prev) => ({ ...prev, status: value }))}
-                  getOptionLabel={(option) => option.label}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </FormControl>
-            </Grid>
-          </Grid>
-
-          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="outlined" onClick={toggleDrawer}>Cancelar</Button>
-            <Button variant="contained" onClick={applyFilters}>Aplicar</Button>
-          </Stack>
-        </Box>
-      </Drawer >
-
-      <MainCard content={false}>
-        <ScrollX>
-          <div ref={tableRef}>
-            <Stack>
-              <RowSelection selected={Object.keys(rowSelection).length} />
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow
-                        key={headerGroup.id}
-                        sx={{
-                          backgroundColor: isDarkMode ? "#14141" : "#F4F4F4",
-                          color: isDarkMode
-                            ? "rgba(0, 0, 0, 0.6)"
-                            : "rgba(255, 255, 255, 0.87)",
-                        }}
-                      >
-                        {headerGroup.headers.map((header) => {
-                          if (
-                            header.column.columnDef.meta !== undefined &&
-                            header.column.getCanSort()
-                          ) {
-                            Object.assign(header.column.columnDef.meta, {
-                              className:
-                                header.column.columnDef.meta.className +
-                                " cursor-pointer prevent-select",
-                            });
-                          }
-
-                          return (
-                            <TableCell
-                              sx={{
-                                fontSize: "11px",
-                                color: isDarkMode
-                                  ? "rgba(255, 255, 255, 0.87)"
-                                  : "rgba(0, 0, 0, 0.6)",
-                              }}
-                              key={header.id}
-                              {...header.column.columnDef.meta}
-                              onClick={header.column.getToggleSortingHandler()}
-                              {...(header.column.getCanSort() &&
-                                header.column.columnDef.meta === undefined && {
-                                className: "cursor-pointer prevent-select",
-                              })}
-                            >
-                              {header.isPlaceholder ? null : (
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  alignItems="center"
-                                >
-                                  <Box>
-                                    {flexRender(
-                                      header.column.columnDef.header,
-                                      header.getContext()
-                                    )}
-                                  </Box>
-                                  {header.column.getCanSort() && (
-                                    <HeaderSort column={header.column} />
-                                  )}
-                                </Stack>
-                              )}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableHead>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          sx={{ textAlign: "center" }}
-                        >
-                          <CircularProgress />
-                        </TableCell>
-                      </TableRow>
-                    ) : data ? (
-                      data.length > 0 ? (
-                        table.getRowModel().rows.map((row) => (
-                          <Fragment key={row.id}>
-                            <TableRow>
-                              {row.getVisibleCells().map((cell) => (
-                                <TableCell
-                                  key={cell.id}
-                                  {...cell.column.columnDef.meta}
-                                  sx={{
-                                    overflow: "hidden",
-                                    color: isDarkMode
-                                      ? "rgba(255, 255, 255, 0.87)"
-                                      : "rgba(0, 0, 0, 0.65)",
-                                    textOverflow: "ellipsis",
-                                    fontFamily:
-                                      '"Open Sans", Helvetica, sans-serif',
-                                    fontSize: "13px",
-                                    fontStyle: "normal",
-                                    fontWeight: 400,
-                                    lineHeight: "normal",
-                                  }}
-                                >
-                                  {flexRender(
-                                    cell.column.columnDef.cell,
-                                    cell.getContext()
-                                  )}
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          </Fragment>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={columns.length}>
-                            <EmptyTable msg="Dados não encontrados" />
-                          </TableCell>
-                        </TableRow>
-                      )
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          sx={{ textAlign: "left" }}
-                        >
-                          <CircularProgress />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <>
-                <Divider />
-                <Box sx={{ p: 2 }}>
-                  <TablePagination
-                    {...{
-                      setPageSize: table.setPageSize,
-                      setPageIndex: table.setPageIndex,
-                      getState: table.getState,
-                      getPageCount: table.getPageCount,
-                      totalItems: processosTotal,
-                      recordType: recordType,
-                    }}
-                  />
-                </Box>
-              </>
-            </Stack>
-          </div>
-        </ScrollX>
-      </MainCard>
-    </>
-  );
-}
-
-ReactTable.propTypes = {
-  columns: PropTypes.array,
-  data: PropTypes.array,
-  getHeaderProps: PropTypes.func,
-  handleAdd: PropTypes.func,
-  modalToggler: PropTypes.func,
-  renderRowSubComponent: PropTypes.any,
-  refreshData: PropTypes.func,
-};
+const getStatusLabel = (active) => (active ? "Ativo" : "Inativo");
 
 const normalizeDepartmentRelationIds = (items, idKey) =>
   Array.isArray(items)
@@ -649,125 +132,721 @@ const buildDepartmentUpdatePayload = (departmentData, nextActive) => ({
   idActionPlans: departmentData.idActionPlans ?? [],
 });
 
-function ActionCell({ row, refreshData }) {
-  const { token } = useToken();
-  const navigation = useNavigate();
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [status, setStatus] = useState(row.original.active);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [openErrorDialog, setOpenErrorDialog] = useState(false);
+export const fuzzyFilter = (row, columnId, value) => {
+  const cellValue = row.getValue(columnId);
 
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
+  if (
+    cellValue === undefined ||
+    cellValue === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return false;
+  }
+
+  const cellString = normalizeText(cellValue);
+  const searchTerms = normalizeText(value)
+    .split(" ")
+    .filter((term) => term.trim() !== "");
+
+  return searchTerms.every((term) => cellString.includes(term));
+};
+
+function ReactTable({ data, columns, isLoading, onExportExcel }) {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === "dark";
+  const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
+  const navigation = useNavigate();
+  const tableRef = useRef(null);
+  const recordType = "Departamentos";
+
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try {
+      const saved = localStorage.getItem(COLUMN_VISIBILITY_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : defaultVisibility;
+    } catch (error) {
+      console.error("Erro ao carregar visibilidade das colunas", error);
+      return defaultVisibility;
+    }
+  });
+  const [sorting, setSorting] = useState([{ id: "name", asc: true }]);
+  const [rowSelection, setRowSelection] = useState({});
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState([
+    { type: "Status", values: ["Ativo"] },
+  ]);
+  const [codeOptions, setCodeOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [typeOptions, setTypeOptions] = useState([]);
+  const [unitOptions, setUnitOptions] = useState([]);
+  const [draftFilters, setDraftFilters] = useState({
+    code: [],
+    department: [],
+    type: [],
+    unit: [],
+    status: ["Ativo"],
+  });
+
+  useEffect(() => {
+    localStorage.setItem(
+      COLUMN_VISIBILITY_STORAGE_KEY,
+      JSON.stringify(columnVisibility),
+    );
+  }, [columnVisibility]);
+
+  useEffect(() => {
+    const getUniqueValues = (values) =>
+      [...new Set(values.filter((value) => value !== null && value !== undefined && value !== ""))]
+        .sort((left, right) => String(left).localeCompare(String(right)));
+
+    setCodeOptions(getUniqueValues((data || []).map((item) => item.code)));
+    setDepartmentOptions(getUniqueValues((data || []).map((item) => item.name)));
+    setTypeOptions(getUniqueValues((data || []).map((item) => item.type)));
+    setUnitOptions(getUniqueValues((data || []).map((item) => item.unit)));
+  }, [data]);
+
+  const toggleDrawer = () => {
+    setDrawerOpen((current) => !current);
   };
+
+  const applyFilters = () => {
+    const nextFilters = [];
+
+    if (draftFilters.code.length > 0) {
+      nextFilters.push({ type: "Codigo", values: draftFilters.code });
+    }
+    if (draftFilters.department.length > 0) {
+      nextFilters.push({
+        type: "Departamento",
+        values: draftFilters.department,
+      });
+    }
+    if (draftFilters.type.length > 0) {
+      nextFilters.push({ type: "Tipo", values: draftFilters.type });
+    }
+    if (draftFilters.unit.length > 0) {
+      nextFilters.push({ type: "Unidade", values: draftFilters.unit });
+    }
+    if (draftFilters.status.length > 0) {
+      nextFilters.push({ type: "Status", values: draftFilters.status });
+    }
+
+    setSelectedFilters(nextFilters);
+    toggleDrawer();
+  };
+
+  const removeFilter = (index) => {
+    setSelectedFilters((currentFilters) => {
+      const filterToRemove = currentFilters[index];
+      const filterKeyMap = {
+        Codigo: "code",
+        Departamento: "department",
+        Tipo: "type",
+        Unidade: "unit",
+        Status: "status",
+      };
+      const filterKey = filterKeyMap[filterToRemove.type];
+
+      setDraftFilters((currentDraft) => ({
+        ...currentDraft,
+        [filterKey]: currentDraft[filterKey].filter(
+          (value) => !filterToRemove.values.includes(value),
+        ),
+      }));
+
+      return currentFilters.filter((_, currentIndex) => currentIndex !== index);
+    });
+  };
+
+  const handleRemoveAllFilters = () => {
+    setSelectedFilters([]);
+    setGlobalFilter("");
+    setDraftFilters({
+      code: [],
+      department: [],
+      type: [],
+      unit: [],
+      status: [],
+    });
+  };
+
+  const filteredData = useMemo(
+    () =>
+      (data || []).filter((item) =>
+        selectedFilters.every((filter) => {
+          if (filter.type === "Codigo") return filter.values.includes(item.code);
+          if (filter.type === "Departamento")
+            return filter.values.includes(item.name);
+          if (filter.type === "Tipo") return filter.values.includes(item.type);
+          if (filter.type === "Unidade") return filter.values.includes(item.unit);
+          if (filter.type === "Status") {
+            const showActive = filter.values.includes("Ativo");
+            const showInactive = filter.values.includes("Inativo");
+            if (showActive && showInactive) return true;
+            if (showActive) return item.active === true;
+            if (showInactive) return item.active === false;
+          }
+          return true;
+        }),
+      ),
+    [data, selectedFilters],
+  );
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    state: { sorting, rowSelection, globalFilter, columnVisibility },
+    enableRowSelection: true,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onGlobalFilterChange: setGlobalFilter,
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    globalFilterFn: fuzzyFilter,
+    debugTable: true,
+  });
+
+  const getAllColumnsFiltered = () =>
+    table
+      .getAllLeafColumns()
+      .filter((column) => !["actions", "select"].includes(column.id));
+
+  useEffect(() => {
+    const markInstance = new Mark(tableRef.current);
+
+    if (globalFilter) {
+      markInstance.unmark({
+        done: () => {
+          markInstance.mark(globalFilter);
+        },
+      });
+    } else {
+      markInstance.unmark();
+    }
+  }, [globalFilter, table.getRowModel().rows]);
+
+  const visibleColumnCount =
+    table.getVisibleLeafColumns().length || columns.length || 1;
+
+  const verticalDividerStyle = {
+    width: "0.5px",
+    height: "37px",
+    backgroundColor: "#98B3C3",
+    opacity: "0.75",
+    flexShrink: "0",
+    marginLeft: "7px",
+  };
+
+  return (
+    <>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{
+          backgroundColor: "#F1F1F1E5",
+          paddingBottom: 2,
+          paddingTop: 2,
+          paddingRight: 2,
+          paddingLeft: 2,
+          marginBottom: 3,
+          ...(matchDownSM && {
+            "& .MuiOutlinedInput-root, & .MuiFormControl-root": {
+              width: "110%",
+            },
+          }),
+        }}
+      >
+        <Stack direction="row" spacing={1} alignItems="center">
+          <SelectColumnVisibility
+            {...{
+              getVisibleLeafColumns: table.getVisibleLeafColumns,
+              getIsAllColumnsVisible: table.getIsAllColumnsVisible,
+              getToggleAllColumnsVisibilityHandler:
+                table.getToggleAllColumnsVisibilityHandler,
+              getAllColumns: getAllColumnsFiltered,
+            }}
+          />
+          <DebouncedInput
+            value={globalFilter ?? ""}
+            onFilterChange={(value) => setGlobalFilter(String(value))}
+            placeholder="Pesquise por codigo, departamento, etc..."
+            style={{
+              width: "350px",
+              height: "33px",
+              borderRadius: "8px",
+              border: "0.3px solid #00000010",
+              backgroundColor: "#FFFFFF",
+            }}
+          />
+          <Button
+            onClick={toggleDrawer}
+            startIcon={
+              <FontAwesomeIcon icon={faFilter} style={{ color: "#00000080" }} />
+            }
+            style={{
+              width: "90px",
+              color: "#00000080",
+              backgroundColor: "#FFFFFF",
+              fontSize: "13px",
+              marginLeft: 24,
+              fontWeight: 400,
+              height: "33px",
+              borderRadius: "8px",
+              border: "0.6px solid #00000040 ",
+            }}
+          >
+            Filtros
+          </Button>
+        </Stack>
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems="center"
+          sx={{ width: { xs: "100%", sm: "auto" } }}
+        >
+          <div style={verticalDividerStyle} />
+          <Button
+            variant="contained"
+            onClick={() =>
+              navigation(`/departamentos/criar`, {
+                state: { indoPara: "NovoDepartamento" },
+              })
+            }
+            startIcon={<PlusOutlined />}
+            style={{ borderRadius: "20px", height: "32px" }}
+          >
+            Novo
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={onExportExcel}
+            startIcon={<DownloadOutlined />}
+            disabled={isLoading}
+            style={{ borderRadius: "20px", height: "32px" }}
+          >
+            Exportar Excel
+          </Button>
+        </Stack>
+      </Stack>
+      <Box mb={2}>
+        {selectedFilters.map((filter, index) => (
+          <Chip
+            key={`${filter.type}-${index}`}
+            label={
+              <Box display="flex" alignItems="center">
+                <Typography
+                  sx={{ color: "#1C5297", fontWeight: 600, marginRight: "4px" }}
+                >
+                  {filter.type}:
+                </Typography>
+                <Typography sx={{ color: "#1C5297", fontWeight: 400 }}>
+                  {filter.values.join(", ")}
+                </Typography>
+              </Box>
+            }
+            onDelete={() => removeFilter(index)}
+            sx={{
+              margin: 0.5,
+              backgroundColor: "#1C52971A",
+              border: "0.7px solid #1C529733",
+            }}
+          />
+        ))}
+        {selectedFilters.length > 0 && (
+          <Chip
+            label="Limpar Filtros"
+            onClick={handleRemoveAllFilters}
+            sx={{
+              margin: 0.5,
+              backgroundColor: "transparent",
+              color: "#1C5297",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+            }}
+          />
+        )}
+      </Box>
+
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        PaperProps={{ sx: { width: 670 } }}
+      >
+        <Box sx={{ width: 650, p: 3 }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box
+              component="h2"
+              sx={{ color: "#1C5297", fontWeight: 600, fontSize: "16px" }}
+            >
+              Filtros
+            </Box>
+            <IconButton onClick={toggleDrawer}>
+              <CloseIcon sx={{ color: "#1C5297", fontSize: "18px" }} />
+            </IconButton>
+          </Stack>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Codigo
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={codeOptions}
+                  value={draftFilters.code}
+                  onChange={(_, value) =>
+                    setDraftFilters((current) => ({
+                      ...current,
+                      code: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Departamento
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={departmentOptions}
+                  value={draftFilters.department}
+                  onChange={(_, value) =>
+                    setDraftFilters((current) => ({
+                      ...current,
+                      department: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Tipo
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={typeOptions}
+                  value={draftFilters.type}
+                  onChange={(_, value) =>
+                    setDraftFilters((current) => ({
+                      ...current,
+                      type: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Unidade
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={unitOptions}
+                  value={draftFilters.unit}
+                  onChange={(_, value) =>
+                    setDraftFilters((current) => ({
+                      ...current,
+                      unit: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
+                Status
+              </InputLabel>
+              <FormControl fullWidth margin="normal">
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={tableStatusOptions}
+                  value={draftFilters.status}
+                  onChange={(_, value) =>
+                    setDraftFilters((current) => ({
+                      ...current,
+                      status: value,
+                    }))
+                  }
+                  renderInput={(params) => <TextField {...params} />}
+                />
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
+            <Button variant="outlined" onClick={toggleDrawer}>
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={applyFilters}>
+              Aplicar
+            </Button>
+          </Stack>
+        </Box>
+      </Drawer>
+
+      <MainCard content={false}>
+        <ScrollX>
+          <div ref={tableRef}>
+            <Stack>
+              <RowSelection selected={Object.keys(rowSelection).length} />
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow
+                        key={headerGroup.id}
+                        sx={{
+                          backgroundColor: isDarkMode ? "#14141" : "#F4F4F4",
+                          color: isDarkMode
+                            ? "rgba(0, 0, 0, 0.6)"
+                            : "rgba(255, 255, 255, 0.87)",
+                        }}
+                      >
+                        {headerGroup.headers.map((header) => {
+                          if (
+                            header.column.columnDef.meta !== undefined &&
+                            header.column.getCanSort()
+                          ) {
+                            Object.assign(header.column.columnDef.meta, {
+                              className: `${
+                                header.column.columnDef.meta.className || ""
+                              } cursor-pointer prevent-select`,
+                            });
+                          }
+
+                          return (
+                            <TableCell
+                              sx={{
+                                fontSize: "11px",
+                                color: isDarkMode
+                                  ? "rgba(255, 255, 255, 0.87)"
+                                  : "rgba(0, 0, 0, 0.6)",
+                              }}
+                              key={header.id}
+                              {...header.column.columnDef.meta}
+                              onClick={header.column.getToggleSortingHandler()}
+                              {...(header.column.getCanSort() &&
+                                header.column.columnDef.meta === undefined && {
+                                  className: "cursor-pointer prevent-select",
+                                })}
+                            >
+                              {header.isPlaceholder ? null : (
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                >
+                                  <Box>
+                                    {flexRender(
+                                      header.column.columnDef.header,
+                                      header.getContext(),
+                                    )}
+                                  </Box>
+                                  {header.column.getCanSort() && (
+                                    <HeaderSort column={header.column} />
+                                  )}
+                                </Stack>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableHead>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={visibleColumnCount}
+                          sx={{ textAlign: "center" }}
+                        >
+                          <CircularProgress />
+                        </TableCell>
+                      </TableRow>
+                    ) : table.getRowModel().rows.length > 0 ? (
+                      table.getRowModel().rows.map((row) => (
+                        <Fragment key={row.id}>
+                          <TableRow>
+                            {row.getVisibleCells().map((cell) => (
+                              <TableCell
+                                key={cell.id}
+                                {...cell.column.columnDef.meta}
+                                sx={{
+                                  overflow: "hidden",
+                                  color: isDarkMode
+                                    ? "rgba(255, 255, 255, 0.87)"
+                                    : "rgba(0, 0, 0, 0.65)",
+                                  textOverflow: "ellipsis",
+                                  fontFamily:
+                                    '"Open Sans", Helvetica, sans-serif',
+                                  fontSize: "13px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "normal",
+                                }}
+                              >
+                                {flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext(),
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </Fragment>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={visibleColumnCount}>
+                          <EmptyTable msg="Dados nao encontrados" />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Divider />
+              <Box sx={{ p: 2 }}>
+                <TablePagination
+                  {...{
+                    setPageSize: table.setPageSize,
+                    setPageIndex: table.setPageIndex,
+                    getState: table.getState,
+                    getPageCount: table.getPageCount,
+                    totalItems: filteredData.length,
+                    recordType,
+                  }}
+                />
+              </Box>
+            </Stack>
+          </div>
+        </ScrollX>
+      </MainCard>
+    </>
+  );
+}
+
+ReactTable.propTypes = {
+  columns: PropTypes.array,
+  data: PropTypes.array,
+  isLoading: PropTypes.bool,
+  onExportExcel: PropTypes.func,
+};
+
+function ActionCell({ row, refreshData }) {
+  const navigation = useNavigate();
+  const { token } = useToken();
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [status, setStatus] = useState(Boolean(row.original.active));
+
+  const normalizedDepartment = {
+    ...row.original,
+    idDepartment: getDepartmentId(row.original),
+  };
+
+  useEffect(() => {
+    setStatus(Boolean(row.original.active));
+  }, [row.original.active]);
 
   const handleClose = () => {
     setAnchorEl(null);
   };
 
-  const handleDialogOpen = () => {
-    setOpenDialog(true);
-  };
-
-  const handleDialogClose = () => {
+  const handleToggleStatus = async () => {
+    handleClose();
     setOpenDialog(false);
-    handleClose();
-  };
 
-  const handleDeleteDialogClose = () => {
-    setOpenDeleteDialog(false);
-    handleClose();
-  };
-
-  useEffect(() => {
-    setStatus(row.original.active);
-  }, [row.original.active]);
-
-  const toggleStatus = async () => {
-    const idDepartment = row.original.idDepartment;
+    const departmentId = normalizedDepartment.idDepartment;
+    const authToken = token || localStorage.getItem("access_token");
     const nextActive = !Boolean(status);
-    const newStatus = nextActive ? "Ativo" : "Inativo";
-    
+
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}departments/${idDepartment}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const getResponse = await axios.get(
+        `${process.env.REACT_APP_API_URL}departments/${departmentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
         },
-      });
-  
-      const departmentData = getResponse.data;
-  
-      // Mantém o contrato do PUT alinhado com a tela de edição.
-      const updatedDepartmentData = buildDepartmentUpdatePayload(
-        departmentData,
+      );
+
+      const payload = buildDepartmentUpdatePayload(
+        getResponse.data,
         nextActive,
       );
-  
-      // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}departments`, updatedDepartmentData, {
+
+      await axios.put(`${process.env.REACT_APP_API_URL}departments`, payload, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
           "Content-Type": "application/json",
         },
       });
-  
-      // Atualizar o estado e exibir mensagem de sucesso
-      setStatus(nextActive);
-      const message = `Departamento ${row.original.name} ${newStatus.toLowerCase()}.`;
-  
-      enqueueSnackbar(message, {
-        variant: "success",
-        autoHideDuration: 3000,
-        anchorOrigin: {
-          vertical: "top",
-          horizontal: "center",
-        },
-      });
-  
-      refreshData();
-    } catch (error) {
-      console.error("Erro:", error);
-      enqueueSnackbar(`Erro: ${error.response?.data || error.message}`, { variant: "error" });
-    }
-  
-    handleDialogClose();
-  };
-  
-  
 
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(
-        `${API_COMMAND}/api/Orgao/${row.original.id}`,
+      enqueueSnackbar(
+        `Departamento ${normalizedDepartment.name} ${
+          nextActive ? "ativado" : "inativado"
+        } com sucesso.`,
         {
-          method: "DELETE",
-        }
-      );
-
-      if (response.ok) {
-        enqueueSnackbar(`Empresa ${row.original.nome} excluído.`, {
           variant: "success",
           autoHideDuration: 3000,
           anchorOrigin: {
             vertical: "top",
             horizontal: "center",
           },
-        });
-        refreshData();
-      } else {
-        const errorBody = await response.text();
-        throw new Error(
-          `Falha ao excluir o departamento: ${response.status} ${response.statusText} - ${errorBody}`
-        );
-      }
-    } catch (error) {
-      console.error("Erro:", error);
-      setOpenErrorDialog(true);
-    }
+        },
+      );
 
-    handleDeleteDialogClose();
+      setStatus(nextActive);
+      refreshData();
+    } catch (error) {
+      console.error("Erro ao atualizar departamento", error);
+      enqueueSnackbar(
+        error.response?.data?.message ||
+          error.response?.data ||
+          "Erro ao alterar o status do departamento.",
+        {
+          variant: "error",
+          autoHideDuration: 3000,
+          anchorOrigin: {
+            vertical: "top",
+            horizontal: "center",
+          },
+        },
+      );
+    }
   };
 
   const buttonStyle = {
@@ -778,25 +857,21 @@ function ActionCell({ row, refreshData }) {
   };
 
   const open = Boolean(anchorEl);
-  const id = open ? "simple-popover" : undefined;
+  const popoverId = open ? "department-action-popover" : undefined;
 
   return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      justifyContent="center"
-      spacing={0}
-    >
+    <Stack direction="row" alignItems="center" justifyContent="center">
       <IconButton
-        aria-describedby={id}
+        aria-describedby={popoverId}
         color="primary"
-        onClick={handleClick}
+        onClick={(event) => setAnchorEl(event.currentTarget)}
         style={buttonStyle}
       >
         <MoreVertIcon />
       </IconButton>
+
       <Popover
-        id={id}
+        id={popoverId}
         open={open}
         anchorEl={anchorEl}
         onClose={handleClose}
@@ -808,11 +883,10 @@ function ActionCell({ row, refreshData }) {
         <Stack>
           <Button
             onClick={() => {
-              const dadosApi = row.original;
-              navigation(`/departamentos/criar`, {
+              navigation("/departamentos/criar", {
                 state: {
                   indoPara: "NovoDepartamento",
-                  dadosApi,
+                  dadosApi: normalizedDepartment,
                 },
               });
               handleClose();
@@ -822,22 +896,24 @@ function ActionCell({ row, refreshData }) {
           >
             Editar
           </Button>
-
           <Button
             onClick={() => {
-              if (row.original.active === true) handleDialogOpen();
-              else toggleStatus();
+              if (status) {
+                setOpenDialog(true);
+              } else {
+                handleToggleStatus();
+              }
             }}
             style={{ color: "#707070", fontWeight: 400 }}
           >
-            {row.original.active === true ? "Inativar" : "Ativar"}
+            {status ? "Inativar" : "Ativar"}
           </Button>
-          
         </Stack>
       </Popover>
+
       <Dialog
         open={openDialog}
-        onClose={handleDialogClose}
+        onClose={() => setOpenDialog(false)}
         sx={{
           "& .MuiPaper-root": {
             width: "547px",
@@ -860,7 +936,7 @@ function ActionCell({ row, refreshData }) {
         >
           <div style={{ display: "flex", alignItems: "center" }}>
             <IconButton
-              aria-label="delete"
+              aria-label="status"
               sx={{
                 fontSize: "16px",
                 marginRight: "2px",
@@ -883,7 +959,6 @@ function ActionCell({ row, refreshData }) {
                 fontSize: "16px",
                 fontWeight: 500,
                 lineHeight: "21px",
-                letterSpacing: "0em",
                 textAlign: "left",
                 color: "rgba(255, 255, 255, 1)",
                 flexGrow: 1,
@@ -894,7 +969,7 @@ function ActionCell({ row, refreshData }) {
           </div>
           <IconButton
             aria-label="close"
-            onClick={handleDialogClose}
+            onClick={() => setOpenDialog(false)}
             sx={{
               color: "rgba(255, 255, 255, 1)",
               "&:hover": {
@@ -912,18 +987,18 @@ function ActionCell({ row, refreshData }) {
             component="div"
             style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
           >
-            Tem certeza que deseja inativar o departamento "{row.original.name}"?
+            Tem certeza que deseja inativar o departamento "{normalizedDepartment.name}"?
           </Typography>
           <Typography
             component="div"
             style={{ marginTop: "20px", color: "#717171" }}
           >
-            Ao inativar, esse departamento não aparecerá mais no cadastro manual.
+            Ao inativar, esse departamento nao aparecera mais no cadastro manual.
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={toggleStatus}
+            onClick={handleToggleStatus}
             color="primary"
             autoFocus
             style={{
@@ -935,14 +1010,14 @@ function ActionCell({ row, refreshData }) {
               background: "#ED5565",
               fontSize: "13px",
               fontWeight: 600,
-              color: "#fff",
+              color: "#FFFFFF",
               textTransform: "none",
             }}
           >
             Sim, inativar
           </Button>
           <Button
-            onClick={handleDialogClose}
+            onClick={() => setOpenDialog(false)}
             style={{
               marginTop: "-55px",
               padding: "8px 16px",
@@ -950,246 +1025,13 @@ function ActionCell({ row, refreshData }) {
               height: "32px",
               borderRadius: "4px",
               border: "1px solid rgba(0, 0, 0, 0.40)",
-              background: "#FFF",
+              background: "#FFFFFF",
               fontSize: "13px",
               fontWeight: 600,
-              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
+              color: "rgba(0, 0, 0, 0.60)",
             }}
           >
             Cancelar
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={openDeleteDialog}
-        onClose={handleDeleteDialogClose}
-        sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            background: "#ED5565",
-            width: "auto",
-            height: "42px",
-            borderRadius: "4px 4px 0px 0px",
-            display: "flex",
-            alignItems: "center",
-            padding: "10px",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              aria-label="delete"
-              sx={{
-                fontSize: "16px",
-                marginRight: "2px",
-                color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
-              }}
-            >
-              <FontAwesomeIcon icon={faTrash} />
-            </IconButton>
-
-            <Typography
-              variant="body1"
-              sx={{
-                fontFamily: '"Open Sans", Helvetica, sans-serif',
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
-                color: "rgba(255, 255, 255, 1)",
-                flexGrow: 1,
-              }}
-            >
-              Excluir
-            </Typography>
-          </div>
-          <IconButton
-            aria-label="close"
-            onClick={handleDeleteDialogClose}
-            sx={{
-              color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
-            }}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Tem certeza que deseja excluir o departamento "{row.original.nome}"?
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            Esse departamento não será mais disponibilizado ao cadastrar um novo
-            processo.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleDelete}
-            color="primary"
-            autoFocus
-            style={{
-              marginTop: "-55px",
-              width: "162px",
-              height: "32px",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              background: "#ED5565",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              textTransform: "none",
-            }}
-          >
-            Sim, excluir
-          </Button>
-          <Button
-            onClick={handleDeleteDialogClose}
-            style={{
-              marginTop: "-55px",
-              padding: "8px 16px",
-              width: "91px",
-              height: "32px",
-              borderRadius: "4px",
-              border: "1px solid rgba(0, 0, 0, 0.40)",
-              background: "#FFF",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--label-60, rgba(0, 0, 0, 0.60))",
-            }}
-          >
-            Cancelar
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={openErrorDialog}
-        onClose={() => setOpenErrorDialog(false)}
-        sx={{
-          "& .MuiPaper-root": {
-            width: "547px",
-            height: "290px",
-            maxWidth: "none",
-          },
-        }}
-      >
-        <DialogTitle
-          sx={{
-            background: "#F69B50",
-            width: "auto",
-            height: "42px",
-            borderRadius: "4px 4px 0px 0px",
-            display: "flex",
-            alignItems: "center",
-            padding: "10px",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <IconButton
-              aria-label="delete"
-              sx={{
-                fontSize: "16px",
-                marginRight: "2px",
-                color: "rgba(255, 255, 255, 1)",
-                "&:hover": {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  color: "white",
-                  cursor: "default",
-                },
-              }}
-            >
-              <FontAwesomeIcon icon={faExclamation} />
-            </IconButton>
-
-            <Typography
-              variant="body1"
-              sx={{
-                fontFamily: '"Open Sans", Helvetica, sans-serif',
-                fontSize: "16px",
-                fontWeight: 500,
-                lineHeight: "21px",
-                letterSpacing: "0em",
-                textAlign: "left",
-                color: "rgba(255, 255, 255, 1)",
-                flexGrow: 1,
-              }}
-            >
-              Exclusão não permitida
-            </Typography>
-          </div>
-          <IconButton
-            aria-label="close"
-            onClick={() => setOpenErrorDialog(false)}
-            sx={{
-              color: "rgba(255, 255, 255, 1)",
-              "&:hover": {
-                backgroundColor: "transparent",
-                boxShadow: "none",
-                color: "white",
-              },
-            }}
-          >
-            <FontAwesomeIcon icon={faXmark} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            component="div"
-            style={{ fontWeight: "bold", marginTop: "35px", color: "#717171" }}
-          >
-            Não é possível excluir o Empresa.
-          </Typography>
-          <Typography
-            component="div"
-            style={{ marginTop: "20px", color: "#717171" }}
-          >
-            O departamento não pode ser excluído pois está vinculado a processos. É
-            possível inativar o departamento nas configurações de edição.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setOpenErrorDialog(false)}
-            style={{
-              marginTop: "-55px",
-              width: "64px",
-              height: "32px",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              background: "#F69B50",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#fff",
-              textTransform: "none",
-            }}
-          >
-            OK
           </Button>
         </DialogActions>
       </Dialog>
@@ -1202,37 +1044,33 @@ ActionCell.propTypes = {
   refreshData: PropTypes.func.isRequired,
 };
 
-// ==============================|| LISTAGEM ||============================== //
-
-// Componente principal da página de listagem de registros
-const ListagemEmpresa = () => {
+const ListagemDepartamentos = () => {
   const theme = useTheme();
   const navigation = useNavigate();
-  const location = useLocation();
-  const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
-  const {
-    acoesJudiciais: lists,
-    isLoading,
-  } = useGetDepartamentos(formData, processoSelecionadoId);
-  const processosTotal = lists ? lists.length : 0;
-  const [open, setOpen] = useState(false);
-  const [customerModal, setCustomerModal] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [customerDeleteId] = useState("");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Handler para atualizar 'formData' e disparar uma nova consulta
-  const refreshOrgaos = () => {
-    setFormData((currentData) => ({
-      ...currentData,
-      refreshCount: currentData.refreshCount + 1,
+  const { acoesJudiciais: resultData, isLoading } = useGetDepartamentos(formData);
+
+  const lists = useMemo(
+    () =>
+      (resultData || []).map((department) => ({
+        ...department,
+        idDepartment: getDepartmentId(department),
+      })),
+    [resultData],
+  );
+
+  const refreshDepartments = () => {
+    setFormData((current) => ({
+      ...current,
+      refreshCount: current.refreshCount + 1,
     }));
   };
 
   useEffect(() => {
     const refreshHandler = () => {
-      refreshOrgaos();
+      refreshDepartments();
     };
 
     emitter.on("refreshCustomers", refreshHandler);
@@ -1242,73 +1080,104 @@ const ListagemEmpresa = () => {
     };
   }, []);
 
-  // Função para fechar modais
-  const handleClose = () => {
-    setOpen(!open);
+  useEffect(() => {
+    if (!isLoading && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [isInitialLoad, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading && formData.GenerateExcel) {
+      setFormData((current) => {
+        if (!current.GenerateExcel) return current;
+        const { GenerateExcel, ...nextState } = current;
+        return nextState;
+      });
+    }
+  }, [formData.GenerateExcel, isLoading]);
+
+  const handleExportExcel = () => {
+    setFormData((current) => ({
+      ...current,
+      GenerateExcel: true,
+      refreshCount: current.refreshCount + 1,
+    }));
   };
 
-  // Função callback para atualizar formData
-  const handleFormDataChange = (newFormData) => {
-    setFormData(newFormData);
-  };
-
-  const handleOpenDepartamento = (dadosApi) => {
-    navigation(`/departamentos/criar`, {
+  const handleOpenDepartment = (department) => {
+    navigation("/departamentos/criar", {
       state: {
         indoPara: "NovoDepartamento",
-        dadosApi,
+        dadosApi: {
+          ...department,
+          idDepartment: getDepartmentId(department),
+        },
       },
     });
   };
 
-  // Definição das colunas da tabela
   const columns = useMemo(
     () => [
       {
-        header: "Código",
+        header: "Codigo",
         accessorKey: "code",
         cell: ({ row }) => (
           <Typography
             sx={{
               fontSize: "13px",
               cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
             }}
-            onClick={() => handleOpenDepartamento(row.original)}
+            onClick={() => handleOpenDepartment(row.original)}
           >
-            {row.original.code}
+            {row.original.code || "-"}
           </Typography>
         ),
       },
       {
-        header: "Departamentos",
+        header: "Departamento",
         accessorKey: "name",
         cell: ({ row }) => (
           <Typography
             sx={{
-              fontSize: '13px',
+              fontSize: "13px",
               cursor: "pointer",
+              fontWeight: 600,
+              color: theme.palette.primary.main,
             }}
-            onClick={() => handleOpenDepartamento(row.original)}
+            onClick={() => handleOpenDepartment(row.original)}
           >
-            {row.original.name}
+            {row.original.name || "-"}
           </Typography>
         ),
       },
       {
-        header: "Tipo de responsabilidade",
-        accessorKey: "responsabilityType",
+        header: "Tipo",
+        accessorKey: "type",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {formatFieldValue(row.original.type)}
+          </Typography>
+        ),
       },
       {
-        header: "Formato de unidade",
-        accessorKey: "unitFormat",
+        header: "Unidade",
+        accessorKey: "unit",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {formatFieldValue(row.original.unit)}
+          </Typography>
+        ),
       },
       {
         header: "Status",
-        accessorKey: "active",
+        accessorFn: (row) => getStatusLabel(row.active),
+        id: "active",
         cell: ({ row }) => (
           <Chip
-            label={row.original.active === true ? "Ativo" : "Inativo"}
-            color={row.original.active === true ? "success" : "error"}
+            label={getStatusLabel(row.original.active)}
+            color={row.original.active ? "success" : "error"}
             sx={{
               backgroundColor: "transparent",
               color: "#00000099",
@@ -1316,16 +1185,14 @@ const ListagemEmpresa = () => {
               fontSize: "12px",
               height: "28px",
               "& .MuiChip-icon": {
-                color:
-                  row.original.active === true ? "success.main" : "error.main",
+                color: row.original.active ? "success.main" : "error.main",
                 marginLeft: "4px",
               },
             }}
             icon={
               <span
                 style={{
-                  backgroundColor:
-                    row.original.active === true ? "green" : "red",
+                  backgroundColor: row.original.active ? "green" : "red",
                   borderRadius: "50%",
                   display: "inline-block",
                   width: "8px",
@@ -1340,69 +1207,37 @@ const ListagemEmpresa = () => {
       },
       {
         header: " ",
-        disableSortBy: true,
+        id: "actions",
+        enableSorting: false,
         cell: ({ row }) => (
-          <ActionCell row={row} refreshData={refreshOrgaos} />
-        ), // Passa refreshData
+          <ActionCell row={row} refreshData={refreshDepartments} />
+        ),
       },
     ],
-    [theme]
+    [theme],
   );
 
-  useEffect(() => {
-    if (isInitialLoad && !isLoading) {
-      setIsInitialLoad(false);
-    }
-  }, [isLoading, isInitialLoad]);
-
-  return (
-    <>
-      
-      {isInitialLoad && isLoading ? (
-        // Exibir indicador de carregamento apenas no carregamento inicial
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "50vh",
-          }}
-        >
-          <CircularProgress />
-        </div>
-      ) : (
-        <Box>
-          {lists && (
-            <ReactTable
-              {...{
-                data: lists,
-                columns,
-                modalToggler: () => {
-                  setCustomerModal(true);
-                  setSelectedCustomer(null);
-                },
-                processosTotal,
-                onFormDataChange: handleFormDataChange,
-                isLoading,
-                refreshData: refreshOrgaos,
-              }}
-            />
-          )}
-        </Box>
-      )}
-      <AlertCustomerDelete
-        id={customerDeleteId}
-        title={customerDeleteId}
-        open={open}
-        handleClose={handleClose}
+  return isInitialLoad && isLoading ? (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "50vh",
+      }}
+    >
+      <CircularProgress />
+    </Box>
+  ) : (
+    <Box>
+      <ReactTable
+        data={lists}
+        columns={columns}
+        isLoading={isLoading}
+        onExportExcel={handleExportExcel}
       />
-      <CustomerModal
-        open={customerModal}
-        modalToggler={setCustomerModal}
-        customer={selectedCustomer}
-      />
-    </>
+    </Box>
   );
 };
 
-export default ListagemEmpresa;
+export default ListagemDepartamentos;
