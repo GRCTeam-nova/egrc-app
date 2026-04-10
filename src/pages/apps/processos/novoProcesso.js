@@ -6,6 +6,7 @@ import {
   Grid,
   Stack,
   Checkbox,
+  Chip,
   InputLabel,
   Dialog,
   DialogActions,
@@ -37,6 +38,17 @@ import DrawerIncidente from "../configuracoes/novoIncidenteDrawerProcesso";
 import DrawerDeficiencia from "../configuracoes/novaDeficienciaDrawerProcessos";
 import DrawerPlanos from "../configuracoes/novoPlanoDrawerProcesso";
 import FileUploader from "../configuracoes/FileUploader";
+import {
+  areAllVisibleOptionsSelected,
+  buildActiveOptionsWithSelected,
+  buildInactiveSelectionHelperText,
+  dedupeOptionsById,
+  findSelectedOption,
+  findSelectedOptions,
+  getOptionDisplayLabel,
+  SELECT_ALL_AUTOCOMPLETE_ID,
+  withSelectAllOption,
+} from "../../../utils/activeAutocomplete";
 
 function ColumnsLayouts() {
   const { token } = useToken();
@@ -402,7 +414,7 @@ function ColumnsLayouts() {
         ...item,
       }));
 
-      setState(transformedData);
+      setState(dedupeOptionsById(transformedData));
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     }
@@ -426,11 +438,11 @@ function ColumnsLayouts() {
       }));
     }
 
-    const inferioresAtualizadas = formData.processoInferior.filter((id) => {
+    const inferioresAtualizadas = [...new Set(formData.processoInferior)].filter((id) => {
       const processoInferior = processosInferiores.find(
         (processo) => processo.id === id,
       );
-      if (!processoInferior) return false;
+      if (!processoInferior) return true;
       return formatarNome(processoInferior.nome) !== nomeDigitado;
     });
     if (inferioresAtualizadas.length !== formData.processoInferior.length) {
@@ -677,61 +689,30 @@ function ColumnsLayouts() {
     }
   };
 
-  const processosInferioresFiltrados = React.useMemo(() => {
-    if (!currentHierarchy) return [];
-
-    return processosInferiores.filter((processo) => {
-      const h = getHierarchyFromProcess(processo);
-      if (h == null) return false;
-
-      if (!(h > currentHierarchy)) return false;
-
-      const superiorId = formData.processoSuperior || null;
-
-      if (formData.processoInferior.includes(processo.id)) return true;
-
-      return (
-        processo.id !== superiorId &&
-        formatarNome(processo.nome) !== formatarNome(nomeDepartamento)
-      );
-    });
-  }, [
-    processosInferiores,
-    currentHierarchy,
-    formData.processoSuperior,
-    formData.processoInferior,
-    nomeDepartamento,
-  ]);
-
-  const opcoesProcessosInferiores = React.useMemo(() => {
-    if (processosInferioresFiltrados.length === 0) return [];
-    return [
-      { id: "all", nome: "Selecionar todos" },
-      ...processosInferioresFiltrados,
-    ];
-  }, [processosInferioresFiltrados]);
-
   const handleSelectAll2 = (event, newValue) => {
-    if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (!currentHierarchy || processosInferioresFiltrados.length === 0)
+    if (
+      newValue.length > 0 &&
+      newValue[newValue.length - 1].id === SELECT_ALL_AUTOCOMPLETE_ID
+    ) {
+      if (!currentHierarchy || processosInferioresDisponiveis.length === 0) {
         return;
+      }
 
-      if (
-        formData.processoInferior.length === processosInferioresFiltrados.length
-      ) {
+      if (allSelectedProcessosInferiores) {
         setFormData({ ...formData, processoInferior: [] });
       } else {
         setFormData({
           ...formData,
-          processoInferior: processosInferioresFiltrados.map((p) => p.id),
+          processoInferior: processosInferioresDisponiveis.map((p) => p.id),
         });
       }
-    } else {
-      tratarMudancaInputGeral(
-        "processoInferior",
-        newValue.map((item) => item.id),
-      );
+      return;
     }
+
+    tratarMudancaInputGeral(
+      "processoInferior",
+      newValue.map((item) => item.id),
+    );
   };
 
   const handleSelectProcessoAnterior = (event, newValue) => {
@@ -846,18 +827,16 @@ function ColumnsLayouts() {
     empresa: true,
   });
 
-  const allSelected =
+  const allSelectedEmpresas =
+    formData.empresa.length === empresas.length && empresas.length > 0;
+  const allSelectedDepartamentos =
     formData.departamentoInferior.length === departamentosInferiores.length &&
     departamentosInferiores.length > 0;
   const allSelectedRiscos =
     formData.risco.length === riscos.length && riscos.length > 0;
-  const allSelected2 =
-    processosInferioresFiltrados.length > 0 &&
-    formData.processoInferior.length === processosInferioresFiltrados.length;
-
-  const allSelected3 =
+  const allSelectedDados =
     formData.dado.length === dados.length && dados.length > 0;
-  const allSelected4 =
+  const allSelectedDeficiencias =
     formData.deficiencia.length === deficiencias.length &&
     deficiencias.length > 0;
   const contaIdsFiltrados = new Set(contasFiltradas.map((conta) => conta.id));
@@ -1029,29 +1008,141 @@ function ColumnsLayouts() {
     }
   };
 
+  const processoSuperiorSelecionado = findSelectedOption(
+    processosSuperiores,
+    formData.processoSuperior,
+  );
+  const processosInferioresSelecionados = findSelectedOptions(
+    processosInferiores,
+    formData.processoInferior,
+  );
   const tipoProcessoSelecionado = formatosUnidades.find(
     (f) => f.id === formData.formatoUnidade,
   )?.nome;
+  const processosAnterioresSelecionados = findSelectedOptions(
+    processosAnteriores,
+    formData.processoAnterior,
+  );
+  const processosPosterioresSelecionados = findSelectedOptions(
+    processosPosteriores,
+    formData.processoPosterior,
+  );
 
-  const opcoesProcessoAnterior = formData.formatoUnidade
-    ? processosAnteriores.filter(
-        (p) =>
-          (p.idProcessType === formData.formatoUnidade ||
-            p.processType === tipoProcessoSelecionado) &&
-          !formData.processoPosterior.includes(p.id) &&
-          p.id !== processosDados?.idProcess,
-      )
-    : [];
+  const processosSuperioresDisponiveis = buildActiveOptionsWithSelected(
+    processosSuperiores,
+    formData.processoSuperior,
+    (processo) => {
+      if (!currentHierarchy) return false;
 
-  const opcoesProcessoPosterior = formData.formatoUnidade
-    ? processosPosteriores.filter(
-        (p) =>
-          (p.idProcessType === formData.formatoUnidade ||
-            p.processType === tipoProcessoSelecionado) &&
-          !formData.processoAnterior.includes(p.id) &&
-          p.id !== processosDados?.idProcess,
-      )
-    : [];
+      const hierarchy = getHierarchyFromProcess(processo);
+      if (hierarchy == null || hierarchy >= currentHierarchy) return false;
+
+      return (
+        !formData.processoInferior.includes(processo.id) &&
+        formatarNome(processo.nome) !== formatarNome(nomeDepartamento)
+      );
+    },
+  );
+
+  const processosInferioresDisponiveis = buildActiveOptionsWithSelected(
+    processosInferiores,
+    formData.processoInferior,
+    (processo) => {
+      if (!currentHierarchy) return false;
+
+      const hierarchy = getHierarchyFromProcess(processo);
+      if (hierarchy == null || hierarchy <= currentHierarchy) return false;
+
+      return (
+        processo.id !== formData.processoSuperior &&
+        formatarNome(processo.nome) !== formatarNome(nomeDepartamento)
+      );
+    },
+  );
+
+  const opcoesProcessoAnterior = buildActiveOptionsWithSelected(
+    processosAnteriores,
+    formData.processoAnterior,
+    (processo) =>
+      Boolean(formData.formatoUnidade) &&
+      (processo.idProcessType === formData.formatoUnidade ||
+        processo.processType === tipoProcessoSelecionado) &&
+      !formData.processoPosterior.includes(processo.id) &&
+      processo.id !== processosDados?.idProcess,
+  );
+
+  const opcoesProcessoPosterior = buildActiveOptionsWithSelected(
+    processosPosteriores,
+    formData.processoPosterior,
+    (processo) =>
+      Boolean(formData.formatoUnidade) &&
+      (processo.idProcessType === formData.formatoUnidade ||
+        processo.processType === tipoProcessoSelecionado) &&
+      !formData.processoAnterior.includes(processo.id) &&
+      processo.id !== processosDados?.idProcess,
+  );
+
+  const processoSuperiorHelperText = buildInactiveSelectionHelperText(
+    processoSuperiorSelecionado ? [processoSuperiorSelecionado] : [],
+    {
+      singular:
+        "Processo superior selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+    },
+  );
+  const processosInferioresHelperText = buildInactiveSelectionHelperText(
+    processosInferioresSelecionados,
+    {
+      singular:
+        "Processo inferior selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+      plural:
+        "Alguns processos inferiores selecionados estão inativos. Você pode mantê-los ou removê-los.",
+    },
+  );
+  const processosAnterioresHelperText = buildInactiveSelectionHelperText(
+    processosAnterioresSelecionados,
+    {
+      singular:
+        "Processo anterior selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+      plural:
+        "Alguns processos anteriores selecionados estão inativos. Você pode mantê-los ou removê-los.",
+    },
+  );
+  const processosPosterioresHelperText = buildInactiveSelectionHelperText(
+    processosPosterioresSelecionados,
+    {
+      singular:
+        "Processo posterior selecionado está inativo. Você pode mantê-lo ou removê-lo.",
+      plural:
+        "Alguns processos posteriores selecionados estão inativos. Você pode mantê-los ou removê-los.",
+    },
+  );
+
+  const allSelectedProcessosInferiores = areAllVisibleOptionsSelected(
+    processosInferioresDisponiveis,
+    formData.processoInferior,
+  );
+
+  const renderInactiveProcessTags = (value, getTagProps) =>
+    value.map((option, index) => {
+      const isInativo = option.active === false;
+
+      return (
+        <Chip
+          label={getOptionDisplayLabel(option, "Inativo")}
+          {...getTagProps({ index })}
+          color={isInativo ? "error" : "default"}
+          variant={isInativo ? "outlined" : "filled"}
+          sx={
+            isInativo
+              ? {
+                  borderColor: "error.main",
+                  color: "error.main",
+                }
+              : {}
+          }
+        />
+      );
+    });
 
   return (
     <>
@@ -1113,7 +1204,11 @@ function ColumnsLayouts() {
                     <Grid container alignItems="center">
                       <Grid item>
                         <Checkbox
-                          checked={option.id === "all" ? allSelected : selected}
+                          checked={
+                            option.id === "all"
+                              ? allSelectedEmpresas
+                              : selected
+                          }
                         />
                       </Grid>
                       <Grid item xs>
@@ -1177,7 +1272,9 @@ function ColumnsLayouts() {
                           <Grid item>
                             <Checkbox
                               checked={
-                                option.id === "all" ? allSelected : selected
+                                option.id === "all"
+                                  ? allSelectedDepartamentos
+                                  : selected
                               }
                             />
                           </Grid>
@@ -1391,38 +1488,24 @@ function ColumnsLayouts() {
                   <Autocomplete
                     noOptionsText={"Dados não encontrados"}
                     disabled={!currentHierarchy}
-                    options={processosSuperiores.filter((processo) => {
-                      if (!currentHierarchy) return false;
-
-                      const h = getHierarchyFromProcess(processo);
-                      if (h == null) return false;
-
-                      if (!(h < currentHierarchy)) return false;
-
-                      const selectedInferior = formData.processoInferior || [];
-                      const selectedIds = [...selectedInferior];
-
-                      if (formData.processoSuperior === processo.id)
-                        return true;
-
-                      return (
-                        !selectedIds.includes(processo.id) &&
-                        formatarNome(processo.nome) !==
-                          formatarNome(nomeDepartamento)
-                      );
-                    })}
-                    getOptionLabel={(option) => option.nome}
-                    value={
-                      processosSuperiores.find(
-                        (processoSuperior) =>
-                          processoSuperior.id === formData.processoSuperior,
-                      ) || null
+                    options={processosSuperioresDisponiveis}
+                    getOptionLabel={(option) =>
+                      getOptionDisplayLabel(option, "Inativo")
                     }
+                    value={processoSuperiorSelecionado}
                     onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        processoSuperior: newValue ? newValue.id : "",
-                      }));
+                      setFormData((prev) => {
+                        const inferioresAtualizados =
+                          prev.processoInferior.filter((id) =>
+                            newValue ? id !== newValue.id : true,
+                          );
+
+                        return {
+                          ...prev,
+                          processoSuperior: newValue ? newValue.id : "",
+                          processoInferior: inferioresAtualizados,
+                        };
+                      });
                     }}
                     renderInput={(params) => (
                       <TextField
@@ -1431,6 +1514,7 @@ function ColumnsLayouts() {
                           !formData.processoSuperior &&
                           formValidation.processoSuperior === false
                         }
+                        helperText={processoSuperiorHelperText}
                       />
                     )}
                   />
@@ -1444,31 +1528,38 @@ function ColumnsLayouts() {
                     noOptionsText={"Dados não encontrados"}
                     multiple
                     disableCloseOnSelect
-                    options={opcoesProcessosInferiores}
-                    disabled={!currentHierarchy}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processoInferior.map(
-                      (id) =>
-                        processosInferiores.find(
-                          (processoInferior) => processoInferior.id === id,
-                        ) || id,
+                    options={withSelectAllOption(
+                      processosInferioresDisponiveis,
+                      "Selecionar todos",
                     )}
+                    disabled={!currentHierarchy}
+                    getOptionLabel={(option) =>
+                      option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                        ? option.nome
+                        : getOptionDisplayLabel(option, "Inativo")
+                    }
+                    value={processosInferioresSelecionados}
                     onChange={handleSelectAll2}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
+                    renderTags={renderInactiveProcessTags}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
                             <Checkbox
                               checked={
-                                option.id === "all" ? allSelected2 : selected
+                                option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                                  ? allSelectedProcessosInferiores
+                                  : selected
                               }
                             />
                           </Grid>
                           <Grid item xs>
-                            {option.nome}
+                            {option.id === SELECT_ALL_AUTOCOMPLETE_ID
+                              ? option.nome
+                              : getOptionDisplayLabel(option, "Inativo")}
                           </Grid>
                         </Grid>
                       </li>
@@ -1483,6 +1574,7 @@ function ColumnsLayouts() {
                             )) &&
                           formValidation.processoInferior === false
                         }
+                        helperText={processosInferioresHelperText}
                       />
                     )}
                   />
@@ -1497,17 +1589,22 @@ function ColumnsLayouts() {
                     multiple
                     disableCloseOnSelect
                     options={opcoesProcessoAnterior}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processoAnterior.map(
-                      (id) =>
-                        processosAnteriores.find((p) => p.id === id) || id,
-                    )}
+                    getOptionLabel={(option) =>
+                      getOptionDisplayLabel(option, "Inativo")
+                    }
+                    value={processosAnterioresSelecionados}
                     onChange={handleSelectProcessoAnterior}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
+                    renderTags={renderInactiveProcessTags}
                     disabled={!formData.formatoUnidade}
-                    renderInput={(params) => <TextField {...params} />}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        helperText={processosAnterioresHelperText}
+                      />
+                    )}
                   />
                 </Stack>
               </Grid>
@@ -1520,17 +1617,22 @@ function ColumnsLayouts() {
                     multiple
                     disableCloseOnSelect
                     options={opcoesProcessoPosterior}
-                    getOptionLabel={(option) => option.nome}
-                    value={formData.processoPosterior.map(
-                      (id) =>
-                        processosPosteriores.find((p) => p.id === id) || id,
-                    )}
+                    getOptionLabel={(option) =>
+                      getOptionDisplayLabel(option, "Inativo")
+                    }
+                    value={processosPosterioresSelecionados}
                     onChange={handleSelectProcessoPosterior}
                     isOptionEqualToValue={(option, value) =>
                       option.id === value.id
                     }
+                    renderTags={renderInactiveProcessTags}
                     disabled={!formData.formatoUnidade}
-                    renderInput={(params) => <TextField {...params} />}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        helperText={processosPosterioresHelperText}
+                      />
+                    )}
                   />
                 </Stack>
               </Grid>
@@ -1570,7 +1672,9 @@ function ColumnsLayouts() {
                           <Grid item>
                             <Checkbox
                               checked={
-                                option.id === "all" ? allSelected3 : selected
+                                option.id === "all"
+                                  ? allSelectedDados
+                                  : selected
                               }
                             />
                           </Grid>
@@ -1632,7 +1736,9 @@ function ColumnsLayouts() {
                           <Grid item>
                             <Checkbox
                               checked={
-                                option.id === "all" ? allSelected4 : selected
+                                option.id === "all"
+                                  ? allSelectedDeficiencias
+                                  : selected
                               }
                             />
                           </Grid>

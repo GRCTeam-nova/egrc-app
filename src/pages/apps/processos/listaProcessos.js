@@ -1148,6 +1148,80 @@ ReactTable.propTypes = {
   onExportExcel: PropTypes.func,
 };
 
+const normalizeRelationIds = (items, candidateKeys = []) =>
+  Array.isArray(items)
+    ? [
+        ...new Set(
+          items
+            .map((item) => {
+              if (!item) return null;
+              if (typeof item === "string") return item;
+
+              for (const key of candidateKeys) {
+                if (item[key]) return item[key];
+              }
+
+              return (
+                item.idProcess ||
+                item.idCompany ||
+                item.idDepartment ||
+                item.id ||
+                null
+              );
+            })
+            .filter(Boolean),
+        ),
+      ]
+    : [];
+
+const normalizeUploadedFiles = (files) =>
+  Array.isArray(files)
+    ? files.map((file) => {
+        if (typeof file === "string") return file;
+        if (file?.path) return file.path;
+        return file;
+      })
+    : [];
+
+const buildProcessUpdatePayload = (processData, nextActive) => ({
+  idProcess: processData.idProcess,
+  active: nextActive,
+  name: processData.name,
+  code: processData.code,
+  description: processData.description ?? "",
+  files: normalizeUploadedFiles(processData.files),
+  idProcessType: processData.idProcessType ?? null,
+  idProcessSuperior: processData.idProcessSuperior ?? null,
+  idProcessPrevious: normalizeRelationIds(processData.idProcessPrevious, [
+    "idProcessPrevious",
+    "idProcess",
+  ]),
+  idProcessNexts: normalizeRelationIds(
+    processData.idProcessNext ?? processData.idProcessNexts,
+    ["idProcessNext", "idProcess"],
+  ),
+  idProcessBottoms: normalizeRelationIds(
+    processData.processBottoms ?? processData.idProcessBottoms,
+    ["idProcessBottom"],
+  ),
+  idCompanies: normalizeRelationIds(
+    processData.companies ?? processData.idCompanies,
+    ["idCompany"],
+  ),
+  idDepartments: normalizeRelationIds(
+    processData.departments ?? processData.idDepartments,
+    ["idDepartment"],
+  ),
+  idLgpds: processData.idLgpds ?? [],
+  idKri: processData.idKri ?? null,
+  idResponsible: processData.idResponsible ?? null,
+  idDeficiencies: processData.idDeficiencies ?? [],
+  idIncidents: processData.idIncidents ?? [],
+  idActionPlans: processData.idActionPlans ?? [],
+  idRisks: processData.idRisks ?? [],
+  idLedgerAccounts: processData.idLedgerAccounts ?? [],
+});
+
 function ActionCell({ row, refreshData }) {
   const navigation = useNavigate();
   const { token } = useToken();
@@ -1184,46 +1258,8 @@ function ActionCell({ row, refreshData }) {
 
       if (!responseGet.ok) throw new Error("Erro ao buscar dados do processo.");
       const data = await responseGet.json();
-
-      const payload = {
-        idProcess: data.idProcess,
-        active: !data.active,
-        name: data.name,
-        code: data.code,
-        description: data.description,
-        files: data.files || [],
-        idProcessType: data.idProcessType || null,
-        idProcessSuperior: data.idProcessSuperior || null,
-
-        idCompanies: Array.isArray(data.companies)
-          ? data.companies.map((u) => u.idCompany)
-          : [],
-        idDepartments: Array.isArray(data.departments)
-          ? data.departments.map((u) => u.idDepartment)
-          : [],
-        idProcessBottoms: Array.isArray(data.processBottoms)
-          ? data.processBottoms.map((u) => u.idProcessBottom)
-          : [],
-
-        idProcessPrevious:
-          Array.isArray(data.idProcessPrevious) &&
-          data.idProcessPrevious.length > 0
-            ? data.idProcessPrevious[0].idProcess
-            : null,
-        idProcessNext:
-          Array.isArray(data.idProcessNext) && data.idProcessNext.length > 0
-            ? data.idProcessNext[0].idProcess
-            : null,
-
-        idLgpds: data.idLgpds || [],
-        idKri: data.idKri || null,
-        idResponsible: data.idResponsible || null,
-        idDeficiencies: data.idDeficiencies || [],
-        idIncidents: data.idIncidents || [],
-        idActionPlans: data.idActionPlans || [],
-        idRisks: data.idRisks || [],
-        idLedgerAccounts: data.idLedgerAccounts || [],
-      };
+      const nextActive = !Boolean(data.active);
+      const payload = buildProcessUpdatePayload(data, nextActive);
 
       const responsePut = await fetch(
         `https://api.egrc.homologacao.com.br/api/v1/processes`,
