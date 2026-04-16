@@ -40,6 +40,18 @@ import {
 } from "../../../components/third-party/react-table";
 import { useGetTestesByControle } from "../../../api/controleTestes";
 
+const getTestDate = (test) => test?.baseDate || test?.date || null;
+
+const getCompletionDate = (test) =>
+  test?.completionDate || test?.completitionDate || null;
+
+const getCompletionDescription = (test) => {
+  const value = test?.descriptionTestCompletion;
+  return typeof value === "string" && value.trim() ? value.trim() : "-";
+};
+
+const getActiveStatus = (test) => (test?.active === true ? "Ativo" : "Inativo");
+
 export const fuzzyFilter = (row, columnId, value) => {
   let cellValue = row.getValue(columnId);
 
@@ -65,7 +77,7 @@ function ReactTable({ data, columns, totalItems, isLoading, onCreateNovo }) {
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
   const tableRef = useRef(null);
-  const [sorting, setSorting] = useState([{ id: "baseDate", desc: true }]);
+  const [sorting, setSorting] = useState([{ id: "testDate", desc: true }]);
   const [globalFilter, setGlobalFilter] = useState("");
 
   const table = useReactTable({
@@ -124,7 +136,7 @@ function ReactTable({ data, columns, totalItems, isLoading, onCreateNovo }) {
               <DebouncedInput
                 value={globalFilter ?? ""}
                 onFilterChange={(value) => setGlobalFilter(String(value))}
-                placeholder="Pesquise pelo codigo ou nome"
+                placeholder="Pesquise por projeto, conclusao ou status"
                 style={{
                   width: "350px",
                   height: "33px",
@@ -399,7 +411,7 @@ const ListaControleTestes = ({ controlId }) => {
   const columns = useMemo(
     () => [
       {
-        header: "Codigo",
+        header: "Projeto",
         accessorKey: "code",
         cell: ({ row }) => (
           <Typography
@@ -423,29 +435,42 @@ const ListaControleTestes = ({ controlId }) => {
         ),
       },
       {
-        header: "Nome",
-        accessorKey: "name",
-        cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>
-            {row.original.name || "-"}
-          </Typography>
-        ),
-      },
-      {
         header: "Data base",
-        accessorKey: "baseDate",
+        accessorFn: (row) => getTestDate(row),
+        id: "testDate",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
-            {formatDate(row.original.baseDate)}
+            {formatDate(getTestDate(row.original))}
           </Typography>
         ),
       },
       {
-        header: "Status",
-        accessorKey: "active",
+        header: "Conclusao do ultimo teste",
+        accessorFn: (row) => getCompletionDescription(row),
+        id: "lastTestConclusion",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {getCompletionDescription(row.original)}
+          </Typography>
+        ),
+      },
+      {
+        header: "Data de conclusao",
+        accessorFn: (row) => getCompletionDate(row),
+        id: "completionDate",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: "13px" }}>
+            {formatDate(getCompletionDate(row.original))}
+          </Typography>
+        ),
+      },
+      {
+        header: "Status do teste",
+        accessorFn: (row) => getActiveStatus(row),
+        id: "testStatus",
         cell: ({ row }) => (
           <Chip
-            label={row.original.active === true ? "Ativo" : "Inativo"}
+            label={getActiveStatus(row.original)}
             color={row.original.active === true ? "success" : "error"}
             sx={{
               backgroundColor: "transparent",
