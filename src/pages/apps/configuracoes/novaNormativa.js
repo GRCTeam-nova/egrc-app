@@ -2942,7 +2942,7 @@ function ColumnsLayouts() {
                             slotProps={{
                               textField: { placeholder: "00/00/0000" },
                             }}
-                            disabled={!canRevogar}
+                            disabled
                           />
                         </Stack>
                       </Grid>
@@ -2960,7 +2960,7 @@ function ColumnsLayouts() {
                                 motivoRevogacao: event.target.value,
                               })
                             }
-                            disabled={!canRevogar}
+                            disabled
                           />
                         </Stack>
                       </Grid>
