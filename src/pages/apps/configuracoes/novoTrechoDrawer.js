@@ -22,7 +22,6 @@ import { useToken } from "../../../api/TokenContext";
 import CloseIcon from "@mui/icons-material/Close";
 import IconButton from "@mui/material/IconButton";
 import { useLocation } from "react-router-dom";
-import { PlusOutlined } from "@ant-design/icons";
 
 function DrawerAcionista({
   acionista,
@@ -157,7 +156,7 @@ function DrawerAcionista({
 
     if (disabled) {
       enqueueSnackbar(
-        "Não é possível alterar trechos enquanto a normativa está em aprovação.",
+        "N\u00e3o \u00e9 poss\u00edvel alterar trechos enquanto os campos da normativa estiverem bloqueados.",
         { variant: "warning" }
       );
       return;
@@ -321,8 +320,15 @@ function DrawerAcionista({
           <Button
             variant="contained"
             onClick={handleOpen}
-            startIcon={<PlusOutlined />}
-            style={{ borderRadius: "20px", height: "32px", ...buttonSx }}
+            sx={{
+              height: "33px",
+              minWidth: "96px",
+              borderRadius: "4px",
+              fontSize: "13px",
+              fontWeight: 600,
+              textTransform: "none",
+              ...buttonSx,
+            }}
             disabled={disabled}
           >
             Novo

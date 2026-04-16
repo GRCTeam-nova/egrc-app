@@ -21,7 +21,6 @@ import { useTheme } from "@mui/material/styles";
 import {
   Box,
   Button,
-  Tooltip,
   Dialog,
   DialogActions,
   Switch,
@@ -127,10 +126,6 @@ function ReactTable({
   const [isActiveFilter, setIsActiveFilter] = useState(true);
   const [isInactiveFilter, setIsInactiveFilter] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
-  const handleFilterClick = (event) => {
-    event.stopPropagation();
-    setAnchorEl(event.currentTarget);
-  };
 
   const handleFilterClose = () => {
     setAnchorEl(null);
@@ -275,9 +270,11 @@ function ReactTable({
                 disabled={isLocked}
                 normativeId={normativeId}
                 buttonSx={{
-                  marginLeft: 1.5,
-                  height: "20px",
-                  minWidth: "20px",
+                  height: "33px",
+                  minWidth: "96px",
+                  borderRadius: "4px",
+                  fontSize: "13px",
+                  fontWeight: 600,
                 }}
               />
             </Box>
@@ -1063,7 +1060,6 @@ const ListagemAcionistas = ({ readOnly = false, normativeId: providedNormativeId
   const {
     acoesJudiciais: lists,
     isLoading,
-    refetch,
   } = useGetEmpresa(formData, normativeId);
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
