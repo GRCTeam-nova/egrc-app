@@ -688,6 +688,40 @@ function CommentCard({
   );
 }
 
+function HistoryLogCard({ title, value, placeholder }) {
+  return (
+    <Stack
+      spacing={2}
+      sx={{
+        backgroundColor: "#f9f9f9",
+        padding: 3,
+        borderRadius: 2,
+        border: "1px solid #eee",
+      }}
+    >
+      <InputLabel sx={{ m: 0, fontWeight: "bold" }}>{title}</InputLabel>
+      <TextField
+        fullWidth
+        multiline
+        minRows={3}
+        maxRows={8}
+        value={value || ""}
+        placeholder={placeholder}
+        InputProps={{ readOnly: true }}
+        sx={{
+          "& .MuiOutlinedInput-root": {
+            backgroundColor: "#f0f7ff",
+          },
+          "& .MuiInputBase-input": {
+            color: "#0d0d0d !important",
+            WebkitTextFillColor: "#0d0d0d !important",
+          },
+        }}
+      />
+    </Stack>
+  );
+}
+
 function ColumnsLayouts() {
   const { token } = useToken();
   const { user } = useAuth();
@@ -730,7 +764,9 @@ function ColumnsLayouts() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [successDialogMode, setSuccessDialogMode] = useState("create");
   const [confirmRevisorOpen, setConfirmRevisorOpen] = useState(false);
+  const [confirmReviewOpen, setConfirmReviewOpen] = useState(false);
   const [confirmRevogOpen, setConfirmRevogOpen] = useState(false);
+  const [reviewJustification, setReviewJustification] = useState("");
   const [tempResponsavelId, setTempResponsavelId] = useState(null);
   const [tempRevDate, setTempRevDate] = useState(null);
   const [showJustificativaField, setShowJustificativaField] = useState(false);
@@ -1033,13 +1069,6 @@ function ColumnsLayouts() {
 
   const isResponsible = String(formData.responsavel) === String(idUser);
   const isReviewer = String(formData.revisor) === String(idUser);
-  const reviewWorkflowEnabled =
-    currentStatus === STATUS.VERSAO_FINAL &&
-    resolveRiskValue(formData.riscoNorma) !== null;
-  const reviewStatusValue = Number(
-    formData.statuRevisao || revisionData.status || "",
-  );
-
   const canEditGeneralFields =
     requisicao === "Criar" ||
     (((persistedStatus || currentStatus) === STATUS.ELABORACAO ||
@@ -1076,9 +1105,9 @@ function ColumnsLayouts() {
     currentStatus === STATUS.EM_ALTERACAO &&
     isResponsible;
   const canMarkReviewed =
-    reviewWorkflowEnabled &&
-    canEditReviewFields &&
-    reviewStatusValue !== 1;
+    requisicao === "Editar" &&
+    isReviewer &&
+    currentStatus === STATUS.VERSAO_FINAL;
 
   const showApprovalComment =
     requisicao === "Editar" &&
@@ -1150,6 +1179,7 @@ function ColumnsLayouts() {
       normalizedRisk,
     );
     const normalizedStatus = Number(base.statusNorma) || null;
+    const normalizedRevisionStatus = Number(base.statuRevisao) || null;
     const normalizedLastRevision =
       normalizedStatus === STATUS.VERSAO_FINAL
         ? toDate(base.ultimaRevisao) || getTodayDate()
@@ -1197,9 +1227,9 @@ function ColumnsLayouts() {
       revocationDate: toIso(base.dataRevogacao),
       revocationReason: base.motivoRevogacao || null,
       normativeStatus: normalizedStatus,
-      normativeRevisionStatus: shouldFillRevisionWorkflow
-        ? Number(base.statuRevisao) || computedRevision.status || null
-        : null,
+      normativeRevisionStatus:
+        normalizedRevisionStatus ||
+        (shouldFillRevisionWorkflow ? computedRevision.status || null : null),
       normativeRisk: normalizedRisk,
       descriptionReviewer: base.descriptionReviewer || null,
       active: Boolean(base.ativo),
@@ -1790,7 +1820,7 @@ function ColumnsLayouts() {
         periodicidadeRevisao: nextFrequencyRevision,
         statuRevisao:
           finalStatus === STATUS.VERSAO_FINAL && nextFrequencyRevision
-            ? 1
+            ? REVISION_STATUS_OPTIONS[0].id
             : formData.statuRevisao,
         ...(pendingApprovalEntries
           ? { normativeApprovers: pendingApprovalEntries }
@@ -1908,16 +1938,43 @@ function ColumnsLayouts() {
     });
   };
 
+  const handleOpenConfirmReview = () => {
+    if (!currentNormativeId) return;
+    setReviewJustification("");
+    setConfirmReviewOpen(true);
+  };
+
+  const handleCancelReview = () => {
+    setConfirmReviewOpen(false);
+    setReviewJustification("");
+  };
+
   const handleMarkReviewed = async () => {
     if (!currentNormativeId) return;
+
+    const trimmedJustification = reviewJustification.trim();
+
+    if (!trimmedJustification) {
+      enqueueSnackbar("A justificativa da revisao e obrigatoria.", {
+        variant: "error",
+      });
+      return;
+    }
+
+    const reviewHistory = appendCommentHistory(
+      formData.descriptionReviewer || "",
+      trimmedJustification,
+      userName,
+    );
 
     const updated = await updateNormative({
       overrides: {
         ultimaRevisao: getTodayDate(),
-        statuRevisao: 1,
+        statuRevisao: REVISION_STATUS_OPTIONS[0].id,
         periodicidadeRevisao: resolvedFrequencyRevision,
+        descriptionReviewer: reviewHistory,
       },
-      commentFields: ["descriptionReviewer"],
+      commentFields: [],
       successMessage: "Revisão registrada com sucesso!",
     });
 
@@ -1926,6 +1983,7 @@ function ColumnsLayouts() {
         ...previous,
         ultimaRevisao: true,
       }));
+      handleCancelReview();
     }
   };
 
@@ -2189,16 +2247,6 @@ function ColumnsLayouts() {
                     onClick={handleAlterar}
                   >
                     ALTERAR
-                  </Button>
-                ) : null}
-
-                {canMarkReviewed ? (
-                  <Button
-                    variant="outlined"
-                    color="info"
-                    onClick={handleMarkReviewed}
-                  >
-                    REVISADO
                   </Button>
                 ) : null}
 
@@ -2799,6 +2847,20 @@ function ColumnsLayouts() {
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
+                      {canMarkReviewed ? (
+                        <Grid item xs={12}>
+                          <Stack direction="row" justifyContent="flex-end">
+                            <Button
+                              variant="outlined"
+                              color="info"
+                              onClick={handleOpenConfirmReview}
+                              disabled={loading}
+                            >
+                              REVISADO
+                            </Button>
+                          </Stack>
+                        </Grid>
+                      ) : null}
                       <Grid item xs={12} sm={6}>
                         <Stack spacing={1}>
                           <InputLabel>Última revisão</InputLabel>
@@ -2891,23 +2953,14 @@ function ColumnsLayouts() {
 
                       {requisicao === "Editar" ? (
                         <Grid item xs={12}>
-                        <CommentCard
+                          <HistoryLogCard
                           title="Comentário da revisão"
                           placeholder="Digite aqui o comentário da revisão periódica."
-                          draftValue={draftComments.descriptionReviewer}
-                          historyValue={formData.descriptionReviewer}
-                          onDraftChange={(value) =>
-                            setDraftComments((previous) => ({
-                              ...previous,
-                              descriptionReviewer: value,
-                            }))
-                          }
-                          onSave={() => saveCommentField("descriptionReviewer")}
-                          disabled={!canEditReviewFields}
-                          loading={loading}
-                        />
+                          value={formData.descriptionReviewer}
+                          />
                         </Grid>
                       ) : null}
+                      
                     </Grid>
                   </AccordionDetails>
                 </Accordion>
@@ -3124,6 +3177,36 @@ function ColumnsLayouts() {
             <Button onClick={handleDenyReplication}>Não</Button>
             <Button onClick={handleConfirmReplication} autoFocus variant="contained">
               Sim
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={confirmReviewOpen} onClose={handleCancelReview}>
+          <DialogTitle>Confirmar revisao</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Tem certeza que deseja registrar a revisao desta norma em{" "}
+              {getTodayDate()?.toLocaleDateString("pt-BR")}? Isso definira o
+              status da revisao como "Revisada".
+            </DialogContentText>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Justificativa da revisao"
+              fullWidth
+              multiline
+              rows={3}
+              value={reviewJustification}
+              onChange={(event) => setReviewJustification(event.target.value)}
+              sx={{ mt: 2 }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancelReview} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button onClick={handleMarkReviewed} autoFocus disabled={loading}>
+              Confirmar
             </Button>
           </DialogActions>
         </Dialog>
