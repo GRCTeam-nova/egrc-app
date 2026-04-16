@@ -29,13 +29,14 @@ function DrawerAcionista({
   hideButton = false,
   disabled = false,
   buttonSx = {},
+  normativeId: providedNormativeId = null,
 }) {
   // Estado interno para controlar se o drawer está aberto
   const [open, setOpen] = useState(false);
   const { token } = useToken();
   const location = useLocation();
   const { dadosApi } = location.state || {};
-  const normativeId = dadosApi?.idNormative || dadosApi;
+  const normativeId = providedNormativeId || dadosApi?.idNormative || dadosApi;
   const [nome, setNome] = useState("");
   const [riscos, setRiscoAssociados] = useState([]);
   const [loading, setLoading] = useState(false);

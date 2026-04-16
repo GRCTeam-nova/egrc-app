@@ -215,6 +215,32 @@ function toIdArray(value, fallback = []) {
   return fallback;
 }
 
+function normalizeIdValue(value) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const numericValue = Number(value);
+  if (!Number.isNaN(numericValue) && String(numericValue) === String(value)) {
+    return numericValue;
+  }
+
+  return value;
+}
+
+function normalizeIdArray(value, { exclude = [] } = {}) {
+  const excludedValues = new Set((exclude || []).map((item) => String(item)));
+  const seenValues = new Set();
+
+  return (Array.isArray(value) ? value : [])
+    .map(normalizeIdValue)
+    .filter((item) => item !== null && !excludedValues.has(String(item)))
+    .filter((item) => {
+      const normalizedItem = String(item);
+      if (seenValues.has(normalizedItem)) return false;
+      seenValues.add(normalizedItem);
+      return true;
+    });
+}
+
 function resolveRiskValue(value) {
   const numericValue = Number(value);
   return [1, 2, 3].includes(numericValue) ? numericValue : null;
@@ -702,12 +728,16 @@ function ColumnsLayouts() {
     INITIAL_FIELD_ERROR_MESSAGES,
   );
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [successDialogMode, setSuccessDialogMode] = useState("create");
   const [confirmRevisorOpen, setConfirmRevisorOpen] = useState(false);
   const [confirmRevogOpen, setConfirmRevogOpen] = useState(false);
   const [tempResponsavelId, setTempResponsavelId] = useState(null);
   const [tempRevDate, setTempRevDate] = useState(null);
   const [showJustificativaField, setShowJustificativaField] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [allowPostCreateEditing, setAllowPostCreateEditing] = useState(
+    Boolean(dadosApi?.allowPostCreateEditing),
+  );
   const [initialResponsibleApplied, setInitialResponsibleApplied] =
     useState(false);
   const topAnchorRef = useRef(null);
@@ -731,6 +761,10 @@ function ColumnsLayouts() {
       window.hasChanges = false;
     };
   }, [hasChanges]);
+
+  useEffect(() => {
+    setAllowPostCreateEditing(Boolean(dadosApi?.allowPostCreateEditing));
+  }, [dadosApi?.allowPostCreateEditing, idNormativeFromRoute]);
 
   const withDirty = (updater) => {
     setHasChanges(true);
@@ -927,8 +961,13 @@ function ColumnsLayouts() {
   const isExterno = ambienteKind === "external";
   const isInterno = ambienteKind === "internal";
   const currentStatus = formData.statusNorma || "";
+  const persistedStatus = normativaDados?.normativeStatus || "";
   const currentNormativeId = formData.idNormative || idNormativeFromRoute;
   const currentUserEmail = normalizeText(user?.email);
+  const isPostCreateEditing =
+    allowPostCreateEditing &&
+    requisicao === "Editar" &&
+    currentStatus === STATUS.VERSAO_FINAL;
   const resolvedFrequencyRevision = useMemo(
     () =>
       resolveFrequencyRevisionValue(
@@ -997,35 +1036,37 @@ function ColumnsLayouts() {
   const reviewWorkflowEnabled =
     currentStatus === STATUS.VERSAO_FINAL &&
     resolveRiskValue(formData.riscoNorma) !== null;
+  const reviewStatusValue = Number(
+    formData.statuRevisao || revisionData.status || "",
+  );
 
   const canEditGeneralFields =
     requisicao === "Criar" ||
-    ((currentStatus === STATUS.ELABORACAO ||
-      currentStatus === STATUS.EM_ALTERACAO) &&
+    (((persistedStatus || currentStatus) === STATUS.ELABORACAO ||
+      (persistedStatus || currentStatus) === STATUS.EM_ALTERACAO ||
+      isPostCreateEditing) &&
       isResponsible &&
       !isFutureApprover);
 
-  const canEditReviewFields = requisicao === "Editar" && isReviewer;
-  const canEditLastRevision =
-    canEditReviewFields &&
+  const canEditReviewFields =
+    requisicao === "Editar" &&
+    isReviewer &&
     currentStatus === STATUS.VERSAO_FINAL &&
-    !formData.ultimaRevisao;
-  const canEditRisk = canEditReviewFields;
-  const canEditElaborationComment =
-    (requisicao === "Criar" && !isExterno) ||
-    ((currentStatus === STATUS.ELABORACAO ||
-      currentStatus === STATUS.EM_ALTERACAO) &&
-      isResponsible);
+    !isPostCreateEditing;
+  const canEditLastRevision = false;
+  const canEditRisk = canEditGeneralFields;
   const canEditApprovalComment = canReplyApproval;
   const canRevogar =
     requisicao === "Editar" &&
     currentStatus === STATUS.VERSAO_FINAL &&
-    isResponsible;
+    isResponsible &&
+    !isPostCreateEditing;
   const canAlterar =
     requisicao === "Editar" &&
     currentStatus === STATUS.VERSAO_FINAL &&
     isResponsible &&
-    !isExterno;
+    !isExterno &&
+    !isPostCreateEditing;
   const canSendElaborated =
     requisicao === "Editar" &&
     currentStatus === STATUS.ELABORACAO &&
@@ -1034,14 +1075,30 @@ function ColumnsLayouts() {
     requisicao === "Editar" &&
     currentStatus === STATUS.EM_ALTERACAO &&
     isResponsible;
-  const canMarkReviewed = reviewWorkflowEnabled && canEditReviewFields;
+  const canMarkReviewed =
+    reviewWorkflowEnabled &&
+    canEditReviewFields &&
+    reviewStatusValue !== 1;
 
-  const showElaborationComment =
-    !(isExterno && currentStatus === STATUS.VERSAO_FINAL) ||
-    Boolean(formData.description);
   const showApprovalComment =
     requisicao === "Editar" &&
     (formData.aprovador.length > 0 || Boolean(formData.note));
+  const canPersistForm =
+    requisicao === "Criar" || canEditGeneralFields || canEditReviewFields;
+  const filteredNormaOrigens = useMemo(
+    () =>
+      normaOrigens.filter(
+        (item) => String(item.id) !== String(currentNormativeId),
+      ),
+    [currentNormativeId, normaOrigens],
+  );
+  const filteredNormaDestinos = useMemo(
+    () =>
+      normaDestinos.filter(
+        (item) => String(item.id) !== String(currentNormativeId),
+      ),
+    [currentNormativeId, normaDestinos],
+  );
 
   const visibleStatusOptions = useMemo(() => {
     if (requisicao !== "Criar") {
@@ -1076,7 +1133,11 @@ function ColumnsLayouts() {
         : option.id === resolveRiskValue(formData.riscoNorma),
     ) || null;
 
-  const buildUpdatePayload = (source, overrides = {}) => {
+  const buildUpdatePayload = (
+    source,
+    overrides = {},
+    { currentApprovers = normativaDados?.normativeApprovers } = {},
+  ) => {
     const base = {
       ...INITIAL_FORM_DATA,
       ...source,
@@ -1089,20 +1150,27 @@ function ColumnsLayouts() {
       normalizedRisk,
     );
     const normalizedStatus = Number(base.statusNorma) || null;
+    const normalizedLastRevision =
+      normalizedStatus === STATUS.VERSAO_FINAL
+        ? toDate(base.ultimaRevisao) || getTodayDate()
+        : toDate(base.ultimaRevisao);
     const shouldFillRevisionWorkflow =
       normalizedStatus === STATUS.VERSAO_FINAL &&
       normalizedRisk !== null &&
       Boolean(normalizedFrequencyRevision);
 
     const computedRevision = shouldFillRevisionWorkflow
-      ? calculateRevisionFields(base.ultimaRevisao, normalizedFrequencyRevision)
+      ? calculateRevisionFields(
+          normalizedLastRevision,
+          normalizedFrequencyRevision,
+        )
       : { limitDate: null, days: "", status: "" };
     const approvalEntries = Array.isArray(base.normativeApprovers)
       ? normalizeNormativeApproverEntries(base.normativeApprovers)
       : buildNormativeApproverEntries({
           selectedApproverIds: base.aprovador,
           approverOptions: aprovadores,
-          currentApprovers: normativaDados?.normativeApprovers,
+          currentApprovers,
         });
 
     return {
@@ -1114,7 +1182,7 @@ function ColumnsLayouts() {
       registerDate: toIso(base.dataCadastro),
       publishDate: toIso(base.dataPublicacao),
       initialVigency: toIso(base.vigenciaInicial),
-      lastRevision: toIso(base.ultimaRevisao),
+      lastRevision: toIso(normalizedLastRevision),
       conclusion: base.descriptionReviewer || null,
       frequencyRevision: shouldFillRevisionWorkflow
         ? Number(normalizedFrequencyRevision) || null
@@ -1140,8 +1208,12 @@ function ColumnsLayouts() {
       idResponsible: base.responsavel || null,
       idEnvironment: base.ambiente || null,
       idReviwer: base.revisor || null,
-      idOrigins: base.normaOrigem,
-      idDestinies: base.normaDestino,
+      idOrigins: normalizeIdArray(base.normaOrigem, {
+        exclude: [base.idNormative],
+      }),
+      idDestinies: normalizeIdArray(base.normaDestino, {
+        exclude: [base.idNormative],
+      }),
       idActionPlans: base.planoAcao,
       idApprovers: base.aprovador,
       emailApprovers: approvalEntries
@@ -1339,6 +1411,140 @@ function ColumnsLayouts() {
     }
   };
 
+  const putNormativePayload = async (payload) =>
+    axios.put(`${API_URL}normatives`, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+  const fetchNormativeRecord = async (idNormative) => {
+    const response = await axios.get(`${API_URL}normatives/${idNormative}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  };
+
+  const syncLinkedNormatives = async ({
+    normativeId,
+    previousSource,
+    nextSource,
+  }) => {
+    if (!normativeId) return;
+
+    const normalizedNormativeId = normalizeIdValue(normativeId);
+    const previousOrigins = normalizeIdArray(previousSource?.normaOrigem);
+    const previousDestinies = normalizeIdArray(previousSource?.normaDestino);
+    const nextOrigins = normalizeIdArray(nextSource?.normaOrigem, {
+      exclude: [normalizedNormativeId],
+    });
+    const nextDestinies = normalizeIdArray(nextSource?.normaDestino, {
+      exclude: [normalizedNormativeId],
+    });
+
+    const updatesByNormative = new Map();
+    const ensureUpdateBucket = (targetId) => {
+      const normalizedTargetId = normalizeIdValue(targetId);
+
+      if (!normalizedTargetId) return null;
+      if (String(normalizedTargetId) === String(normalizedNormativeId)) {
+        return null;
+      }
+
+      const currentBucket = updatesByNormative.get(normalizedTargetId) || {
+        addOrigins: new Set(),
+        removeOrigins: new Set(),
+        addDestinies: new Set(),
+        removeDestinies: new Set(),
+      };
+
+      updatesByNormative.set(normalizedTargetId, currentBucket);
+      return currentBucket;
+    };
+
+    nextOrigins.forEach((originId) => {
+      const bucket = ensureUpdateBucket(originId);
+      if (!bucket) return;
+      bucket.addDestinies.add(normalizedNormativeId);
+      bucket.removeDestinies.delete(normalizedNormativeId);
+    });
+
+    previousOrigins
+      .filter(
+        (originId) =>
+          !nextOrigins.some((item) => String(item) === String(originId)),
+      )
+      .forEach((originId) => {
+        const bucket = ensureUpdateBucket(originId);
+        if (!bucket) return;
+        bucket.removeDestinies.add(normalizedNormativeId);
+        bucket.addDestinies.delete(normalizedNormativeId);
+      });
+
+    nextDestinies.forEach((destinyId) => {
+      const bucket = ensureUpdateBucket(destinyId);
+      if (!bucket) return;
+      bucket.addOrigins.add(normalizedNormativeId);
+      bucket.removeOrigins.delete(normalizedNormativeId);
+    });
+
+    previousDestinies
+      .filter(
+        (destinyId) =>
+          !nextDestinies.some((item) => String(item) === String(destinyId)),
+      )
+      .forEach((destinyId) => {
+        const bucket = ensureUpdateBucket(destinyId);
+        if (!bucket) return;
+        bucket.removeOrigins.add(normalizedNormativeId);
+        bucket.addOrigins.delete(normalizedNormativeId);
+      });
+
+    for (const [targetId, changes] of updatesByNormative.entries()) {
+      const targetRecord = await fetchNormativeRecord(targetId);
+      const targetForm = mapNormativeToForm(targetRecord);
+
+      const nextTargetOrigins = normalizeIdArray(targetForm.normaOrigem, {
+        exclude: [targetId],
+      }).filter(
+        (originId) =>
+          !changes.removeOrigins.has(normalizeIdValue(originId)),
+      );
+      const nextTargetDestinies = normalizeIdArray(targetForm.normaDestino, {
+        exclude: [targetId],
+      }).filter(
+        (destinyId) =>
+          !changes.removeDestinies.has(normalizeIdValue(destinyId)),
+      );
+
+      changes.addOrigins.forEach((originId) => {
+        nextTargetOrigins.push(originId);
+      });
+      changes.addDestinies.forEach((destinyId) => {
+        nextTargetDestinies.push(destinyId);
+      });
+
+      const targetPayload = buildUpdatePayload(
+        {
+          ...targetForm,
+          normaOrigem: normalizeIdArray(nextTargetOrigins, {
+            exclude: [targetId],
+          }),
+          normaDestino: normalizeIdArray(nextTargetDestinies, {
+            exclude: [targetId],
+          }),
+        },
+        {},
+        { currentApprovers: targetRecord?.normativeApprovers },
+      );
+
+      await putNormativePayload(targetPayload);
+    }
+  };
+
   const createNormative = async () => {
     if (!validateBaseFields()) return;
 
@@ -1369,33 +1575,36 @@ function ColumnsLayouts() {
         throw new Error("A API não retornou o identificador da normativa.");
       }
 
-      const sourceForUpdate = applyDraftComments(
-        {
-          ...formData,
-          idNormative: createdId,
-          statusNorma:
-            formData.statusNorma ||
-            (isExterno ? STATUS.VERSAO_FINAL : STATUS.ELABORACAO),
-        },
-        ["description"],
-      );
+      const sourceForUpdate = {
+        ...formData,
+        idNormative: createdId,
+        statusNorma:
+          formData.statusNorma ||
+          (isExterno ? STATUS.VERSAO_FINAL : STATUS.ELABORACAO),
+      };
 
       const payload = buildUpdatePayload(sourceForUpdate);
 
-      await axios.put(`${API_URL}normatives`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await putNormativePayload(payload);
 
       clearDraftComments();
       setFieldErrorMessages(INITIAL_FIELD_ERROR_MESSAGES);
       setHasChanges(false);
+      setAllowPostCreateEditing(
+        sourceForUpdate.statusNorma === STATUS.VERSAO_FINAL,
+      );
+      setSuccessDialogMode("create");
       setSuccessDialogOpen(true);
 
       navigate(location.pathname, {
         replace: true,
-        state: { dadosApi: { idNormative: createdId } },
+        state: {
+          dadosApi: {
+            idNormative: createdId,
+            allowPostCreateEditing:
+              sourceForUpdate.statusNorma === STATUS.VERSAO_FINAL,
+          },
+        },
       });
 
       await loadNormative(createdId);
@@ -1424,6 +1633,7 @@ function ColumnsLayouts() {
   } = {}) => {
     if (!currentNormativeId) return false;
 
+    const previousSource = normativaDados ? mapNormativeToForm(normativaDados) : null;
     const currentSource = applyDraftComments(
       {
         ...formData,
@@ -1444,11 +1654,19 @@ function ColumnsLayouts() {
         overrides,
       );
 
-      await axios.put(`${API_URL}normatives`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await putNormativePayload(payload);
+
+      let linkedSyncFailed = false;
+      try {
+        await syncLinkedNormatives({
+          normativeId: currentNormativeId,
+          previousSource,
+          nextSource: currentSource,
+        });
+      } catch (syncError) {
+        linkedSyncFailed = true;
+        console.error(syncError);
+      }
 
       clearDraftComments(commentFields);
       setFieldErrorMessages(INITIAL_FIELD_ERROR_MESSAGES);
@@ -1468,6 +1686,15 @@ function ColumnsLayouts() {
       enqueueSnackbar(successMessage, {
         variant: "success",
       });
+
+      if (linkedSyncFailed) {
+        enqueueSnackbar(
+          "A normativa foi salva, mas não foi possível sincronizar todos os vínculos de origem e destino.",
+          {
+            variant: "warning",
+          },
+        );
+      }
 
       return true;
     } catch (error) {
@@ -1544,6 +1771,17 @@ function ColumnsLayouts() {
         : formData.ultimaRevisao;
     const nextFrequencyRevision =
       finalStatus === STATUS.VERSAO_FINAL ? resolvedFrequencyRevision : "";
+    const pendingApprovalEntries =
+      finalStatus === STATUS.EM_APROVACAO
+        ? buildNormativeApproverEntries({
+            selectedApproverIds: formData.aprovador,
+            approverOptions: aprovadores,
+            currentApprovers: [],
+          }).map((approver) => ({
+            ...approver,
+            approved: false,
+          }))
+        : null;
 
     const updated = await updateNormative({
       overrides: {
@@ -1554,8 +1792,11 @@ function ColumnsLayouts() {
           finalStatus === STATUS.VERSAO_FINAL && nextFrequencyRevision
             ? 1
             : formData.statuRevisao,
+        ...(pendingApprovalEntries
+          ? { normativeApprovers: pendingApprovalEntries }
+          : {}),
       },
-      commentFields: ["description"],
+      commentFields: [],
       successMessage:
         finalStatus === STATUS.EM_APROVACAO
           ? "Normativa enviada para aprovação."
@@ -1662,7 +1903,7 @@ function ColumnsLayouts() {
       overrides: {
         statusNorma: STATUS.EM_ALTERACAO,
       },
-      commentFields: ["description"],
+      commentFields: [],
       successMessage: "Normativa colocada em alteração!",
     });
   };
@@ -1693,26 +1934,32 @@ function ColumnsLayouts() {
     keepViewportAtTop({ focusTop: true });
   };
 
+  const handleBackToNormativeList = () => {
+    setSuccessDialogOpen(false);
+    navigate("/normativas/lista");
+    window.scrollTo(0, 0);
+  };
+
+  const handleExit = () => {
+    navigate(-1);
+    window.scrollTo(0, 0);
+  };
+
   const handleSubmit = async () => {
     if (requisicao === "Criar") {
       await createNormative();
       return;
     }
 
-    const requireLastRevision =
-      canEditReviewFields &&
-      currentStatus === STATUS.VERSAO_FINAL &&
-      (isExterno || canEditLastRevision);
-
-    if (!validateBaseFields({ requireLastRevision })) return;
+    if (!validateBaseFields()) return;
 
     const updated = await updateNormative({
       successMessage: `Normativa ${feedbackLabel} com sucesso!`,
     });
 
     if (updated) {
-      navigate(-1);
-      window.scrollTo(0, 0);
+      setSuccessDialogMode("edit");
+      setSuccessDialogOpen(true);
     }
   };
 
@@ -1754,12 +2001,14 @@ function ColumnsLayouts() {
       statusNorma:
         selectedKind === "external"
           ? STATUS.VERSAO_FINAL
-          : previous.statusNorma &&
-              [STATUS.ELABORACAO, STATUS.VERSAO_FINAL].includes(
-                previous.statusNorma,
-              )
-            ? previous.statusNorma
-            : STATUS.ELABORACAO,
+          : selectedKind === "internal"
+            ? STATUS.ELABORACAO
+            : previous.statusNorma &&
+                [STATUS.ELABORACAO, STATUS.VERSAO_FINAL].includes(
+                  previous.statusNorma,
+                )
+              ? previous.statusNorma
+              : STATUS.ELABORACAO,
     }));
   };
 
@@ -1774,25 +2023,39 @@ function ColumnsLayouts() {
     }));
   };
 
-  const handleMultiSelectAll = (field, options) => (_, newValue) => {
-    const clickedAll = newValue.some((option) => option.id === "all");
+  const handleMultiSelectAll =
+    (field, options, { excludeIds = [] } = {}) =>
+    (_, newValue) => {
+      const normalizedExcludeIds = excludeIds.map((item) => String(item));
+      const availableIds = normalizeIdArray(
+        options.map((option) => option.id),
+        { exclude: normalizedExcludeIds },
+      );
+      const clickedAll = newValue.some((option) => option.id === "all");
 
-    if (clickedAll) {
+      if (clickedAll) {
+        withDirty((previous) => {
+          const currentSelection = normalizeIdArray(previous[field], {
+            exclude: normalizedExcludeIds,
+          });
+
+          return {
+            ...previous,
+            [field]:
+              currentSelection.length === availableIds.length ? [] : availableIds,
+          };
+        });
+        return;
+      }
+
       withDirty((previous) => ({
         ...previous,
-        [field]:
-          previous[field].length === options.length
-            ? []
-            : options.map((option) => option.id),
+        [field]: normalizeIdArray(
+          newValue.map((option) => option.id),
+          { exclude: normalizedExcludeIds },
+        ),
       }));
-      return;
-    }
-
-    withDirty((previous) => ({
-      ...previous,
-      [field]: newValue.map((option) => option.id),
-    }));
-  };
+    };
 
   const handleCompanyCreated = (newCompany) => {
     const mappedCompany = mapOption(newCompany);
@@ -2094,8 +2357,6 @@ function ColumnsLayouts() {
 
           {requisicao === "Editar" ? (
             <>
-              {requisicao === "Editar" ? (
-                <>
                 <Grid item xs={12} mt={2}>
                 <Typography
                   variant="subtitle1"
@@ -2139,25 +2400,22 @@ function ColumnsLayouts() {
                 </Stack>
               </Grid>
 
-              {showElaborationComment ? (
-                <Grid item xs={12}>
-                  <CommentCard
-                    title="Comentário da elaboração"
-                    placeholder="Digite aqui seu comentário, justificativa ou observação da elaboração."
-                    draftValue={draftComments.description}
-                    historyValue={formData.description}
-                    onDraftChange={(value) =>
-                      setDraftComments((previous) => ({
-                        ...previous,
-                        description: value,
-                      }))
+              <Grid item xs={12}>
+                <Stack spacing={1}>
+                  <InputLabel>Descrição da norma</InputLabel>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={formData.description}
+                    onChange={(event) =>
+                      withDirty({ description: event.target.value })
                     }
-                    onSave={() => saveCommentField("description")}
-                    disabled={!canEditElaborationComment}
-                    loading={loading}
+                    disabled={!canEditGeneralFields}
+                    placeholder="Descreva a norma, seu objetivo e o contexto de aplicação."
                   />
-                </Grid>
-              ) : null}
+                </Stack>
+              </Grid>
 
               {showApprovalComment ? (
                 <Grid item xs={12}>
@@ -2178,8 +2436,6 @@ function ColumnsLayouts() {
                   />
                 </Grid>
               ) : null}
-                </>
-              ) : null}
 
               <Grid item xs={12} mt={2}>
                 <Typography
@@ -2197,18 +2453,30 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaOrigens]}
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...filteredNormaOrigens,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={buildSelectedValues(formData.normaOrigem, normaOrigens)}
-                    onChange={handleMultiSelectAll("normaOrigem", normaOrigens)}
+                    value={buildSelectedValues(
+                      normalizeIdArray(formData.normaOrigem, {
+                        exclude: [currentNormativeId],
+                      }),
+                      filteredNormaOrigens,
+                    )}
+                    onChange={handleMultiSelectAll("normaOrigem", filteredNormaOrigens, {
+                      excludeIds: [currentNormativeId],
+                    })}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Checkbox
                           checked={
                             option.id === "all"
-                              ? formData.normaOrigem.length === normaOrigens.length &&
-                                normaOrigens.length > 0
+                              ? normalizeIdArray(formData.normaOrigem, {
+                                  exclude: [currentNormativeId],
+                                }).length === filteredNormaOrigens.length &&
+                                filteredNormaOrigens.length > 0
                               : selected
                           }
                         />
@@ -2227,18 +2495,34 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...normaDestinos]}
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...filteredNormaDestinos,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={buildSelectedValues(formData.normaDestino, normaDestinos)}
-                    onChange={handleMultiSelectAll("normaDestino", normaDestinos)}
+                    value={buildSelectedValues(
+                      normalizeIdArray(formData.normaDestino, {
+                        exclude: [currentNormativeId],
+                      }),
+                      filteredNormaDestinos,
+                    )}
+                    onChange={handleMultiSelectAll(
+                      "normaDestino",
+                      filteredNormaDestinos,
+                      {
+                        excludeIds: [currentNormativeId],
+                      },
+                    )}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Checkbox
                           checked={
                             option.id === "all"
-                              ? formData.normaDestino.length ===
-                                  normaDestinos.length && normaDestinos.length > 0
+                              ? normalizeIdArray(formData.normaDestino, {
+                                  exclude: [currentNormativeId],
+                                }).length === filteredNormaDestinos.length &&
+                                filteredNormaDestinos.length > 0
                               : selected
                           }
                         />
@@ -2520,25 +2804,17 @@ function ColumnsLayouts() {
                           <InputLabel>Última revisão</InputLabel>
                           <DatePicker
                             value={formData.ultimaRevisao || null}
-                            onChange={(newValue) =>
-                              withDirty({
-                                ultimaRevisao: newValue,
-                              })
-                            }
+                            onChange={() => {}}
                             disabled={!canEditLastRevision}
                             slotProps={{
                               textField: {
                                 placeholder: "00/00/0000",
                                 error: !formValidation.ultimaRevisao,
                                 helperText:
-                                  currentStatus === STATUS.VERSAO_FINAL &&
-                                  !formData.ultimaRevisao &&
-                                  canEditLastRevision
-                                    ? "Obrigatória para normativas que começam em versão final."
-                                    : currentStatus === STATUS.ELABORACAO ||
-                                        currentStatus === STATUS.EM_ALTERACAO
-                                      ? "Será preenchida automaticamente quando a normativa ficar em versão final."
-                                      : "",
+                                  currentStatus === STATUS.ELABORACAO ||
+                                  currentStatus === STATUS.EM_ALTERACAO
+                                    ? "Será preenchida automaticamente quando a normativa ficar em versão final."
+                                    : "Campo calculado automaticamente pelo fluxo da normativa.",
                               },
                             }}
                           />
@@ -2735,6 +3011,8 @@ function ColumnsLayouts() {
                   </AccordionSummary>
                   <AccordionDetails>
                     <ListagemTrecho
+                      key={`${currentNormativeId || "novo"}-${currentStatus || "sem-status"}`}
+                      normativeId={currentNormativeId}
                       readOnly={
                         currentStatus === STATUS.EM_APROVACAO ||
                         currentStatus === STATUS.REVOGADO
@@ -2747,7 +3025,7 @@ function ColumnsLayouts() {
             </>
           ) : null}
 
-          {requisicao === "Criar" || canEditGeneralFields ? (
+          {canPersistForm || requisicao === "Editar" ? (
             <Grid
               item
               xs={12}
@@ -2756,14 +3034,31 @@ function ColumnsLayouts() {
               display="flex"
               justifyContent="flex-start"
             >
-              <Button
-                variant="contained"
-                color="primary"
-                sx={{ px: 4, py: 1, fontWeight: "bold" }}
-                onClick={handleSubmit}
-              >
-                {requisicao === "Criar" ? "Cadastrar" : "Atualizar formulário"}
-              </Button>
+              <Stack direction="row" spacing={2}>
+                {canPersistForm ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    sx={{ px: 4, py: 1, fontWeight: "bold" }}
+                    onClick={handleSubmit}
+                  >
+                    {requisicao === "Criar"
+                      ? "Cadastrar"
+                      : "Salvar alterações"}
+                  </Button>
+                ) : null}
+
+                {requisicao === "Editar" ? (
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    sx={{ px: 4, py: 1, fontWeight: "bold" }}
+                    onClick={handleExit}
+                  >
+                    Sair
+                  </Button>
+                ) : null}
+              </Stack>
             </Grid>
           ) : null}
         </Grid>
@@ -2787,22 +3082,22 @@ function ColumnsLayouts() {
           <DialogTitle
             sx={{ fontWeight: 600, fontSize: "20px", color: "#333" }}
           >
-            Normativa criada com sucesso!
+            {successDialogMode === "create"
+              ? "Normativa criada com sucesso!"
+              : "Alterações salvas com sucesso!"}
           </DialogTitle>
           <DialogContent>
             <DialogContentText sx={{ fontSize: "16px", color: "#555", px: 2 }}>
-              A normativa foi cadastrada com sucesso. Você pode voltar para a
-              listagem ou continuar a edição desta normativa.
+              {successDialogMode === "create"
+                ? "A normativa foi cadastrada com sucesso. Você pode voltar para a listagem ou continuar a edição desta normativa."
+                : "As alterações da normativa foram salvas. Você deseja permanecer nesta tela ou voltar para a listagem?"}
             </DialogContentText>
           </DialogContent>
           <DialogActions
             sx={{ display: "flex", justifyContent: "center", gap: 2, pb: 2 }}
           >
             <Button
-              onClick={() => {
-                setSuccessDialogOpen(false);
-                navigate(-1);
-              }}
+              onClick={handleBackToNormativeList}
               variant="outlined"
               sx={{ borderColor: "#007bff", color: "#007bff", fontWeight: 600 }}
             >
@@ -2813,7 +3108,9 @@ function ColumnsLayouts() {
               variant="contained"
               sx={{ backgroundColor: "#007bff", fontWeight: 600 }}
             >
-              Continuar editando
+              {successDialogMode === "create"
+                ? "Continuar editando"
+                : "Permanecer na tela"}
             </Button>
           </DialogActions>
         </Dialog>
