@@ -65,16 +65,16 @@ import emitter from "./eventEmitter";
 const COLUMN_VISIBILITY_STORAGE_KEY = "egrc_table_visibility_normativos";
 
 const NORMATIVE_STATUS_LABELS = {
-  1: "Elaboracao",
-  2: "Em aprovacao",
-  3: "Versao final",
+  1: "Elaboração",
+  2: "Em aprovação",
+  3: "Versão final",
   4: "Revogado",
-  5: "Em alteracao",
+  5: "Em alteração",
 };
 
 const REVISION_STATUS_LABELS = {
   1: "Revisada",
-  2: "Proxima da revisao",
+  2: "Próxima da revisão",
   3: "Em atraso",
 };
 
@@ -114,8 +114,12 @@ const normalizeArrayValue = (value) => {
   if (typeof value === "object") {
     const candidate =
       value.name ??
+      value.nome ??
       value.label ??
       value.value ??
+      value.title ??
+      value.environmentName ??
+      value.statusName ??
       value.description ??
       value.code ??
       null;
@@ -154,8 +158,31 @@ const getNormativeStatusLabel = (status) =>
 const getRevisionStatusLabel = (status) =>
   REVISION_STATUS_LABELS[Number(status)] || (status ? String(status) : "-");
 
+const resolveNormativeStatusValue = (normative) =>
+  normative?.normativeStatus ??
+  normative?.statusNorma ??
+  normative?.idNormativeStatus ??
+  normative?.normativeStatusId ??
+  normative?.normativeStatusName ??
+  normative?.normativeStatusDescription ??
+  normative?.statusDescription ??
+  null;
+
+const resolveEnvironmentValue = (normative) =>
+  normative?.environment ??
+  normative?.environments ??
+  normative?.environmentName ??
+  normative?.environmentDescription ??
+  normative?.environmentLabel ??
+  normative?.nameEnvironment ??
+  normative?.environmentsName ??
+  null;
+
 const getNormativeStatusChipColor = (status) => {
-  switch (Number(status)) {
+  const numericStatus = Number(status);
+  const normalizedStatus = normalizeText(status || "");
+
+  switch (numericStatus) {
     case 1:
       return "warning";
     case 2:
@@ -167,6 +194,13 @@ const getNormativeStatusChipColor = (status) => {
     case 5:
       return "primary";
     default:
+      if (normalizedStatus.includes("elabor")) return "warning";
+      if (normalizedStatus.includes("aprov")) return "info";
+      if (normalizedStatus.includes("vers") || normalizedStatus.includes("final")) {
+        return "success";
+      }
+      if (normalizedStatus.includes("revog")) return "error";
+      if (normalizedStatus.includes("alter")) return "primary";
       return "default";
   }
 };
@@ -1267,6 +1301,8 @@ const ListagemNormativos = () => {
       (resultData || []).map((normative) => ({
         ...normative,
         idNormative: getNormativeId(normative),
+        normativeStatus: resolveNormativeStatusValue(normative),
+        environment: resolveEnvironmentValue(normative),
         companies: normalizeArrayValue(normative.companies),
         departments: normalizeArrayValue(normative.departments),
       })),
