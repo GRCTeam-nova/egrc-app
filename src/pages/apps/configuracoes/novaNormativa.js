@@ -1882,7 +1882,7 @@ function ColumnsLayouts() {
 
       enqueueSnackbar(
         isApproved
-          ? "Resposta de aprovação enviada com sucesso!"
+          ? "Aprovação enviada com sucesso!"
           : "A normativa foi retornada ao responsável.",
         {
           variant: "success",
@@ -3013,10 +3013,7 @@ function ColumnsLayouts() {
                     <ListagemTrecho
                       key={`${currentNormativeId || "novo"}-${currentStatus || "sem-status"}`}
                       normativeId={currentNormativeId}
-                      readOnly={
-                        currentStatus === STATUS.EM_APROVACAO ||
-                        currentStatus === STATUS.REVOGADO
-                      }
+                      readOnly={!canEditGeneralFields}
                     />
                   </AccordionDetails>
                 </Accordion>
