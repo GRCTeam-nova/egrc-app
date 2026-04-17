@@ -241,6 +241,16 @@ function normalizeIdArray(value, { exclude = [] } = {}) {
     });
 }
 
+function getConflictingNormativeIds(origins, destinies) {
+  const normalizedDestinies = new Set(
+    normalizeIdArray(destinies).map((item) => String(item)),
+  );
+
+  return normalizeIdArray(origins).filter((originId) =>
+    normalizedDestinies.has(String(originId)),
+  );
+}
+
 function resolveRiskValue(value) {
   const numericValue = Number(value);
   return [1, 2, 3].includes(numericValue) ? numericValue : null;
@@ -1104,19 +1114,75 @@ function ColumnsLayouts() {
     (formData.aprovador.length > 0 || Boolean(formData.note));
   const canPersistForm =
     requisicao === "Criar" || canEditGeneralFields || canEditReviewFields;
-  const filteredNormaOrigens = useMemo(
+  const selectedNormaOrigemIds = useMemo(
+    () =>
+      normalizeIdArray(formData.normaOrigem, {
+        exclude: [currentNormativeId],
+      }),
+    [currentNormativeId, formData.normaOrigem],
+  );
+  const selectedNormaDestinoIds = useMemo(
+    () =>
+      normalizeIdArray(formData.normaDestino, {
+        exclude: [currentNormativeId],
+      }),
+    [currentNormativeId, formData.normaDestino],
+  );
+  const allNormaOrigens = useMemo(
     () =>
       normaOrigens.filter(
         (item) => String(item.id) !== String(currentNormativeId),
       ),
     [currentNormativeId, normaOrigens],
   );
-  const filteredNormaDestinos = useMemo(
+  const allNormaDestinos = useMemo(
     () =>
       normaDestinos.filter(
         (item) => String(item.id) !== String(currentNormativeId),
       ),
     [currentNormativeId, normaDestinos],
+  );
+  const filteredNormaOrigens = useMemo(
+    () =>
+      allNormaOrigens.filter(
+        (item) =>
+          !selectedNormaDestinoIds.some(
+            (selectedId) => String(selectedId) === String(item.id),
+          ),
+      ),
+    [allNormaOrigens, selectedNormaDestinoIds],
+  );
+  const filteredNormaDestinos = useMemo(
+    () =>
+      allNormaDestinos.filter(
+        (item) =>
+          !selectedNormaOrigemIds.some(
+            (selectedId) => String(selectedId) === String(item.id),
+          ),
+      ),
+    [allNormaDestinos, selectedNormaOrigemIds],
+  );
+  const selectedAvailableNormaOrigemIds = useMemo(
+    () =>
+      normalizeIdArray(formData.normaOrigem, {
+        exclude: [currentNormativeId, ...selectedNormaDestinoIds],
+      }),
+    [currentNormativeId, formData.normaOrigem, selectedNormaDestinoIds],
+  );
+  const selectedAvailableNormaDestinoIds = useMemo(
+    () =>
+      normalizeIdArray(formData.normaDestino, {
+        exclude: [currentNormativeId, ...selectedNormaOrigemIds],
+      }),
+    [currentNormativeId, formData.normaDestino, selectedNormaOrigemIds],
+  );
+  const conflictingNormativeIds = useMemo(
+    () =>
+      getConflictingNormativeIds(
+        selectedNormaOrigemIds,
+        selectedNormaDestinoIds,
+      ),
+    [selectedNormaDestinoIds, selectedNormaOrigemIds],
   );
 
   const visibleStatusOptions = useMemo(() => {
@@ -1355,6 +1421,16 @@ function ColumnsLayouts() {
     if (missingLabels.length > 0) {
       enqueueSnackbar(
         `Os campos ${missingLabels.join(", ")} são obrigatórios para continuar.`,
+        {
+          variant: "error",
+        },
+      );
+      return false;
+    }
+
+    if (conflictingNormativeIds.length > 0) {
+      enqueueSnackbar(
+        "A mesma normativa não pode ser selecionada como origem e destino ao mesmo tempo.",
         {
           variant: "error",
         },
@@ -2519,13 +2595,11 @@ function ColumnsLayouts() {
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={buildSelectedValues(
-                      normalizeIdArray(formData.normaOrigem, {
-                        exclude: [currentNormativeId],
-                      }),
-                      filteredNormaOrigens,
+                      selectedNormaOrigemIds,
+                      allNormaOrigens,
                     )}
                     onChange={handleMultiSelectAll("normaOrigem", filteredNormaOrigens, {
-                      excludeIds: [currentNormativeId],
+                      excludeIds: [currentNormativeId, ...selectedNormaDestinoIds],
                     })}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
                     renderOption={(props, option, { selected }) => (
@@ -2533,9 +2607,8 @@ function ColumnsLayouts() {
                         <Checkbox
                           checked={
                             option.id === "all"
-                              ? normalizeIdArray(formData.normaOrigem, {
-                                  exclude: [currentNormativeId],
-                                }).length === filteredNormaOrigens.length &&
+                              ? selectedAvailableNormaOrigemIds.length ===
+                                  filteredNormaOrigens.length &&
                                 filteredNormaOrigens.length > 0
                               : selected
                           }
@@ -2561,16 +2634,14 @@ function ColumnsLayouts() {
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={buildSelectedValues(
-                      normalizeIdArray(formData.normaDestino, {
-                        exclude: [currentNormativeId],
-                      }),
-                      filteredNormaDestinos,
+                      selectedNormaDestinoIds,
+                      allNormaDestinos,
                     )}
                     onChange={handleMultiSelectAll(
                       "normaDestino",
                       filteredNormaDestinos,
                       {
-                        excludeIds: [currentNormativeId],
+                        excludeIds: [currentNormativeId, ...selectedNormaOrigemIds],
                       },
                     )}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -2579,9 +2650,8 @@ function ColumnsLayouts() {
                         <Checkbox
                           checked={
                             option.id === "all"
-                              ? normalizeIdArray(formData.normaDestino, {
-                                  exclude: [currentNormativeId],
-                                }).length === filteredNormaDestinos.length &&
+                              ? selectedAvailableNormaDestinoIds.length ===
+                                  filteredNormaDestinos.length &&
                                 filteredNormaDestinos.length > 0
                               : selected
                           }
