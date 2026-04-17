@@ -1977,8 +1977,29 @@ function ColumnsLayouts() {
     }
   };
 
+  const exitPostCreateEditingMode = () => {
+    if (!allowPostCreateEditing) return;
+
+    setAllowPostCreateEditing(false);
+
+    if (!currentNormativeId) return;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: {
+        ...(location.state || {}),
+        dadosApi: {
+          ...((location.state || {}).dadosApi || {}),
+          idNormative: currentNormativeId,
+          allowPostCreateEditing: false,
+        },
+      },
+    });
+  };
+
   const handleContinueEditing = () => {
     setSuccessDialogOpen(false);
+
     keepViewportAtTop({ focusTop: true });
   };
 
@@ -2006,6 +2027,7 @@ function ColumnsLayouts() {
     });
 
     if (updated) {
+      exitPostCreateEditingMode();
       setSuccessDialogMode("edit");
       setSuccessDialogOpen(true);
     }
