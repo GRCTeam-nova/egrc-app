@@ -121,7 +121,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
 
   const tratarSubmit = async () => {
     // Verifica se os campos obrigatórios estão preenchidos
-    if (!nome.trim() || !formData.inicioStep || !formData.finalStep) {
+    if (!nome.trim() || !formData.inicioStep) {
       enqueueSnackbar("Preencha os campos obrigatórios!", { variant: "error" });
       return;
     }
@@ -282,6 +282,9 @@ function DrawerAcionista({ acionista, hideButton = false }) {
       if (window.refreshOrgaos) {
         window.refreshOrgaos();
       }
+      if (window.refreshPlanoDates) {
+        window.refreshPlanoDates();
+      }
       setOpen(false);
     } catch (error) {
       console.error(error);
@@ -394,7 +397,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
               <Grid item xs={12} mb={1.5}>
                 <Stack spacing={1}>
                   <InputLabel sx={{ fontSize: "12px", fontWeight: 600 }}>
-                    Data de conclusão *
+                    Data de conclusão
                   </InputLabel>
                   <DatePicker
                     value={formData.finalStep || null}
