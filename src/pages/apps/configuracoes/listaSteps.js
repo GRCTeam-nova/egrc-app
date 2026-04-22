@@ -828,6 +828,9 @@ const ListagemAvaliacoes = () => {
       ...currentData,
       refreshCount: currentData.refreshCount + 1,
     }));
+    if (window.refreshPlanoDates) {
+      window.refreshPlanoDates();
+    }
   };
 
   const handleEditAcionista = (acionista) => {

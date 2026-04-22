@@ -40,6 +40,66 @@ import DrawerRisco from "./novoRiscoDrawerPlanos";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import FileUploader from "../configuracoes/FileUploader";
 
+const ACTION_PLAN_FILE_KEYS = [
+  "files",
+  "actionPlanDocuments",
+  "actionPlanFiles",
+  "documents",
+  "attachments",
+  "anexos",
+];
+
+const getNormalizedFilePath = (file) => {
+  if (!file) return "";
+  if (typeof file === "string") return file;
+
+  return file.path || file.url || file.file || file.fileUrl || file.href || "";
+};
+
+const getFileNameFromValue = (value) => {
+  if (!value || typeof value !== "string") return "";
+
+  const sanitizedValue = value.split("?")[0];
+  return sanitizedValue.split("/").filter(Boolean).pop() || sanitizedValue;
+};
+
+const normalizeActionPlanFiles = (source) => {
+  const rawFiles = Array.isArray(source)
+    ? source
+    : ACTION_PLAN_FILE_KEYS.reduce((files, key) => {
+      if (files.length > 0 || !Array.isArray(source?.[key])) {
+        return files;
+      }
+
+      return source[key];
+    }, []);
+
+  return rawFiles
+    .map((file) => {
+      if (!file) return null;
+      if (file instanceof File || typeof file === "string") return file;
+
+      const path = getNormalizedFilePath(file);
+      const name =
+        file.name ||
+        file.filename ||
+        file.originalName ||
+        file.description ||
+        getFileNameFromValue(path);
+
+      if (!path && !name) {
+        return null;
+      }
+
+      return {
+        ...file,
+        ...(path ? { path } : {}),
+        ...(name ? { name } : {}),
+      };
+    })
+    .filter(Boolean);
+};
+
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
@@ -178,6 +238,67 @@ function ColumnsLayouts() {
     window.scrollTo(0, 0);
   }, []);
 
+  useEffect(() => {
+    if (steps && steps.length > 0) {
+      const startDates = steps
+        .map((s) => (s.startDate ? new Date(s.startDate).getTime() : null))
+        .filter((d) => d !== null && !isNaN(d));
+      const endDates = steps
+        .map((s) => (s.endDate ? new Date(s.endDate).getTime() : null))
+        .filter((d) => d !== null && !isNaN(d));
+
+      let minStart = formData.startDate;
+      let maxEnd = formData.endDate;
+
+      if (startDates.length > 0) {
+        minStart = new Date(Math.min(...startDates));
+      }
+      if (endDates.length > 0) {
+        maxEnd = new Date(Math.max(...endDates));
+      }
+
+      setFormData((prev) => {
+        // Only update if dates actually changed to prevent loops
+        const startChanged = minStart && prev.startDate ? minStart.getTime() !== prev.startDate.getTime() : minStart !== prev.startDate;
+        const endChanged = maxEnd && prev.endDate ? maxEnd.getTime() !== prev.endDate.getTime() : maxEnd !== prev.endDate;
+        if (startChanged || endChanged) {
+          return {
+            ...prev,
+            startDate: minStart,
+            endDate: maxEnd,
+          };
+        }
+        return prev;
+      });
+    }
+  }, [steps]);
+
+  useEffect(() => {
+    window.refreshPlanoDates = async () => {
+      if (dadosApi?.idActionPlan) {
+        try {
+          const stepsResponse = await fetch(
+            `${process.env.REACT_APP_API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+          if (stepsResponse.ok) {
+            const fetchedSteps = await stepsResponse.json();
+            setSteps(fetchedSteps);
+          }
+        } catch (err) {
+          console.error("Erro ao recarregar steps do plano:", err.message);
+        }
+      }
+    };
+    return () => {
+      delete window.refreshPlanoDates;
+    };
+  }, [dadosApi, token]);
+
   // Em caso de edição
   useEffect(() => {
     if (dadosApi) {
@@ -198,6 +319,24 @@ function ColumnsLayouts() {
           }
 
           const data = await response.json();
+          let fetchedSteps = [];
+          try {
+            const stepsResponse = await fetch(
+              `${process.env.REACT_APP_API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+            if (stepsResponse.ok) {
+              fetchedSteps = await stepsResponse.json();
+              setSteps(fetchedSteps);
+            }
+          } catch (err) {
+            console.error("Erro ao buscar steps do plano:", err.message);
+          }
+
           setRequisicao("Editar");
           setMensagemFeedback("editada");
           setNome(data.name);
@@ -218,7 +357,7 @@ function ColumnsLayouts() {
             startDate: data.startDate ? new Date(data.startDate) : null,
             endDate: data.endDate ? new Date(data.endDate) : null,
             conclusionDate: data.conclusionDate ? new Date(data.conclusionDate) : null,
-            files: data.files || [],
+            files: normalizeActionPlanFiles(data),
 
           }));
 
@@ -478,11 +617,13 @@ function ColumnsLayouts() {
 
       const finalFiles = [...existingFiles, ...(uploadFilesResult.files || [])];
 
-      finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file?.path) return file.path;
-        return file;
-      });
+      finalFilesPayload = finalFiles
+        .map((file) => {
+          if (typeof file === "string") return file;
+
+          return getNormalizedFilePath(file) || null;
+        })
+        .filter(Boolean);
     }
 
 
@@ -991,11 +1132,11 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
-                  <InputLabel>Data de início (RN)</InputLabel>
+                  <InputLabel>Data de início</InputLabel>
                   <DatePicker
                     value={formData.startDate}
                     onChange={() => { }}
-                    
+                    disabled
                     slotProps={{ textField: { fullWidth: true } }}
                   />
                 </Stack>
@@ -1003,11 +1144,11 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
-                  <InputLabel>Data de fim (RN)</InputLabel>
+                  <InputLabel>Data de fim</InputLabel>
                   <DatePicker
                     value={formData.endDate}
                     onChange={() => { }}
-                  
+                    disabled
                     slotProps={{ textField: { fullWidth: true } }}
                   />
                 </Stack>
