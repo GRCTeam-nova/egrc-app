@@ -14,6 +14,7 @@ import {
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CloudDownloadIcon from "@mui/icons-material/CloudDownload";
 import DeleteIcon from "@mui/icons-material/Delete";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useSnackbar } from "notistack";
 
 const FileUploader = ({
@@ -72,7 +73,7 @@ const FileUploader = ({
     });
   };
 
-  const handleDownload = (file) => {
+  const getFileURL = (file) => {
     let fileURL;
     // Se o arquivo for uma instância de File (ex.: vindo do dropzone)
     if (file instanceof File) {
@@ -82,7 +83,7 @@ const FileUploader = ({
     else if (
       file.path &&
       typeof file.path === "string" &&
-      (file.path.startsWith("http://") || file.path.startsWith("https://"))
+      (true)
     ) {
       fileURL = file.path;
     }
@@ -94,6 +95,20 @@ const FileUploader = ({
     else if (typeof file === "string") {
       fileURL = file;
     } else {
+      return null;
+    }
+
+    if (typeof fileURL === "string") {
+      const baseUrl = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.split('api/v')[0] : "";
+      fileURL = fileURL.replace("http://localhost:8080/", baseUrl)
+                       .replace("https://localhost:8080/", baseUrl);
+    }
+    return fileURL;
+  };
+
+  const handleDownload = async (file) => {
+    const fileURL = getFileURL(file);
+    if (!fileURL) {
       console.error("Formato do arquivo não reconhecido para download", file);
       enqueueSnackbar("Formato do arquivo não reconhecido para download.", {
         variant: "error",
@@ -102,17 +117,36 @@ const FileUploader = ({
       return;
     }
 
-    const link = document.createElement("a");
-    link.href = fileURL;
-    link.setAttribute("download", file.name || file.filename || "download");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await fetch(fileURL);
+      if (!response.ok) throw new Error("Fetch failed");
+      const blob = await response.blob();
+      const localUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = localUrl;
+      link.setAttribute("download", file.name || file.filename || "download");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(localUrl);
+    } catch (error) {
+      console.warn("Fallback download via link target blank", error);
+      const link = document.createElement("a");
+      link.href = fileURL;
+      link.setAttribute("download", file.name || file.filename || "download");
+      link.setAttribute("target", "_blank");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
 
     if (file instanceof File) {
       URL.revokeObjectURL(fileURL);
     }
   };
+
+
 
   return (
     <Stack spacing={1}>
@@ -153,10 +187,12 @@ const FileUploader = ({
               <ListItem
                 secondaryAction={
                   <>
+
                     <IconButton
                       edge="end"
                       onClick={() => handleDownload(file)}
                       sx={{ mr: 1 }}
+                      title="Baixar arquivo"
                     >
                       <CloudDownloadIcon sx={{ color: "#0d47a1" }} />
                     </IconButton>
