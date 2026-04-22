@@ -144,7 +144,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   }, [open, token]);
 
   const handleDocumentoChange = (event) => {
-    const value = event.target.value.replace(/\D/g, "");
+    const value = event.target.value;
     setDocumento(value);
   };
 
@@ -152,7 +152,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   const handleQuantidadeChange = (event) => {
     const value = event.target.value;
     
-    if (/^\d*\.?\d*$/.test(value)) {
+    if (true) {
       setQuantidade(value);
     }
   };
@@ -179,7 +179,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           name: nome,
           document: documento,
           
-          percentage: quantidade.trim() !== "" ? Number(quantidade) : null,
+          percentage: quantidade.trim() !== "" && !isNaN(Number(quantidade)) ? Number(quantidade) : null,
           idActionType: idActionType || null,
           active: true,
         };
@@ -233,7 +233,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
             idSharedholder,
             name: nome,
             document: documento,
-            percentage: Number(quantidade), 
+            percentage: quantidade.trim() !== "" && !isNaN(Number(quantidade)) ? Number(quantidade) : null, 
             active: true,
             idActionType: idActionType || null, 
           };
@@ -353,7 +353,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
                     fullWidth
                     value={documento}
                     onChange={handleDocumentoChange}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+                    inputProps={{ inputMode: "text" }}
                   />
                 </Stack>
               </Grid>
@@ -399,7 +399,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
                     value={quantidade}
                     
                     inputProps={{
-                      inputMode: "decimal",
+                      inputMode: "text",
                       step: "any",
                     }}
                   />
