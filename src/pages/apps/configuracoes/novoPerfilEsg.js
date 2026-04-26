@@ -20,6 +20,7 @@ import {
   Card,
   CardContent,
   Divider,
+  Chip,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -60,6 +61,12 @@ const coresDisponiveis = [
   { id: 9, nome: "Cinza", valor: "#828282" },
   { id: 10, nome: "Rosa Escuro", valor: "#d85786" },
 ];
+
+const statusPriorizacaoMap = {
+  1: { nome: "Em elaboração", cor: "#FFA500" },
+  2: { nome: "Concluída", cor: "#28a745" },
+  3: { nome: "Revisada", cor: "#007bff" },
+};
 
 // ==============================|| PERFIL ESG ||============================== //
 function NovoPerfilEsg() {
@@ -187,42 +194,47 @@ function NovoPerfilEsg() {
   useEffect(() => {
     if (apiData && !optionsLoading) {
         const data = apiData;
-        const listNames = data.levelLists ? data.levelLists.map(l => l.levelListName) : [];
+        const activeLists = data.levelLists ? data.levelLists.filter(l => l.active !== false) : [];
+        const listNames = activeLists.map(l => l.levelListName);
         const hasAbrangencia = listNames.includes("Níveis de Abrangência");
         const hasUrgencia = listNames.includes("Níveis de Urgência/Prioridade");
         const hasPI = listNames.includes("Níveis de Importância das Partes Interessadas");
         
         let qtd = null;
-        if (data.levelLists && data.levelLists.length > 0) {
-           const firstListIndicators = data.levelLists[0].levelIndicators;
+        if (activeLists.length > 0) {
+           const firstListIndicators = activeLists[0].levelIndicators?.filter(ind => ind.active !== false);
            if (firstListIndicators) {
                qtd = firstListIndicators.length;
            }
         }
         
         const findIndicators = (listName) => {
-          const list = data.levelLists?.find(l => l.levelListName === listName);
+          const list = activeLists.find(l => l.levelListName === listName);
           if (list && list.levelIndicators && list.levelIndicators.length > 0) {
-             return list.levelIndicators.map(ind => {
-               const corObj = coresDisponiveis.find(c => c.valor === ind.cssColor);
-               return {
-                 id: ind.id,
-                 nome: ind.levelIndicatorName,
-                 valor: ind.value,
-                 cor: corObj ? corObj.id : null
-               };
-             }).sort((a,b) => a.valor - b.valor);
+             const activeIndicators = list.levelIndicators.filter(ind => ind.active !== false);
+             if (activeIndicators.length > 0) {
+                 return activeIndicators.map(ind => {
+                   const corObj = coresDisponiveis.find(c => c.valor === ind.cssColor);
+                   return {
+                     id: ind.id,
+                     nome: ind.levelIndicatorName,
+                     valor: ind.value,
+                     cor: corObj ? corObj.id : null
+                   };
+                 }).sort((a,b) => a.valor - b.valor);
+             }
           }
           return null;
         };
         
         const findMultiple = (list, ids) => list.filter(item => ids?.includes(item.id));
         const stIds = data.stakeholders?.map(x => x.id) || data.stakeholderIds || data.profileESGStakeholders?.map(x => x.stakeholderId) || [];
-
+        const cyIds = data.prioritizationCycles?.map(c => c.id) || data.prioritizationCycleIds || data.profileESGCycles?.map(c => c.prioritizationCycleId) || [];
+        
         setFormData(prev => ({
           ...prev,
           nomePerfilCiclo: data.profileESGName || "",
-          cicloPriorizacao: data.prioritizationCycles ? data.prioritizationCycles.map(c => c.id) : [],
+          cicloPriorizacao: cyIds,
           stakeholders: findMultiple(stakeholdersOptions, stIds),
           qtdNiveisAvaliacao: qtd || prev.qtdNiveisAvaliacao,
           abrangencia: hasAbrangencia,
@@ -459,8 +471,14 @@ function NovoPerfilEsg() {
 
          // Mapear exclusões
          existingIndicators.forEach(ind => {
-             if (!formIds.includes(ind.id)) {
-                 indicatorsToDelete.push(ind.id);
+             if (!formIds.includes(ind.id) && ind.active !== false) {
+                 indicatorsToDelete.push({
+                   id: ind.id,
+                   levelIndicatorName: ind.levelIndicatorName,
+                   value: ind.value,
+                   cssColor: ind.cssColor,
+                   active: false
+                 });
              }
          });
 
@@ -471,7 +489,8 @@ function NovoPerfilEsg() {
                levelIndicatorName: nivel.nome,
                value: nivel.valor,
                cssColor: cssColor,
-               levelListId: list.id
+               levelListId: list.id,
+               active: true
             };
 
             const existing = existingIndicators.find(e => e.id === nivel.id);
@@ -480,7 +499,8 @@ function NovoPerfilEsg() {
                // Update only if something naturally changed
                if (existing.levelIndicatorName !== nivel.nome || 
                    existing.value !== nivel.valor || 
-                   existing.cssColor !== cssColor) {
+                   existing.cssColor !== cssColor ||
+                   existing.active === false) {
                   indicatorsToUpdate.push({ ...payload, id: nivel.id });
                }
             } else {
@@ -506,8 +526,8 @@ function NovoPerfilEsg() {
             headers: { Authorization: `Bearer ${token}` }
           })
         ),
-        ...indicatorsToDelete.map(id => 
-          axios.delete(`${API_URL}LevelIndicator/${id}`, {
+        ...indicatorsToDelete.map(ind => 
+          axios.put(`${API_URL}LevelIndicator`, ind, {
             headers: { Authorization: `Bearer ${token}` }
           })
         )
@@ -653,24 +673,70 @@ function NovoPerfilEsg() {
                 ]}
                 getOptionLabel={(option) => option.nome}
                 value={formData.cicloPriorizacao.map(
-                  (id) => ciclosPriorizacaoOptions.find((ciclo) => ciclo.id === id) || id
-                )}
+                  (id) => ciclosPriorizacaoOptions.find((ciclo) => String(ciclo.id) === String(id))
+                ).filter(Boolean)}
                 onChange={handleSelectAllCiclos}
                 isOptionEqualToValue={(option, value) => option.id === value.id}
-                renderOption={(props, option, { selected }) => (
-                  <li {...props}>
-                    <Grid container alignItems="center">
-                      <Grid item>
-                        <Checkbox
-                          checked={option.id === "all" ? allSelectedCiclos : selected}
-                        />
+                renderOption={(props, option, { selected }) => {
+                  const status = statusPriorizacaoMap[option.prioritizationCycleStats];
+                  return (
+                    <li {...props}>
+                      <Grid container alignItems="center">
+                        <Grid item>
+                          <Checkbox
+                            checked={option.id === "all" ? allSelectedCiclos : selected}
+                          />
+                        </Grid>
+                        <Grid item xs>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {option.nome}
+                            {option.id !== "all" && status && (
+                              <Chip 
+                                label={status.nome} 
+                                size="small" 
+                                sx={{ 
+                                  backgroundColor: status.cor, 
+                                  color: 'white',
+                                  fontSize: '10px',
+                                  height: '18px'
+                                }} 
+                              />
+                            )}
+                          </Box>
+                        </Grid>
                       </Grid>
-                      <Grid item xs>
-                        {option.nome}
-                      </Grid>
-                    </Grid>
-                  </li>
-                )}
+                    </li>
+                  );
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => {
+                    const status = statusPriorizacaoMap[option.prioritizationCycleStats];
+                    return (
+                      <Chip
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {option.nome}
+                            {status && (
+                              <Chip 
+                                label={status.nome} 
+                                size="small" 
+                                sx={{ 
+                                  backgroundColor: status.cor, 
+                                  color: 'white',
+                                  fontSize: '9px',
+                                  height: '16px'
+                                }} 
+                              />
+                            )}
+                          </Box>
+                        }
+                        size="small"
+                        {...getTagProps({ index })}
+                        key={option.id}
+                      />
+                    );
+                  })
+                }
                 renderInput={(params) => <TextField {...params} />}
               />
             </Stack>

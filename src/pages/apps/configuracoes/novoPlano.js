@@ -40,6 +40,84 @@ import DrawerRisco from "./novoRiscoDrawerPlanos";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import FileUploader from "../configuracoes/FileUploader";
 
+const ACTION_PLAN_FILE_KEYS = [
+  "files",
+  "actionPlanDocuments",
+  "actionPlanFiles",
+  "documents",
+  "attachments",
+  "anexos",
+];
+
+const getNormalizedFilePath = (file) => {
+  if (!file) return "";
+  if (typeof file === "string") return file;
+
+  return file.path || file.url || file.file || file.fileUrl || file.href || "";
+};
+
+const getFileNameFromValue = (value) => {
+  if (!value || typeof value !== "string") return "";
+
+  const sanitizedValue = value.split("?")[0];
+  return sanitizedValue.split("/").filter(Boolean).pop() || sanitizedValue;
+};
+
+const normalizeActionPlanFiles = (source) => {
+  const rawFiles = Array.isArray(source)
+    ? source
+    : ACTION_PLAN_FILE_KEYS.reduce((files, key) => {
+        if (files.length > 0 || !Array.isArray(source?.[key])) {
+          return files;
+        }
+
+        return source[key];
+      }, []);
+
+  return rawFiles
+    .map((file) => {
+      if (!file) return null;
+      if (file instanceof File || typeof file === "string") return file;
+
+      const path = getNormalizedFilePath(file);
+      const name =
+        file.name ||
+        file.filename ||
+        file.originalName ||
+        file.description ||
+        getFileNameFromValue(path);
+
+      if (!path && !name) {
+        return null;
+      }
+
+      return {
+        ...file,
+        ...(path ? { path } : {}),
+        ...(name ? { name } : {}),
+      };
+    })
+    .filter(Boolean);
+};
+
+const getNormalizedRelationId = (item, keys = []) => {
+  if (!item) return null;
+  if (typeof item !== "object") return item;
+
+  for (const key of keys) {
+    if (item[key]) {
+      return item[key];
+    }
+  }
+
+  return item.id || null;
+};
+
+const normalizeRelationIds = (items, keys = []) =>
+  Array.isArray(items)
+    ? items.map((item) => getNormalizedRelationId(item, keys)).filter(Boolean)
+    : [];
+
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
   const { token } = useToken();
@@ -51,6 +129,7 @@ function ColumnsLayouts() {
   const [riscos, setRiscos] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
   const [processos, setProcessos] = useState([]);
+  const [controles, setControles] = useState([]);
   const [descricao, setDescricao] = useState("");
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
@@ -61,6 +140,8 @@ function ColumnsLayouts() {
   const [normativaDados, setNormativaDados] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [contas, setContas] = useState([]);
+  const [contasFiltradas, setContasFiltradas] = useState([]);
+  const [controlesFiltrados, setControlesFiltrados] = useState([]);
   const [responsaveis, setResponsavel] = useState([]);
   const [steps, setSteps] = useState([]); // para a RN das datas
   const [statuss] = useState([
@@ -94,7 +175,6 @@ function ColumnsLayouts() {
     causa: [],
     risco: [],
     ameaca: [],
-    conta: [],
 
     responsavel: null,
     startDate: null,
@@ -154,29 +234,91 @@ function ColumnsLayouts() {
   };
 
   useEffect(() => {
-    fetchData(
-      `${process.env.REACT_APP_API_URL}departments`,
-      setDepartamentos
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}deficiencies`,
-      setDeficiencia
-    );
-    fetchData(
-      `${process.env.REACT_APP_API_URL}processes`,
-      setProcessos
-    );
+    fetchData(`${process.env.REACT_APP_API_URL}departments`, setDepartamentos);
+    fetchData(`${process.env.REACT_APP_API_URL}deficiencies`, setDeficiencia);
+    fetchData(`${process.env.REACT_APP_API_URL}processes`, setProcessos);
+    fetchData(`${process.env.REACT_APP_API_URL}controls`, setControles);
     fetchData(`${process.env.REACT_APP_API_URL}risks`, setRiscos);
 
     fetchData(
       `${process.env.REACT_APP_API_URL}action-plans/types`,
-      setTipoPlano
+      setTipoPlano,
     );
     fetchData(`${process.env.REACT_APP_API_URL}ledger-accounts`, setContas);
-    fetchData(`${process.env.REACT_APP_API_URL}collaborators/responsibles`, setResponsavel);
+    fetchData(
+      `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
+      setResponsavel,
+    );
 
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    if (steps && steps.length > 0) {
+      const startDates = steps
+        .map((s) => (s.startDate ? new Date(s.startDate).getTime() : null))
+        .filter((d) => d !== null && !isNaN(d));
+      const endDates = steps
+        .map((s) => (s.endDate ? new Date(s.endDate).getTime() : null))
+        .filter((d) => d !== null && !isNaN(d));
+
+      let minStart = formData.startDate;
+      let maxEnd = formData.endDate;
+
+      if (startDates.length > 0) {
+        minStart = new Date(Math.min(...startDates));
+      }
+      if (endDates.length > 0) {
+        maxEnd = new Date(Math.max(...endDates));
+      }
+
+      setFormData((prev) => {
+        // Only update if dates actually changed to prevent loops
+        const startChanged =
+          minStart && prev.startDate
+            ? minStart.getTime() !== prev.startDate.getTime()
+            : minStart !== prev.startDate;
+        const endChanged =
+          maxEnd && prev.endDate
+            ? maxEnd.getTime() !== prev.endDate.getTime()
+            : maxEnd !== prev.endDate;
+        if (startChanged || endChanged) {
+          return {
+            ...prev,
+            startDate: minStart,
+            endDate: maxEnd,
+          };
+        }
+        return prev;
+      });
+    }
+  }, [steps]);
+
+  useEffect(() => {
+    window.refreshPlanoDates = async () => {
+      if (dadosApi?.idActionPlan) {
+        try {
+          const stepsResponse = await fetch(
+            `${process.env.REACT_APP_API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+          if (stepsResponse.ok) {
+            const fetchedSteps = await stepsResponse.json();
+            setSteps(fetchedSteps);
+          }
+        } catch (err) {
+          console.error("Erro ao recarregar steps do plano:", err.message);
+        }
+      }
+    };
+    return () => {
+      delete window.refreshPlanoDates;
+    };
+  }, [dadosApi, token]);
 
   // Em caso de edição
   useEffect(() => {
@@ -190,7 +332,7 @@ function ColumnsLayouts() {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
-            }
+            },
           );
 
           if (!response.ok) {
@@ -198,6 +340,24 @@ function ColumnsLayouts() {
           }
 
           const data = await response.json();
+          let fetchedSteps = [];
+          try {
+            const stepsResponse = await fetch(
+              `${process.env.REACT_APP_API_URL}action-plans/${dadosApi.idActionPlan}/steps`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            );
+            if (stepsResponse.ok) {
+              fetchedSteps = await stepsResponse.json();
+              setSteps(fetchedSteps);
+            }
+          } catch (err) {
+            console.error("Erro ao buscar steps do plano:", err.message);
+          }
+
           setRequisicao("Editar");
           setMensagemFeedback("editada");
           setNome(data.name);
@@ -209,17 +369,27 @@ function ColumnsLayouts() {
             status: data.actionPlanStatus || null,
             prioridade: data.actionPlanPriority || null,
             tipoPlano: data.idActionPlanType || null,
-            departamento: data.idDepartments || null,
-            deficiencia: data.idDeficiencies || null,
-            processo: data.idProcesses || null,
-            risco: data.idRisks || null,
-            conta: data.idLedgerAccounts || [],
+            departamento: normalizeRelationIds(data.idDepartments, [
+              "idDepartment",
+            ]),
+            deficiencia: normalizeRelationIds(data.idDeficiencies, [
+              "idDeficiency",
+            ]),
+            processo: normalizeRelationIds(data.idProcesses, ["idProcess"]),
+            risco: normalizeRelationIds(data.idRisks, ["idRisk"]),
+            controle: normalizeRelationIds(data.idControls || data.controls, [
+              "idControl",
+            ]),
+            conta: normalizeRelationIds(data.idLedgerAccounts, [
+              "idLedgerAccount",
+            ]),
             responsavel: data.idResponsible || null,
             startDate: data.startDate ? new Date(data.startDate) : null,
             endDate: data.endDate ? new Date(data.endDate) : null,
-            conclusionDate: data.conclusionDate ? new Date(data.conclusionDate) : null,
-            files: data.files || [],
-
+            conclusionDate: data.conclusionDate
+              ? new Date(data.conclusionDate)
+              : null,
+            files: normalizeActionPlanFiles(data),
           }));
 
           setNormativaDados(data);
@@ -238,8 +408,184 @@ function ColumnsLayouts() {
     }
   }, [dadosApi]);
 
+  useEffect(() => {
+    const atualizarControlesPorProcesso = async () => {
+      if (formData.processo.length === 0) {
+        setControlesFiltrados(controles);
+        return;
+      }
+
+      try {
+        const processResponses = await Promise.all(
+          formData.processo.map((id) =>
+            axios.get(`${process.env.REACT_APP_API_URL}processes/${id}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }),
+          ),
+        );
+
+        const idsControlePermitidos = new Set();
+        const idsRiscoDoProcesso = new Set();
+
+        processResponses.forEach((response) => {
+          normalizeRelationIds(
+            response.data.risks || response.data.idRisks || [],
+            ["idRisk"],
+          ).forEach((idRisco) => idsRiscoDoProcesso.add(idRisco));
+        });
+
+        if (idsRiscoDoProcesso.size > 0) {
+          const riskResponses = await Promise.all(
+            [...idsRiscoDoProcesso].map((id) =>
+              axios.get(`${process.env.REACT_APP_API_URL}risks/${id}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }),
+            ),
+          );
+
+          riskResponses.forEach((response) => {
+            normalizeRelationIds(
+              response.data.controls || response.data.idControls || [],
+              ["idControl"],
+            ).forEach((idControle) => idsControlePermitidos.add(idControle));
+          });
+        }
+
+        if (idsControlePermitidos.size === 0) {
+          processResponses.forEach((response) => {
+            normalizeRelationIds(
+              response.data.controls || response.data.idControls || [],
+              ["idControl"],
+            ).forEach((idControle) => idsControlePermitidos.add(idControle));
+          });
+        }
+
+        if (idsControlePermitidos.size === 0) {
+          setControlesFiltrados(controles);
+          return;
+        }
+
+        setControlesFiltrados(
+          controles.filter((controle) =>
+            idsControlePermitidos.has(controle.id),
+          ),
+        );
+      } catch (error) {
+        console.error("Erro ao buscar dependências de controles:", error);
+        setControlesFiltrados(controles);
+      }
+    };
+
+    if (controles.length > 0) {
+      atualizarControlesPorProcesso();
+    }
+  }, [formData.processo, controles, token]);
+
+  useEffect(() => {
+    const atualizarContasPorControle = async () => {
+      if (formData.controle.length === 0) {
+        setContasFiltradas(contas);
+        return;
+      }
+
+      try {
+        const controlResponses = await Promise.all(
+          formData.controle.map((id) =>
+            axios.get(`${process.env.REACT_APP_API_URL}controls/${id}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }),
+          ),
+        );
+
+        const idsContaPermitidos = new Set();
+
+        controlResponses.forEach((response) => {
+          normalizeRelationIds(
+            response.data.idControlLedgerAccounts ||
+              response.data.ledgerAccounts ||
+              response.data.idLedgerAccounts ||
+              [],
+            ["idLedgerAccount"],
+          ).forEach((idConta) => idsContaPermitidos.add(idConta));
+        });
+
+        setContasFiltradas(
+          contas.filter((conta) => idsContaPermitidos.has(conta.id)),
+        );
+      } catch (error) {
+        console.error("Erro ao buscar dependências de contas:", error);
+        setContasFiltradas(contas);
+      }
+    };
+
+    if (contas.length > 0) {
+      atualizarContasPorControle();
+    }
+  }, [formData.controle, contas, token]);
+
+  useEffect(() => {
+    if (formData.processo.length === 0) {
+      return;
+    }
+
+    const idsControlePermitidos = new Set(
+      controlesFiltrados.map((controle) => controle.id),
+    );
+
+    setFormData((prev) => {
+      const controlesAtuais = Array.isArray(prev.controle) ? prev.controle : [];
+      const controlesValidos = controlesAtuais.filter((id) =>
+        idsControlePermitidos.has(id),
+      );
+
+      if (controlesValidos.length === controlesAtuais.length) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        controle: controlesValidos,
+      };
+    });
+  }, [formData.processo, controlesFiltrados]);
+
+  useEffect(() => {
+    if (formData.controle.length === 0) {
+      return;
+    }
+
+    const idsContaPermitidos = new Set(
+      contasFiltradas.map((conta) => conta.id),
+    );
+
+    setFormData((prev) => {
+      const contasAtuais = Array.isArray(prev.conta) ? prev.conta : [];
+      const contasValidas = contasAtuais.filter((id) =>
+        idsContaPermitidos.has(id),
+      );
+
+      if (contasValidas.length === contasAtuais.length) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        conta: contasValidas,
+      };
+    });
+  }, [formData.controle, contasFiltradas]);
+
   const handleDepartmentCreated = (newDepartamento) => {
-    setDepartamentos((prevDepartamentos) => [...prevDepartamentos, newDepartamento]);
+    setDepartamentos((prevDepartamentos) => [
+      ...prevDepartamentos,
+      newDepartamento,
+    ]);
     setFormData((prev) => ({
       ...prev,
       departamento: [...prev.departamento, newDepartamento.id],
@@ -247,10 +593,7 @@ function ColumnsLayouts() {
   };
 
   const handleDeficiencyCreated = (newDeficiencia) => {
-    setDeficiencia((prevDeficiencias) => [
-      ...prevDeficiencias,
-      newDeficiencia,
-    ]);
+    setDeficiencia((prevDeficiencias) => [...prevDeficiencias, newDeficiencia]);
     setFormData((prev) => ({
       ...prev,
       deficiencia: [...prev.deficiencia, newDeficiencia.id],
@@ -273,7 +616,6 @@ function ColumnsLayouts() {
     }));
   };
 
-
   const tratarMudancaInputGeral = (field, value) => {
     if (field === "prioridade") {
       // Guarde apenas o ID do item selecionado
@@ -283,7 +625,6 @@ function ColumnsLayouts() {
       setFormData({ ...formData, [field]: value });
     }
   };
-
 
   const handleSelectAllDepartamentos = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
@@ -300,7 +641,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "departamento",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -320,7 +661,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "deficiencia",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -340,7 +681,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "processo",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -360,7 +701,7 @@ function ColumnsLayouts() {
     } else {
       tratarMudancaInputGeral(
         "risco",
-        newValue.map((item) => item.id)
+        newValue.map((item) => item.id),
       );
     }
   };
@@ -388,7 +729,6 @@ function ColumnsLayouts() {
     nome: true,
   });
 
-
   const allSelected2 =
     formData.processo.length === processos.length && processos.length > 0;
 
@@ -404,16 +744,37 @@ function ColumnsLayouts() {
     formData.risco.length === riscos.length && riscos.length > 0;
 
   const allSelectedContas =
-    formData.conta.length === contas.length && contas.length > 0;
+    formData.conta.length === contasFiltradas.length &&
+    contasFiltradas.length > 0;
+
+  const allSelectedControles =
+    formData.controle.length === controlesFiltrados.length &&
+    controlesFiltrados.length > 0;
+
+  const handleSelectAllControles = (event, newValue) => {
+    const hasAll = newValue?.some((option) => option.id === "all");
+
+    setFormData((prev) => ({
+      ...prev,
+      controle: hasAll
+        ? allSelectedControles
+          ? []
+          : controlesFiltrados.map((controle) => controle.id)
+        : newValue.map((option) => option.id),
+    }));
+  };
 
   const handleSelectAllContas = (event, newValue) => {
     const hasAll = newValue?.some((o) => o.id === "all");
     setFormData((prev) => ({
       ...prev,
-      conta: hasAll ? (allSelectedContas ? [] : contas.map((c) => c.id)) : newValue.map((o) => o.id),
+      conta: hasAll
+        ? allSelectedContas
+          ? []
+          : contasFiltradas.map((conta) => conta.id)
+        : newValue.map((o) => o.id),
     }));
   };
-
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
@@ -451,16 +812,23 @@ function ColumnsLayouts() {
 
     if (requisicao === "Editar") {
       const newFiles = (formData.files || []).filter((f) => f instanceof File);
-      const existingFiles = (formData.files || []).filter((f) => !(f instanceof File));
+      const existingFiles = (formData.files || []).filter(
+        (f) => !(f instanceof File),
+      );
 
       let uploadFilesResult = { files: [] };
 
       if (newFiles.length > 0) {
         const formDataUpload = new FormData();
         formDataUpload.append("ContainerFolder", 11);
-        formDataUpload.append("IdContainer", normativaDados?.idActionPlan || "");
+        formDataUpload.append(
+          "IdContainer",
+          normativaDados?.idActionPlan || "",
+        );
 
-        newFiles.forEach((file) => formDataUpload.append("Files", file, file.name));
+        newFiles.forEach((file) =>
+          formDataUpload.append("Files", file, file.name),
+        );
 
         const uploadResponse = await axios.post(
           `${process.env.REACT_APP_API_URL}files/uploads`,
@@ -470,7 +838,7 @@ function ColumnsLayouts() {
               Authorization: `Bearer ${token}`,
               "Content-Type": "multipart/form-data",
             },
-          }
+          },
         );
 
         uploadFilesResult = uploadResponse.data;
@@ -478,13 +846,14 @@ function ColumnsLayouts() {
 
       const finalFiles = [...existingFiles, ...(uploadFilesResult.files || [])];
 
-      finalFilesPayload = finalFiles.map((file) => {
-        if (typeof file === "string") return file;
-        if (file?.path) return file.path;
-        return file;
-      });
-    }
+      finalFilesPayload = finalFiles
+        .map((file) => {
+          if (typeof file === "string") return file;
 
+          return getNormalizedFilePath(file) || null;
+        })
+        .filter(Boolean);
+    }
 
     // Verifica se é para criar ou atualizar
     if (requisicao === "Criar") {
@@ -506,7 +875,9 @@ function ColumnsLayouts() {
 
         startDate: formData.startDate ? formData.startDate.toISOString() : null,
         endDate: formData.endDate ? formData.endDate.toISOString() : null,
-        conclusionDate: formData.conclusionDate ? formData.conclusionDate.toISOString() : null,
+        conclusionDate: formData.conclusionDate
+          ? formData.conclusionDate.toISOString()
+          : null,
 
         actionPlanStatus: formData.status,
         actionPlanPriority: formData.prioridade,
@@ -515,11 +886,15 @@ function ColumnsLayouts() {
         idActionPlanType: formData.tipoPlano || null,
         idResponsible: formData.responsavel || null,
 
-        idDepartments: formData.departamento?.length ? formData.departamento : null,
-        idDeficiencies: formData.deficiencia?.length ? formData.deficiencia : null,
+        idDepartments: formData.departamento?.length
+          ? formData.departamento
+          : null,
+        idDeficiencies: formData.deficiencia?.length
+          ? formData.deficiencia
+          : null,
         idProcesses: formData.processo?.length ? formData.processo : null,
         idRisks: formData.risco?.length ? formData.risco : null,
-
+        idControls: formData.controle?.length ? formData.controle : null,
         idLedgerAccounts: formData.conta?.length ? formData.conta : null,
         files: finalFilesPayload?.length ? finalFilesPayload : [],
       };
@@ -606,7 +981,7 @@ function ColumnsLayouts() {
                 getOptionLabel={(option) => option.nome}
                 value={
                   prioridades.find(
-                    (prioridade) => prioridade.id === formData.prioridade
+                    (prioridade) => prioridade.id === formData.prioridade,
                   ) || null
                 }
                 onChange={(event, newValue) => {
@@ -630,6 +1005,35 @@ function ColumnsLayouts() {
 
           {requisicao === "Editar" && (
             <>
+              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+                <Stack spacing={1}>
+                  <InputLabel>Tipo do plano</InputLabel>
+                  <Autocomplete
+                    options={tiposPlanos}
+                    getOptionLabel={(option) => option.nome}
+                    value={
+                      tiposPlanos.find(
+                        (tipoPlano) => tipoPlano.id === formData.tipoPlano,
+                      ) || null
+                    }
+                    onChange={(event, newValue) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        tipoPlano: newValue ? newValue.id : "",
+                      }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        error={
+                          !formData.tipoPlano &&
+                          formValidation.tipoPlano === false
+                        }
+                      />
+                    )}
+                  />
+                </Stack>
+              </Grid>
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Descrição</InputLabel>
@@ -677,42 +1081,59 @@ function ColumnsLayouts() {
                   <Autocomplete
                     options={responsaveis}
                     getOptionLabel={(option) => option.nome}
-                    value={responsaveis.find((r) => r.id === formData.responsavel) || null}
+                    value={
+                      responsaveis.find((r) => r.id === formData.responsavel) ||
+                      null
+                    }
                     onChange={(event, newValue) => {
-                      setFormData((prev) => ({ ...prev, responsavel: newValue ? newValue.id : null }));
+                      setFormData((prev) => ({
+                        ...prev,
+                        responsavel: newValue ? newValue.id : null,
+                      }));
                     }}
                     renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
 
-
-              <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+              <Grid item xs={6} mb={5}>
                 <Stack spacing={1}>
-                  <InputLabel>Tipo do plano</InputLabel>
+                  <InputLabel>Controles</InputLabel>
                   <Autocomplete
-                    options={tiposPlanos}
+                    multiple
+                    disableCloseOnSelect
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...controlesFiltrados,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={
-                      tiposPlanos.find(
-                        (tipoPlano) => tipoPlano.id === formData.tipoPlano
-                      ) || null
-                    }
-                    onChange={(event, newValue) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        tipoPlano: newValue ? newValue.id : "",
-                      }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        error={
-                          !formData.tipoPlano &&
-                          formValidation.tipoPlano === false
-                        }
-                      />
+                    value={formData.controle.map(
+                      (id) =>
+                        controles.find((controle) => controle.id === id) || id,
                     )}
+                    onChange={handleSelectAllControles}
+                    isOptionEqualToValue={(option, value) =>
+                      option.id === value.id
+                    }
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Grid container alignItems="center">
+                          <Grid item>
+                            <Checkbox
+                              checked={
+                                option.id === "all"
+                                  ? allSelectedControles
+                                  : selected
+                              }
+                            />
+                          </Grid>
+                          <Grid item xs>
+                            {option.nome}
+                          </Grid>
+                        </Grid>
+                      </li>
+                    )}
+                    renderInput={(params) => <TextField {...params} />}
                   />
                 </Stack>
               </Grid>
@@ -723,18 +1144,33 @@ function ColumnsLayouts() {
                   <Autocomplete
                     multiple
                     disableCloseOnSelect
-                    options={[{ id: "all", nome: "Selecionar todos" }, ...contas]}
+                    options={[
+                      { id: "all", nome: "Selecionar todos" },
+                      ...contasFiltradas,
+                    ]}
                     getOptionLabel={(option) => option.nome}
-                    value={formData.conta.map((id) => contas.find((c) => c.id === id) || id)}
+                    value={formData.conta.map(
+                      (id) => contas.find((c) => c.id === id) || id,
+                    )}
                     onChange={handleSelectAllContas}
-                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    isOptionEqualToValue={(option, value) =>
+                      option.id === value.id
+                    }
                     renderOption={(props, option, { selected }) => (
                       <li {...props}>
                         <Grid container alignItems="center">
                           <Grid item>
-                            <Checkbox checked={option.id === "all" ? allSelectedContas : selected} />
+                            <Checkbox
+                              checked={
+                                option.id === "all"
+                                  ? allSelectedContas
+                                  : selected
+                              }
+                            />
                           </Grid>
-                          <Grid item xs>{option.nome}</Grid>
+                          <Grid item xs>
+                            {option.nome}
+                          </Grid>
                         </Grid>
                       </li>
                     )}
@@ -742,7 +1178,6 @@ function ColumnsLayouts() {
                   />
                 </Stack>
               </Grid>
-
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -768,8 +1203,8 @@ function ColumnsLayouts() {
                     value={formData.departamento.map(
                       (id) =>
                         departamentos.find(
-                          (departamento) => departamento.id === id
-                        ) || id
+                          (departamento) => departamento.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAllDepartamentos}
                     isOptionEqualToValue={(option, value) =>
@@ -831,8 +1266,8 @@ function ColumnsLayouts() {
                     value={formData.deficiencia.map(
                       (id) =>
                         deficiencias.find(
-                          (deficiencia) => deficiencia.id === id
-                        ) || id
+                          (deficiencia) => deficiencia.id === id,
+                        ) || id,
                     )}
                     onChange={handleSelectAllEmpresas}
                     isOptionEqualToValue={(option, value) =>
@@ -893,7 +1328,7 @@ function ColumnsLayouts() {
                     getOptionLabel={(option) => option.nome}
                     value={formData.processo.map(
                       (id) =>
-                        processos.find((processo) => processo.id === id) || id
+                        processos.find((processo) => processo.id === id) || id,
                     )}
                     onChange={handleSelectAll2}
                     isOptionEqualToValue={(option, value) =>
@@ -951,7 +1386,7 @@ function ColumnsLayouts() {
                     ]}
                     getOptionLabel={(option) => option.nome}
                     value={formData.risco.map(
-                      (id) => riscos.find((risco) => risco.id === id) || id
+                      (id) => riscos.find((risco) => risco.id === id) || id,
                     )}
                     onChange={handleSelectAllRisco}
                     isOptionEqualToValue={(option, value) =>
@@ -991,11 +1426,11 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
-                  <InputLabel>Data de início (RN)</InputLabel>
+                  <InputLabel>Data de início</InputLabel>
                   <DatePicker
                     value={formData.startDate}
-                    onChange={() => { }}
-                    
+                    onChange={() => {}}
+                    disabled
                     slotProps={{ textField: { fullWidth: true } }}
                   />
                 </Stack>
@@ -1003,11 +1438,11 @@ function ColumnsLayouts() {
 
               <Grid item xs={6} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
-                  <InputLabel>Data de fim (RN)</InputLabel>
+                  <InputLabel>Data de fim</InputLabel>
                   <DatePicker
                     value={formData.endDate}
-                    onChange={() => { }}
-                  
+                    onChange={() => {}}
+                    disabled
                     slotProps={{ textField: { fullWidth: true } }}
                   />
                 </Stack>
@@ -1019,13 +1454,15 @@ function ColumnsLayouts() {
                   <DatePicker
                     value={formData.conclusionDate}
                     onChange={(newValue) =>
-                      setFormData((prev) => ({ ...prev, conclusionDate: newValue }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        conclusionDate: newValue,
+                      }))
                     }
                     slotProps={{ textField: { fullWidth: true } }}
                   />
                 </Stack>
               </Grid>
-
 
               <Grid item xs={4} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
@@ -1049,7 +1486,9 @@ function ColumnsLayouts() {
                   <FileUploader
                     containerFolder={11}
                     initialFiles={formData.files}
-                    onFilesChange={(files) => setFormData((prev) => ({ ...prev, files }))}
+                    onFilesChange={(files) =>
+                      setFormData((prev) => ({ ...prev, files }))
+                    }
                   />
                 </Stack>
               </Grid>

@@ -41,7 +41,7 @@ function ColumnsLayouts() {
   const { token } = useToken();
   const navigate = useNavigate();
   const location = useLocation();
-  const { dadosApi } = location.state || {};
+  const { dadosApi, idProject, idControl } = location.state || {};
   const [objetivoControles, setObjetivoControle] = useState("");
   const [tiposControles, setTiposControles] = useState("");
   const [carvs, setCarvs] = useState("");
@@ -110,7 +110,7 @@ function ColumnsLayouts() {
     plano: [],
     deficiencia: [],
     ameaca: [],
-    controle: "",
+    controle: idControl || "",
     normativa: [],
     assertion: [],
     status: null,
@@ -118,7 +118,7 @@ function ColumnsLayouts() {
     categoria: "",
     conclusaoTeste: "",
     frequencia: "",
-    projeto: "",
+    projeto: idProject || "",
     responsaveisTeste: responsavelPadrao,
     execucao: "",
     classificacao: "",

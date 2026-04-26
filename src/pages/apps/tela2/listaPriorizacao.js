@@ -1240,7 +1240,7 @@ const ListagemEmpresa = () => {
           }}
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/priorizacao/criar`, {
+              navigation(`/priorizacao/editar/${row.original.id}`, {
                 state: {
                   indoPara: "NovoESG",
                   dadosApi,

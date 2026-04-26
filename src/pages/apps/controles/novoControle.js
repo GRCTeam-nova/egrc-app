@@ -1,5 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Button,
   Box,
   TextField,
@@ -17,6 +20,7 @@ import {
   DialogTitle,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { enqueueSnackbar } from "notistack";
@@ -27,6 +31,7 @@ import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { CONTROL_FREQUENCY_OPTIONS } from "../../../utils/controlFrequency";
 import DrawerProcesso from "../configuracoes/novoProcessoDrawerControles";
 import DrawerConta from "../configuracoes/novaContaDrawerControles";
 import DrawerRisco from "../configuracoes/novoRiscoDrawerControles";
@@ -35,6 +40,7 @@ import DrawerDeficiencia from "../configuracoes/novaDeficienciaDrawerControles";
 import DrawerObjetivo from "../configuracoes/novoObjetivoDrawerControle";
 import DrawerIpe from "../configuracoes/novoIpeDrawerControle";
 import FileUploader from "../configuracoes/FileUploader";
+import ListaControleTestes from "./listaControleTestes";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -44,6 +50,7 @@ function ColumnsLayouts() {
   const { dadosApi } = location.state || {};
   const [objetivoControles, setObjetivoControle] = useState([]);
   const [contas, setContas] = useState([]);
+  const [contasFiltradas, setContasFiltradas] = useState([]);
   const [tiposControles, setTiposControles] = useState([]);
   const [carvs, setCarvs] = useState([]);
   const [frequencias, setFrequencias] = useState([]);
@@ -52,6 +59,7 @@ function ColumnsLayouts() {
   const [ativos, setAtivos] = useState([]);
   const [ipes, setIpes] = useState([]);
   const [riscos, setRiscoAssociados] = useState([]);
+  const [riscosFiltrados, setRiscosFiltrados] = useState([]);
   const [assertions, setAssertions] = useState([]);
   const [deficiencias, setDeficiencias] = useState([]);
   const [elementos, setElementos] = useState([]);
@@ -155,6 +163,22 @@ function ColumnsLayouts() {
     }
   };
 
+  const isOrphan = (item, keys) => {
+    let hasField = false;
+
+    for (const key of keys) {
+      if (item[key] !== undefined) {
+        hasField = true;
+
+        if (Array.isArray(item[key]) && item[key].length > 0) {
+          return false;
+        }
+      }
+    }
+
+    return hasField;
+  };
+
   useEffect(() => {
     fetchData(
       `${process.env.REACT_APP_API_URL}risks`,
@@ -214,20 +238,7 @@ function ColumnsLayouts() {
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setResponsavel
     );
-    const frequencias = [
-      { id: 1, nome: "Várias vezes ao dia" },
-      { id: 2, nome: "Diário" },
-      { id: 3, nome: "Semanal" },
-      { id: 4, nome: "Quinzenal" },
-      { id: 5, nome: "Mensal" },
-      { id: 6, nome: "Bimestral" },
-      { id: 7, nome: "Trimestral" },
-      { id: 8, nome: "Semestral" },
-      { id: 9, nome: "Anual" },
-      { id: 10, nome: "Bienal" },
-      { id: 11, nome: "Quinquenal" },
-    ];
-    setFrequencias(frequencias);
+    setFrequencias(CONTROL_FREQUENCY_OPTIONS);
     window.scrollTo(0, 0);
   }, []);
 
@@ -261,24 +272,38 @@ function ColumnsLayouts() {
           setRevisao(data.revisionControl);
           setFormData((prev) => ({
             ...prev,
-            deficiencia: data.idDeficiencies || null,
-            ipe: data.idInformationActivities || null,
-            elemento: data.idControlElementCosos || null,
-            risco: data.idRisks || null,
-            ativo: data.idPlatforms || null,
-            compensaControle: data.idControlCompensatings || null,
-            compensadoControle: data.idControlCompensateds || null,
-            objetivoControle: data.idControlObjectives || null,
+            deficiencia: Array.isArray(data.idDeficiencies)
+              ? data.idDeficiencies
+              : [],
+            ipe: Array.isArray(data.idInformationActivities)
+              ? data.idInformationActivities
+              : [],
+            elemento: Array.isArray(data.idControlElementCosos)
+              ? data.idControlElementCosos
+              : [],
+            risco: Array.isArray(data.idRisks) ? data.idRisks : [],
+            ativo: Array.isArray(data.idPlatforms) ? data.idPlatforms : [],
+            compensaControle: Array.isArray(data.idControlCompensatings)
+              ? data.idControlCompensatings
+              : [],
+            compensadoControle: Array.isArray(data.idControlCompensateds)
+              ? data.idControlCompensateds
+              : [],
+            objetivoControle: Array.isArray(data.idControlObjectives)
+              ? data.idControlObjectives
+              : [],
             processo: data.idProcess || null,
             responsavel: data.idResponsible || null,
-            conta: data.idControlLedgerAccounts || null,
+            conta: Array.isArray(data.idControlLedgerAccounts)
+              ? data.idControlLedgerAccounts
+              : [],
             frequencia: data.frequency || null,
             files: data.files || [],
             tiposControle: data.idControlType || null,
             execucao: data.idControlExecution || null,
             classificacao: data.idClassification || null,
-            assertion: data.idAssertions || null,
-            carv: data.idCvars || null,
+            assertion: Array.isArray(data.idAssertions) ? data.idAssertions : [],
+            carv: Array.isArray(data.idCvars) ? data.idCvars : [],
           }));
 
           setControleDados(data);
@@ -296,6 +321,71 @@ function ColumnsLayouts() {
       }
     }
   }, [dadosApi]);
+
+  useEffect(() => {
+    const atualizarDependentesPorProcesso = async () => {
+      if (!formData.processo) {
+        setContasFiltradas(contas);
+        setRiscosFiltrados(riscos);
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}processes/${formData.processo}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const ledgerAccounts =
+          response.data.ledgerAccounts || response.data.idLedgerAccounts || [];
+        const processRisks = response.data.risks || response.data.idRisks || [];
+
+        const idsContaPermitidos = new Set(
+          ledgerAccounts
+            .map((ledger) =>
+              typeof ledger === "object"
+                ? ledger.idLedgerAccount || ledger.id
+                : ledger
+            )
+            .filter(Boolean)
+        );
+
+        const idsRiscoPermitidos = new Set(
+          processRisks
+            .map((risk) =>
+              typeof risk === "object" ? risk.idRisk || risk.id : risk
+            )
+            .filter(Boolean)
+        );
+
+        setContasFiltradas(
+          contas.filter(
+            (conta) =>
+              idsContaPermitidos.has(conta.id) ||
+              isOrphan(conta, ["processes", "idProcesses"])
+          )
+        );
+
+        setRiscosFiltrados(
+          riscos.filter(
+            (risco) =>
+              idsRiscoPermitidos.has(risco.id) ||
+              isOrphan(risco, ["processes", "idProcesses"])
+          )
+        );
+      } catch (error) {
+        console.error("Erro ao buscar dependências do processo:", error);
+      }
+    };
+
+    if (contas.length > 0 || riscos.length > 0) {
+      atualizarDependentesPorProcesso();
+    }
+  }, [formData.processo, contas, riscos, token]);
 
   const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
 
@@ -349,6 +439,58 @@ useEffect(() => {
     formData.compensadoControle,
   ]);
 
+  useEffect(() => {
+    if (!formData.processo || contas.length === 0) {
+      return;
+    }
+
+    const idsContaPermitidos = new Set(
+      contasFiltradas.map((conta) => conta.id)
+    );
+
+    setFormData((prev) => {
+      const contasAtuais = Array.isArray(prev.conta) ? prev.conta : [];
+      const contasValidas = contasAtuais.filter((id) =>
+        idsContaPermitidos.has(id)
+      );
+
+      if (contasValidas.length === contasAtuais.length) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        conta: contasValidas,
+      };
+    });
+  }, [formData.processo, contas.length, contasFiltradas]);
+
+  useEffect(() => {
+    if (!formData.processo || riscos.length === 0) {
+      return;
+    }
+
+    const idsRiscoPermitidos = new Set(
+      riscosFiltrados.map((risco) => risco.id)
+    );
+
+    setFormData((prev) => {
+      const riscosAtuais = Array.isArray(prev.risco) ? prev.risco : [];
+      const riscosValidos = riscosAtuais.filter((id) =>
+        idsRiscoPermitidos.has(id)
+      );
+
+      if (riscosValidos.length === riscosAtuais.length) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        risco: riscosValidos,
+      };
+    });
+  }, [formData.processo, riscos.length, riscosFiltrados]);
+
   const handleProcessCreated = (newProcesso) => {
     setProcessos((prevProcessos) => [...prevProcessos, newProcesso]);
 
@@ -359,7 +501,12 @@ useEffect(() => {
   };
 
   const handleAccountCreated = (newConta) => {
-    setContas((prevContas) => [...prevContas, newConta]);
+    const contaNormalizada = {
+      ...newConta,
+      idProcesses: newConta.idProcesses || [],
+    };
+
+    setContas((prevContas) => [...prevContas, contaNormalizada]);
     setFormData((prev) => ({
       ...prev,
       conta: [...prev.conta, newConta.id],
@@ -367,7 +514,12 @@ useEffect(() => {
   };
 
   const handleRiskCreated = (newRisco) => {
-    setRiscoAssociados((prevRiscos) => [...prevRiscos, newRisco]);
+    const riscoNormalizado = {
+      ...newRisco,
+      idProcesses: newRisco.idProcesses || [],
+    };
+
+    setRiscoAssociados((prevRiscos) => [...prevRiscos, riscoNormalizado]);
     setFormData((prev) => ({
       ...prev,
       risco: [...prev.risco, newRisco.id],
@@ -421,12 +573,15 @@ useEffect(() => {
 
   const handleSelectAll = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.risco.length === riscos.length) {
+      if (allSelected) {
         // Deselect all
         setFormData({ ...formData, risco: [] });
       } else {
         // Select all
-        setFormData({ ...formData, risco: riscos.map((risco) => risco.id) });
+        setFormData({
+          ...formData,
+          risco: riscosFiltrados.map((risco) => risco.id),
+        });
       }
     } else {
       tratarMudancaInputGeral(
@@ -517,12 +672,15 @@ useEffect(() => {
 
   const handleSelectAllContas = (event, newValue) => {
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
-      if (formData.conta.length === contas.length) {
+      if (allSelectedContas) {
         // Deselect all
         setFormData({ ...formData, conta: [] });
       } else {
         // Select all
-        setFormData({ ...formData, conta: contas.map((conta) => conta.id) });
+        setFormData({
+          ...formData,
+          conta: contasFiltradas.map((conta) => conta.id),
+        });
       }
     } else {
       tratarMudancaInputGeral(
@@ -667,8 +825,16 @@ useEffect(() => {
     processo: true,
   });
 
+  const riscoIdsFiltrados = new Set(
+    riscosFiltrados.map((risco) => risco.id)
+  );
+  const contaIdsFiltrados = new Set(
+    contasFiltradas.map((conta) => conta.id)
+  );
   const allSelected =
-    formData.risco.length === riscos.length && riscos.length > 0;
+    riscosFiltrados.length > 0 &&
+    formData.risco.filter((id) => riscoIdsFiltrados.has(id)).length ===
+      riscosFiltrados.length;
   const allSelectedAtivos =
     formData.ativo.length === ativos.length && ativos.length > 0;
   const allSelectedIpes =
@@ -687,7 +853,9 @@ useEffect(() => {
     formData.compensaControle.length === compensaControles.length &&
     compensaControles.length > 0;
   const allSelectedContas =
-    formData.conta.length === contas.length && contas.length > 0;
+    contasFiltradas.length > 0 &&
+    formData.conta.filter((id) => contaIdsFiltrados.has(id)).length ===
+      contasFiltradas.length;
   const allSelectedObjetivoControles =
     formData.objetivoControle.length === objetivoControles.length &&
     objetivoControles.length > 0;
@@ -695,6 +863,7 @@ useEffect(() => {
     formData.carv.length === carvs.length && carvs.length > 0;
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const controleAtualId = controleDados?.idControl || dadosApi?.id || null;
 
   const tratarSubmit = async () => {
     let url = "";
@@ -905,7 +1074,7 @@ useEffect(() => {
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>
-                Processos *{" "}
+                Processo *{" "}
                 <DrawerProcesso
                   buttonSx={{
                     marginLeft: 1.5,
@@ -1204,12 +1373,17 @@ useEffect(() => {
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText="Nenhuma conta encontrada"
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todas" },
-                      ...contas,
-                    ]}
+                    options={
+                      contasFiltradas.length > 0
+                        ? [
+                            { id: "all", nome: "Selecionar todas" },
+                            ...contasFiltradas,
+                          ]
+                        : []
+                    }
                     getOptionLabel={(option) => option.nome}
                     value={formData.conta.map(
                       (id) => contas.find((conta) => conta.id === id) || id
@@ -1355,12 +1529,17 @@ useEffect(() => {
                     />
                   </InputLabel>
                   <Autocomplete
+                    noOptionsText="Nenhum risco encontrado"
                     multiple
                     disableCloseOnSelect
-                    options={[
-                      { id: "all", nome: "Selecionar todos" },
-                      ...riscos,
-                    ]}
+                    options={
+                      riscosFiltrados.length > 0
+                        ? [
+                            { id: "all", nome: "Selecionar todos" },
+                            ...riscosFiltrados,
+                          ]
+                        : []
+                    }
                     getOptionLabel={(option) => option.nome}
                     value={formData.risco.map(
                       (id) => riscos.find((risco) => risco.id === id) || id
@@ -1821,16 +2000,18 @@ useEffect(() => {
                 </Stack>
               </Grid>
 
-              {/* <Grid item xs={12} sx={{ paddingBottom: 5 }}>
-                              <Accordion>
-                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                  <Typography variant="h6">Testes</Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                  <ListagemTestes />
-                                </AccordionDetails>
-                              </Accordion>
-                            </Grid> */}
+              {controleAtualId && (
+                <Grid item xs={12} sx={{ paddingBottom: 5 }}>
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">Testes</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ px: 0 }}>
+                      <ListaControleTestes controlId={controleAtualId} />
+                    </AccordionDetails>
+                  </Accordion>
+                </Grid>
+              )}
             </>
           )}
 

@@ -534,6 +534,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovoImpactoEsg />
             },
+            {
+              path: 'editar/:id',
+              element: <NovoImpactoEsg />
+            },
           ]
         },
         {

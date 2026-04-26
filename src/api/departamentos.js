@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { API_URL } from 'config';
+import { useEffect, useState } from "react";
+import { API_URL } from "config";
 
-// Hook para buscar os dados de empresas
-export function useGetDepartamentos(formData) {
+export function useGetDepartamentos(formData = {}) {
   const [acoesJudiciais, setCustomers] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { GenerateExcel, refreshCount } = formData;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -13,24 +13,47 @@ export function useGetDepartamentos(formData) {
       setError(null);
 
       try {
-        const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem("access_token");
+        let url = `${API_URL}departments/reports`;
 
-        // Usar o token para acessar a API de empresas
-        const response = await fetch(
-          `${API_URL}departments`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        if (GenerateExcel === true) {
+          url += "?GenerateExcel=true";
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (!response.ok) {
           throw new Error("Erro ao buscar os dados de departamentos");
         }
 
-        const data = await response.json();
-        setCustomers(data);
+        if (GenerateExcel === true) {
+          const blob = await response.blob();
+          const contentDisposition = response.headers.get("Content-Disposition");
+          let filename = "Departamentos.xlsx";
+
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (filenameMatch && filenameMatch[1]) {
+              filename = filenameMatch[1];
+            }
+          }
+
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(downloadUrl);
+        } else {
+          const data = await response.json();
+          setCustomers(data.reportDepartments || []);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -39,7 +62,7 @@ export function useGetDepartamentos(formData) {
     };
 
     fetchData();
-  }, [formData]);
+  }, [GenerateExcel, refreshCount]);
 
   return {
     acoesJudiciais,

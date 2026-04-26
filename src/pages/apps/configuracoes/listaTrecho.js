@@ -21,7 +21,6 @@ import { useTheme } from "@mui/material/styles";
 import {
   Box,
   Button,
-  Tooltip,
   Dialog,
   DialogActions,
   Switch,
@@ -107,7 +106,14 @@ export const fuzzyFilter = (row, columnId, value) => {
 
 // ==============================|| REACT TABLE - LIST ||============================== //
 
-function ReactTable({ data, columns, processosTotal, isLoading, isLocked }) {
+function ReactTable({
+  data,
+  columns,
+  processosTotal,
+  isLoading,
+  isLocked,
+  normativeId,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
@@ -120,10 +126,6 @@ function ReactTable({ data, columns, processosTotal, isLoading, isLocked }) {
   const [isActiveFilter, setIsActiveFilter] = useState(true);
   const [isInactiveFilter, setIsInactiveFilter] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
-  const handleFilterClick = (event) => {
-    event.stopPropagation();
-    setAnchorEl(event.currentTarget);
-  };
 
   const handleFilterClose = () => {
     setAnchorEl(null);
@@ -266,10 +268,13 @@ function ReactTable({ data, columns, processosTotal, isLoading, isLocked }) {
             >
               <DrawerAcionista
                 disabled={isLocked}
+                normativeId={normativeId}
                 buttonSx={{
-                  marginLeft: 1.5,
-                  height: "20px",
-                  minWidth: "20px",
+                  height: "33px",
+                  minWidth: "96px",
+                  borderRadius: "4px",
+                  fontSize: "13px",
+                  fontWeight: 600,
                 }}
               />
             </Box>
@@ -484,6 +489,7 @@ ReactTable.propTypes = {
   getHeaderProps: PropTypes.func,
   handleAdd: PropTypes.func,
   isLocked: PropTypes.bool,
+  normativeId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   modalToggler: PropTypes.func,
   renderRowSubComponent: PropTypes.any,
   refreshData: PropTypes.func,
@@ -1045,16 +1051,15 @@ ActionCell.propTypes = {
 // ==============================|| LISTAGEM ||============================== //
 
 // Componente principal da página de listagem de registros
-const ListagemAcionistas = ({ readOnly = false }) => {
+const ListagemAcionistas = ({ readOnly = false, normativeId: providedNormativeId = null }) => {
   const theme = useTheme();
   const location = useLocation();
   const { dadosApi } = location.state || {};
-  const normativeId = dadosApi?.idNormative || dadosApi;
+  const normativeId = providedNormativeId || dadosApi?.idNormative || dadosApi;
   const [formData, setFormData] = useState({ refreshCount: 0 });
   const {
     acoesJudiciais: lists,
     isLoading,
-    refetch,
   } = useGetEmpresa(formData, normativeId);
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
@@ -1232,6 +1237,7 @@ const ListagemAcionistas = ({ readOnly = false }) => {
                 onFormDataChange: handleFormDataChange,
                 isLocked: readOnly,
                 isLoading,
+                normativeId,
                 refreshData: refreshOrgaos,
               }}
             />
@@ -1246,6 +1252,7 @@ const ListagemAcionistas = ({ readOnly = false }) => {
         acionista={selectedAcionista}
         disabled={readOnly}
         hideButton={true}
+        normativeId={normativeId}
       />
 
       <AlertCustomerDelete

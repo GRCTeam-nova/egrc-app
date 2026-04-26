@@ -50,6 +50,8 @@ import {
   ListItemText,
   ListItemAvatar,
   ListItemSecondaryAction,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import EditIcon from "@mui/icons-material/Edit";
@@ -69,6 +71,7 @@ import { enqueueSnackbar } from "notistack";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
+import { isBefore } from "date-fns";
 import ptBR from "date-fns/locale/pt-BR";
 import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
@@ -281,6 +284,99 @@ const steps = [
   { label: 'Análises e Gráficos', icon: <TrendingUpIcon /> },
 ];
 
+const IndicatorMenuCell = ({ tema, fieldName, listName, perfilEsgDetalhes, formData, handleInputChange, onSelect }) => {
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const open = Boolean(anchorEl);
+
+  const levelList = perfilEsgDetalhes?.levelLists?.find(l => l.levelListName === listName);
+  const indicators = levelList?.levelIndicators?.filter(ind => ind.active !== false) || [];
+
+  const vote = tema.esgProfileVotesLists?.find(v => v.levelListId === levelList?.id);
+  const currentIndicatorId = tema[`${fieldName}Indicator`]?.id || tema[`${fieldName}Indicator`] || vote?.levelIndicatorId;
+  const currentIndicator = indicators.find(ind => ind.id === currentIndicatorId);
+
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleSelect = (indicator) => {
+    if (onSelect) {
+      onSelect(indicator);
+      handleClose();
+      return;
+    }
+    const updatedTemas = formData.temas.map(t => {
+      if (t.codigo === tema.codigo) {
+         const newTema = { 
+           ...t, 
+           [`${fieldName}Indicator`]: indicator,
+           [fieldName]: indicator.value 
+         };
+         
+         const p = newTema.probabilidadeIndicator?.value || newTema.probabilidade || 0;
+         const i = newTema.intensidadeIndicator?.value || newTema.intensidade || 0;
+         const a = newTema.abrangenciaIndicator?.value || newTema.abrangencia || 0;
+         const u = newTema.urgenciaIndicator?.value || newTema.urgencia || 0;
+         const pi = newTema.importanciaPIIndicator?.value || newTema.importanciaPI || 0;
+         
+         newTema.significanciaImpacto = (p + i + a + u) / 4;
+         newTema.importanciaPI = pi;
+         
+         const f = parseFloat(newTema.significanciaFinanceira) || 0;
+         newTema.priorizacao = (newTema.significanciaImpacto + f + newTema.importanciaPI) / 3;
+         
+         return newTema;
+      }
+      return t;
+    });
+    handleInputChange('temas', updatedTemas);
+    handleClose();
+  };
+
+  return (
+    <Box>
+      <Box 
+        onClick={handleClick}
+        sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1, 
+          cursor: 'pointer',
+          padding: '4px 8px',
+          border: '1px solid #eee',
+          borderRadius: '4px',
+          minHeight: '32px',
+          '&:hover': { backgroundColor: '#f5f5f5' }
+        }}
+      >
+        {currentIndicator ? (
+          <>
+            <Box sx={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: currentIndicator.cssColor || '#ccc' }} />
+            <Typography variant="body2">{currentIndicator.levelIndicatorName}</Typography>
+          </>
+        ) : (
+          <Typography variant="body2" color="textSecondary">Selecionar</Typography>
+        )}
+      </Box>
+      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+        {indicators.map(ind => (
+          <MenuItem key={ind.id} onClick={() => handleSelect(ind)}>
+            <Box sx={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: ind.cssColor || '#ccc', mr: 1 }} />
+            {ind.levelIndicatorName} ({ind.value})
+          </MenuItem>
+        ))}
+        {indicators.length === 0 && (
+          <MenuItem disabled>Selecione um Perfil ESG primeiro</MenuItem>
+        )}
+      </Menu>
+    </Box>
+  );
+};
+
 // ==============================|| CICLO DE PRIORIZAÇÃO REFATORADO ||============================== //
 function NovoCicloPriorizacao() {
   const { token } = useToken();
@@ -314,7 +410,7 @@ function NovoCicloPriorizacao() {
     comentarioPriorizador: "",
     comentarioRevisores: "",
     statusPriorizacao: 1, // Em elaboração por padrão
-    temas: temasMock
+    temas: []
   });
 
   const { id } = useParams();
@@ -322,6 +418,8 @@ function NovoCicloPriorizacao() {
   const [colaboradoresOptions, setColaboradoresOptions] = useState([]);
   const [ciclosAnterioresOptions, setCiclosAnterioresOptions] = useState([]);
   const [perfisEsgOptions, setPerfisEsgOptions] = useState([]);
+  const [perfilEsgDetalhes, setPerfilEsgDetalhes] = useState(null);
+  const [cicloAnteriorDetalhes, setCicloAnteriorDetalhes] = useState(null);
 
   useEffect(() => {
     let unmounted = false;
@@ -379,13 +477,43 @@ function NovoCicloPriorizacao() {
           descricaoCiclo: d.prioritizationCycleDescription || '',
           dataInicio: d.startDate ? new Date(d.startDate) : null,
           dataFim: d.endDate ? new Date(d.endDate) : null,
-          priorizador: d.responsibleId ? { id: d.responsibleId, nome: 'Vínculo ID: ' + d.responsibleId } : null,
-          revisores: d.reviewerIds ? d.reviewerIds.map(rid => ({ id: rid, nome: 'ID ' + rid })) : [],
+          priorizador: d.responsibleId || null,
+          revisores: d.reviewerIds || [],
           comentarioPriorizador: d.responsibleComment || '',
-          statusPriorizacao: d.prioritizationCycleStats || 1,
-          perfilPriorizacao: d.levelListId || null,
+          statusPriorizacao: (() => {
+            const s = d.prioritizationCycleStats;
+            if (typeof s === 'number') return s;
+            if (typeof s === 'string') {
+              const str = s.toLowerCase();
+              if (str.includes('elabora')) return 1;
+              if (str.includes('conclu')) return 2;
+              if (str.includes('revis')) return 3;
+            }
+            return 1;
+          })(),
+          perfilPriorizacao: d.profileESGId || null,
           cicloAnterior: d.predecessorIds && d.predecessorIds.length > 0 ? d.predecessorIds[0] : null,
-          temas: d.themeIds ? d.themeIds.map(tid => ({ id: tid, codigo: tid, tema: 'Tema ID ' + tid, status: 'Monitorado' })) : [],
+          temas: d.themeEvaluations ? d.themeEvaluations.map(evalItem => ({
+            id: evalItem.themeId,
+            codigo: evalItem.themeId,
+            tema: 'Tema ID ' + evalItem.themeId,
+            status: 'Monitorado',
+            significanciaImpacto: evalItem.significanciaImpacto || 0,
+            significanciaFinanceira: evalItem.significanciaFinanceira || 0,
+            importanciaPI: evalItem.importanciaPI || 0,
+            priorizacao: evalItem.priorizacao || 0,
+            esgProfileVotesLists: evalItem.esgProfileVotesLists || evalItem.esgProfileVotesList || [],
+            impactosPositivos: [],
+            impactosNegativos: []
+          })) : (d.themeIds ? d.themeIds.map(tid => ({ 
+            id: tid, 
+            codigo: tid, 
+            tema: 'Tema ID ' + tid, 
+            status: 'Monitorado',
+            esgProfileVotesLists: [],
+            impactosPositivos: [],
+            impactosNegativos: []
+          })) : []),
           id: d.id,
           isDisabled: d.isDisabled
         }));
@@ -396,8 +524,76 @@ function NovoCicloPriorizacao() {
       }
     };
     fetchEdit();
-    return () => { unmounted = true; };
   }, [id, token]);
+
+  useEffect(() => {
+    if (temasOptions.length > 0 && formData.temas.length > 0) {
+      const needsHydration = formData.temas.some(t => t.tema && t.tema.startsWith('Tema ID '));
+      if (needsHydration) {
+        const hydratedTemas = formData.temas.map(t => {
+          if (t.tema && t.tema.startsWith('Tema ID ')) {
+            const realTema = temasOptions.find(opt => opt.id === t.id || String(opt.id) === String(t.codigo));
+            if (realTema) {
+              const axisMap = { 1: "Ambiental", 2: "Social", 3: "Governança" };
+              const eixoStr = axisMap[realTema.esgAxis] || "Ambiental";
+              return {
+                ...t,
+                tema: realTema.themeName || realTema.nomeTema || realTema.tema || realTema.id,
+                eixo: eixoStr,
+                codigo: realTema.themeCode || (typeof realTema.id === 'string' ? realTema.id.substring(0, 8) : realTema.id)
+              };
+            }
+          }
+          return t;
+        });
+        setFormData(prev => ({ ...prev, temas: hydratedTemas }));
+      }
+    }
+  }, [temasOptions, formData.temas]);
+
+  useEffect(() => {
+    let unmounted = false;
+    const fetchPerfilDetails = async () => {
+      if (!token || !formData.perfilPriorizacao) {
+        setPerfilEsgDetalhes(null);
+        return;
+      }
+      try {
+        const res = await axios.get(`${API_URL}ProfileESG/${formData.perfilPriorizacao}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!unmounted) {
+          setPerfilEsgDetalhes(res.data);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar detalhes do Perfil ESG", err);
+      }
+    };
+    fetchPerfilDetails();
+    return () => { unmounted = true; };
+  }, [formData.perfilPriorizacao, token]);
+
+  useEffect(() => {
+    let unmounted = false;
+    const fetchCicloAnterior = async () => {
+      if (!token || !formData.cicloAnterior) {
+        setCicloAnteriorDetalhes(null);
+        return;
+      }
+      try {
+        const res = await axios.get(`${API_URL}PrioritizationCycle/${formData.cicloAnterior}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!unmounted) {
+          setCicloAnteriorDetalhes(res.data);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar detalhes do Ciclo Anterior", err);
+      }
+    };
+    fetchCicloAnterior();
+    return () => { unmounted = true; };
+  }, [formData.cicloAnterior, token]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -408,7 +604,7 @@ function NovoCicloPriorizacao() {
   };
 
   const handleSelectAllRevisores = (event, newValue) => {
-    const availableRevisores = colaboradoresOptions.filter(c => c.id !== formData.priorizador);
+    const availableRevisores = colaboradoresOptions;
 
     if (newValue.length > 0 && newValue[newValue.length - 1].id === "all") {
       if (formData.revisores.length === availableRevisores.length) {
@@ -504,6 +700,11 @@ function NovoCicloPriorizacao() {
       missingFields.push("Priorizador");
     }
 
+    if (formData.dataInicio && formData.dataFim && isBefore(formData.dataFim, formData.dataInicio)) {
+      enqueueSnackbar("A data de fim não pode ser anterior à data de início!", { variant: "error" });
+      return;
+    }
+
     if (missingFields.length > 0) {
       const fieldsMessage = missingFields.join(" e ");
       const singularOrPlural = missingFields.length > 1 
@@ -525,19 +726,50 @@ function NovoCicloPriorizacao() {
           }))
         : [];
 
+      const themeEvaluations = formData.temas.map(tema => {
+        const esgProfileVotesLists = [];
+        
+        const addVote = (listName, indicatorObj) => {
+           if (!indicatorObj) return;
+           const list = perfilEsgDetalhes?.levelLists?.find(l => l.levelListName === listName);
+           if (list) {
+              esgProfileVotesLists.push({
+                 levelListId: list.id,
+                 levelIndicatorId: indicatorObj.id || indicatorObj
+              });
+           }
+        };
+
+        addVote("Níveis de Probabilidade", tema.probabilidadeIndicator);
+        addVote("Níveis de Intensidade", tema.intensidadeIndicator);
+        addVote("Níveis de Abrangência", tema.abrangenciaIndicator);
+        addVote("Níveis de Urgência/Prioridade", tema.urgenciaIndicator);
+        addVote("Níveis de Importância das Partes Interessadas", tema.importanciaPIIndicator);
+
+        return {
+          themeId: tema.id || tema.codigo,
+          significanciaImpacto: tema.significanciaImpacto || 0,
+          significanciaFinanceira: tema.significanciaFinanceira || 0,
+          importanciaPI: tema.importanciaPI || 0,
+          priorizacao: tema.priorizacao || 0,
+          esgProfileVotesLists
+        };
+      });
+
       const payload = {
         prioritizationCycleName: formData.nomeCiclo,
         startDate: formData.dataInicio ? formData.dataInicio.toISOString() : null,
         endDate: formData.dataFim ? formData.dataFim.toISOString() : null,
-        levelListId: formData.perfilPriorizacao || null,
+        profileESGId: formData.perfilPriorizacao || null,
         prioritizationCycleDescription: formData.descricaoCiclo,
-        prioritizationCycleStats: formData.statusPriorizacao || 1,
+        prioritizationCycleStats: Number(formData.statusPriorizacao) || 1,
         predecessorIds: formData.cicloAnterior ? [formData.cicloAnterior] : [],
         responsibleId: formData.priorizador || null,
         reviewerIds: formData.revisores.map(r => r.id ? r.id : r),
         responsibleComment: formData.comentarioPriorizador || null,
         reviewerComments: reviewerCommentsMapped,
-        themeIds: formData.temas.map(t => t.id || t)
+        themeIds: formData.temas.map(t => t.id || t),
+        themeEvaluations
       };
 
       if (requisicao === 'Editar') {
@@ -899,6 +1131,7 @@ function NovoCicloPriorizacao() {
               <InputLabel>Nome do Ciclo de Priorização *</InputLabel>
               <TextField
                 fullWidth
+                disabled={requisicao === 'Editar'}
                 value={formData.nomeCiclo}
                 onChange={(e) => handleInputChange('nomeCiclo', e.target.value)}
                 error={!formData.nomeCiclo && formValidation.nomeCiclo === false}
@@ -952,12 +1185,14 @@ function NovoCicloPriorizacao() {
               <InputLabel>Data de Fim *</InputLabel>
               <DatePicker
                 value={formData.dataFim}
+                minDate={formData.dataInicio}
                 onChange={(newValue) => handleInputChange('dataFim', newValue)}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     fullWidth
-                    error={!formData.dataFim && formValidation.dataFim === false}
+                    error={(!formData.dataFim && formValidation.dataFim === false) || (formData.dataInicio && formData.dataFim && isBefore(formData.dataFim, formData.dataInicio))}
+                    helperText={formData.dataInicio && formData.dataFim && isBefore(formData.dataFim, formData.dataInicio) ? "A data fim deve ser após a data início" : ""}
                   />
                 )}
               />
@@ -984,7 +1219,7 @@ function NovoCicloPriorizacao() {
             <Stack spacing={1}>
               <InputLabel>Ciclo de Priorização Anterior</InputLabel>
               <Autocomplete
-                options={ciclosAnterioresOptions}
+                options={ciclosAnterioresOptions.filter(ciclo => ciclo.id !== id)}
                 getOptionLabel={(option) => option.nome}
                 value={ciclosAnterioresOptions.find(ciclo => ciclo.id === formData.cicloAnterior) || null}
                 onChange={(event, newValue) => {
@@ -1025,8 +1260,8 @@ function NovoCicloPriorizacao() {
   );
 
   const renderResponsaveis = () => {
-    const availableRevisores = colaboradoresOptions.filter(colab => colab.id !== formData.priorizador);
-    const availablePriorizadores = colaboradoresOptions.filter(colab => !formData.revisores.includes(colab.id));
+    const availableRevisores = colaboradoresOptions;
+    const availablePriorizadores = colaboradoresOptions;
 
     return (
     <Card sx={{ mb: 3 }}>
@@ -1285,10 +1520,14 @@ function NovoCicloPriorizacao() {
                 <TableCell sx={{ fontWeight: 'bold' }}>Intens.</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Abrang.</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Urgên.</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>StakeHolders</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Sig. Impacto</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Sig. Financeira</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Import. PI</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Priorização</TableCell>
+                {cicloAnteriorDetalhes && (
+                  <TableCell sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Nota Ant.</TableCell>
+                )}
                 <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Ações</TableCell>
               </TableRow>
@@ -1321,65 +1560,101 @@ function NovoCicloPriorizacao() {
                     ))}
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {tema.probabilidade}
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={(tema.probabilidade / 5) * 100} 
-                        sx={{ width: 40, height: 6 }}
-                      />
-                    </Box>
+                    <IndicatorMenuCell
+                      tema={tema}
+                      fieldName="probabilidade"
+                      listName="Níveis de Probabilidade"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      formData={formData}
+                      handleInputChange={handleInputChange}
+                    />
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {tema.intensidade}
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={(tema.intensidade / 5) * 100} 
-                        sx={{ width: 40, height: 6 }}
-                      />
-                    </Box>
+                    <IndicatorMenuCell
+                      tema={tema}
+                      fieldName="intensidade"
+                      listName="Níveis de Intensidade"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      formData={formData}
+                      handleInputChange={handleInputChange}
+                    />
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {tema.abrangencia}
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={(tema.abrangencia / 5) * 100} 
-                        sx={{ width: 40, height: 6 }}
-                      />
-                    </Box>
+                    <IndicatorMenuCell
+                      tema={tema}
+                      fieldName="abrangencia"
+                      listName="Níveis de Abrangência"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      formData={formData}
+                      handleInputChange={handleInputChange}
+                    />
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {tema.urgencia}
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={(tema.urgencia / 5) * 100} 
-                        sx={{ width: 40, height: 6 }}
-                      />
-                    </Box>
+                    <IndicatorMenuCell
+                      tema={tema}
+                      fieldName="urgencia"
+                      listName="Níveis de Urgência/Prioridade"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      formData={formData}
+                      handleInputChange={handleInputChange}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <IndicatorMenuCell
+                      tema={tema}
+                      fieldName="importanciaPI"
+                      listName="Níveis de Importância das Partes Interessadas"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      formData={formData}
+                      handleInputChange={handleInputChange}
+                    />
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="bold">
-                      {tema.significanciaImpacto.toFixed(1)}
+                      {tema.significanciaImpacto?.toFixed(1) || "0.0"}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" fontWeight="bold">
-                      {tema.significanciaFinanceira.toFixed(1)}
-                    </Typography>
+                    <TextField
+                      size="small"
+                      type="number"
+                      inputProps={{ min: 0, max: 10, step: 0.1 }}
+                      value={tema.significanciaFinanceira || 0}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        const updatedTemas = formData.temas.map(t => {
+                           if(t.codigo === tema.codigo) {
+                              const newT = { ...t, significanciaFinanceira: val };
+                              newT.priorizacao = ((newT.significanciaImpacto || 0) + val + (newT.importanciaPI || 0)) / 3;
+                              return newT;
+                           }
+                           return t;
+                        });
+                        handleInputChange('temas', updatedTemas);
+                      }}
+                      sx={{ width: 70 }}
+                    />
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="bold">
-                      {tema.importanciaPI.toFixed(1)}
+                      {tema.importanciaPI?.toFixed(1) || "0.0"}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="bold" color="primary">
-                      {tema.priorizacao.toFixed(1)}
+                      {tema.priorizacao?.toFixed(1) || "0.0"}
                     </Typography>
                   </TableCell>
+                  {cicloAnteriorDetalhes && (
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {(() => {
+                          const oldEval = cicloAnteriorDetalhes.themeEvaluations?.find(e => e.themeId === (tema.id || tema.codigo));
+                          return oldEval?.priorizacao?.toFixed(1) || "-";
+                        })()}
+                      </Typography>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Chip 
                       label={tema.status} 
@@ -1532,44 +1807,112 @@ function NovoCicloPriorizacao() {
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Probabilidade (1-5)"
-                    type="number"
-                    inputProps={{ min: 1, max: 5 }}
-                    value={editingTema.probabilidade}
-                    onChange={(e) => setEditingTema({...editingTema, probabilidade: parseInt(e.target.value)})}
-                  />
+                  <Stack spacing={1}>
+                    <InputLabel>Probabilidade</InputLabel>
+                    <IndicatorMenuCell 
+                      tema={editingTema}
+                      fieldName="probabilidade"
+                      listName="Níveis de Probabilidade"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      onSelect={(indicator) => {
+                        const p = indicator.value;
+                        const i = editingTema.intensidadeIndicator?.value || editingTema.intensidade || 0;
+                        const a = editingTema.abrangenciaIndicator?.value || editingTema.abrangencia || 0;
+                        const u = editingTema.urgenciaIndicator?.value || editingTema.urgencia || 0;
+                        const pi = editingTema.importanciaPIIndicator?.value || editingTema.importanciaPI || 0;
+                        const f = parseFloat(editingTema.significanciaFinanceira) || 0;
+                        const sigImp = (p + i + a + u) / 4;
+                        setEditingTema({
+                          ...editingTema, 
+                          probabilidadeIndicator: indicator, 
+                          probabilidade: p,
+                          significanciaImpacto: sigImp,
+                          priorizacao: (sigImp + f + pi) / 3
+                        });
+                      }}
+                    />
+                  </Stack>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Intensidade (1-5)"
-                    type="number"
-                    inputProps={{ min: 1, max: 5 }}
-                    value={editingTema.intensidade}
-                    onChange={(e) => setEditingTema({...editingTema, intensidade: parseInt(e.target.value)})}
-                  />
+                  <Stack spacing={1}>
+                    <InputLabel>Intensidade</InputLabel>
+                    <IndicatorMenuCell 
+                      tema={editingTema}
+                      fieldName="intensidade"
+                      listName="Níveis de Intensidade"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      onSelect={(indicator) => {
+                        const p = editingTema.probabilidadeIndicator?.value || editingTema.probabilidade || 0;
+                        const i = indicator.value;
+                        const a = editingTema.abrangenciaIndicator?.value || editingTema.abrangencia || 0;
+                        const u = editingTema.urgenciaIndicator?.value || editingTema.urgencia || 0;
+                        const pi = editingTema.importanciaPIIndicator?.value || editingTema.importanciaPI || 0;
+                        const f = parseFloat(editingTema.significanciaFinanceira) || 0;
+                        const sigImp = (p + i + a + u) / 4;
+                        setEditingTema({
+                          ...editingTema, 
+                          intensidadeIndicator: indicator, 
+                          intensidade: i,
+                          significanciaImpacto: sigImp,
+                          priorizacao: (sigImp + f + pi) / 3
+                        });
+                      }}
+                    />
+                  </Stack>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Abrangência (1-5)"
-                    type="number"
-                    inputProps={{ min: 1, max: 5 }}
-                    value={editingTema.abrangencia}
-                    onChange={(e) => setEditingTema({...editingTema, abrangencia: parseInt(e.target.value)})}
-                  />
+                  <Stack spacing={1}>
+                    <InputLabel>Abrangência</InputLabel>
+                    <IndicatorMenuCell 
+                      tema={editingTema}
+                      fieldName="abrangencia"
+                      listName="Níveis de Abrangência"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      onSelect={(indicator) => {
+                        const p = editingTema.probabilidadeIndicator?.value || editingTema.probabilidade || 0;
+                        const i = editingTema.intensidadeIndicator?.value || editingTema.intensidade || 0;
+                        const a = indicator.value;
+                        const u = editingTema.urgenciaIndicator?.value || editingTema.urgencia || 0;
+                        const pi = editingTema.importanciaPIIndicator?.value || editingTema.importanciaPI || 0;
+                        const f = parseFloat(editingTema.significanciaFinanceira) || 0;
+                        const sigImp = (p + i + a + u) / 4;
+                        setEditingTema({
+                          ...editingTema, 
+                          abrangenciaIndicator: indicator, 
+                          abrangencia: a,
+                          significanciaImpacto: sigImp,
+                          priorizacao: (sigImp + f + pi) / 3
+                        });
+                      }}
+                    />
+                  </Stack>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Urgência (1-5)"
-                    type="number"
-                    inputProps={{ min: 1, max: 5 }}
-                    value={editingTema.urgencia}
-                    onChange={(e) => setEditingTema({...editingTema, urgencia: parseInt(e.target.value)})}
-                  />
+                  <Stack spacing={1}>
+                    <InputLabel>Urgência</InputLabel>
+                    <IndicatorMenuCell 
+                      tema={editingTema}
+                      fieldName="urgencia"
+                      listName="Níveis de Urgência/Prioridade"
+                      perfilEsgDetalhes={perfilEsgDetalhes}
+                      onSelect={(indicator) => {
+                        const p = editingTema.probabilidadeIndicator?.value || editingTema.probabilidade || 0;
+                        const i = editingTema.intensidadeIndicator?.value || editingTema.intensidade || 0;
+                        const a = editingTema.abrangenciaIndicator?.value || editingTema.abrangencia || 0;
+                        const u = indicator.value;
+                        const pi = editingTema.importanciaPIIndicator?.value || editingTema.importanciaPI || 0;
+                        const f = parseFloat(editingTema.significanciaFinanceira) || 0;
+                        const sigImp = (p + i + a + u) / 4;
+                        setEditingTema({
+                          ...editingTema, 
+                          urgenciaIndicator: indicator, 
+                          urgencia: u,
+                          significanciaImpacto: sigImp,
+                          priorizacao: (sigImp + f + pi) / 3
+                        });
+                      }}
+                    />
+                  </Stack>
                 </Grid>
                 <Grid item xs={12}>
                   <TextField

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { API_URL } from 'config';
+import { getControlFrequencyLabel } from "../utils/controlFrequency";
 
 // Hook para buscar os dados de empresas
 export function useGetControles(formData = {}) {
@@ -88,7 +89,14 @@ export function useGetControles(formData = {}) {
         } else {
           // listagem JSON
           const data = await response.json();
-          setCustomers(data.reportControls);
+          const normalizedControls = Array.isArray(data.reportControls)
+            ? data.reportControls.map((control) => ({
+                ...control,
+                frequency: getControlFrequencyLabel(control.frequency),
+              }))
+            : [];
+
+          setCustomers(normalizedControls);
         }
       } catch (err) {
         setError(err.message);
