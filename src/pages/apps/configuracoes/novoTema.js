@@ -1,27 +1,20 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import { API_URL } from 'config';
 import * as React from "react";
 import {
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Button,
   Box,
   TextField,
   Autocomplete,
   Grid,
   Stack,
-  Checkbox,
   InputLabel,
   Dialog,
   DialogActions,
   DialogContent,
   Typography,
-  Switch,
   DialogContentText,
   DialogTitle,
-  FormControlLabel,
-  Card,
-  CardContent,
   Divider,
   Chip,
 } from "@mui/material";
@@ -33,203 +26,58 @@ import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
-// Dados mock para os selects
 const eixosEsg = [
-  { id: 1, nome: "Ambiental" },
-  { id: 2, nome: "Social" },
-  { id: 3, nome: "Governança" },
+  { id: 1, nome: "Ambiental" },    // 1 = Environmental
+  { id: 2, nome: "Governança" },   // 2 = Governance
+  { id: 3, nome: "Social" },       // 3 = Social
 ];
 
-const criteriosAvaliados = [
-  // Critérios Ambientais
-  { id: 1, nome: "Mitigação de emissões de gases de efeito estufa (GEE)", eixo: "Ambiental" },
-  { id: 2, nome: "Adaptação às mudanças climáticas", eixo: "Ambiental" },
-  { id: 3, nome: "Eficiência energética", eixo: "Ambiental" },
-  { id: 4, nome: "Uso da água", eixo: "Ambiental" },
-  { id: 5, nome: "Gestão de efluentes", eixo: "Ambiental" },
-  { id: 6, nome: "Conservação e uso sustentável da biodiversidade", eixo: "Ambiental" },
-  { id: 7, nome: "Uso sustentável do solo", eixo: "Ambiental" },
-  { id: 8, nome: "Conservação e uso sustentável dos oceanos", eixo: "Ambiental" },
-  { id: 9, nome: "Economia circular", eixo: "Ambiental" },
-  { id: 10, nome: "Gestão de resíduos", eixo: "Ambiental" },
-  { id: 11, nome: "Gestão ambiental", eixo: "Ambiental" },
-  { id: 12, nome: "Prevenção da poluição sonora (ruídos e vibrações)", eixo: "Ambiental" },
-  { id: 13, nome: "Qualidade do ar (emissão de poluentes)", eixo: "Ambiental" },
-  { id: 14, nome: "Gerenciamento de áreas contaminadas", eixo: "Ambiental" },
-  // Critérios Sociais
-  { id: 15, nome: "Investimento social privado", eixo: "Social" },
-  { id: 16, nome: "Diálogo e engajamento das partes interessadas", eixo: "Social" },
-  { id: 17, nome: "Impacto social", eixo: "Social" },
-  { id: 18, nome: "Respeito aos direitos humanos", eixo: "Social" },
-  { id: 19, nome: "Combate ao trabalho forçado ou compulsório", eixo: "Social" },
-  { id: 20, nome: "Combate ao trabalho infantil", eixo: "Social" },
-  { id: 21, nome: "Políticas e práticas de diversidade e equidade", eixo: "Social" },
-  { id: 22, nome: "Cultura e promoção de inclusão", eixo: "Social" },
-  { id: 23, nome: "Desenvolvimento profissional", eixo: "Social" },
-  { id: 24, nome: "Saúde e segurança ocupacional", eixo: "Social" },
-  { id: 25, nome: "Qualidade de vida", eixo: "Social" },
-  { id: 26, nome: "Liberdade de associação", eixo: "Social" },
-  { id: 27, nome: "Política de remuneração e benefícios", eixo: "Social" },
-  { id: 28, nome: "Relacionamento com consumidores e clientes", eixo: "Social" },
-  { id: 29, nome: "Relacionamento com os fornecedores", eixo: "Social" },
-  // Critérios de Governança
-  { id: 30, nome: "Estrutura e composição da governança corporativa", eixo: "Governança" },
-  { id: 31, nome: "Propósito e estratégia em relação à sustentabilidade", eixo: "Governança" },
-  { id: 32, nome: "Compliance, programa de integridade e práticas anticorrupção", eixo: "Governança" },
-  { id: 33, nome: "Práticas de combate à concorrência desleal (antitruste)", eixo: "Governança" },
-  { id: 34, nome: "Engajamento das partes interessadas", eixo: "Governança" },
-  { id: 35, nome: "Gestão de riscos do negócio", eixo: "Governança" },
-  { id: 36, nome: "Controles internos", eixo: "Governança" },
-  { id: 37, nome: "Auditorias interna e externa", eixo: "Governança" },
-  { id: 38, nome: "Gestão da segurança da informação", eixo: "Governança" },
-  { id: 39, nome: "Privacidade de dados pessoais", eixo: "Governança" },
-  { id: 40, nome: "Responsabilização (prestação de contas)", eixo: "Governança" },
-  { id: 41, nome: "Relatórios ESG, de sustentabilidade e/ou relato integrado", eixo: "Governança" },
-  { id: 42, nome: "Produtos perigosos", eixo: "Ambiental" },
-  { id: 43, nome: "Diálogo social e desenvolvimento territorial", eixo: "Social" },
-];
-
-const gruposTema = [
-  { id: 1, nome: "Grupo Ambiental" },
-  { id: 2, nome: "Grupo Social" },
-  { id: 3, nome: "Grupo Governança" },
-  { id: 4, nome: "Grupo Estratégico" },
-  { id: 5, nome: "Grupo Operacional" },
-];
-
-const indicadores = [
-  { id: 1, nome: "Indicador de Emissões GEE" },
-  { id: 2, nome: "Indicador de Consumo de Água" },
-  { id: 3, nome: "Indicador de Geração de Resíduos" },
-  { id: 4, nome: "Indicador de Diversidade" },
-  { id: 5, nome: "Indicador de Segurança do Trabalho" },
-  { id: 6, nome: "Indicador de Governança" },
-];
-
-const stakeholders = [
-  { id: 1, nome: "Cliente" },
-  { id: 2, nome: "Fornecedor" },
-  { id: 3, nome: "Acionistas/Investidores" },
-  { id: 4, nome: "Conselheiros" },
-  { id: 5, nome: "Associações/ONGs/Órgãos" },
-  { id: 6, nome: "Sociedade" },
-  { id: 7, nome: "Colaboradores" },
-  { id: 8, nome: "Reguladores" },
-];
-
-const ods = [
-  { id: 1, nome: "ODS 1 - Erradicação da Pobreza" },
-  { id: 2, nome: "ODS 2 - Fome Zero e Agricultura Sustentável" },
-  { id: 3, nome: "ODS 3 - Saúde e Bem-Estar" },
-  { id: 4, nome: "ODS 4 - Educação de Qualidade" },
-  { id: 5, nome: "ODS 5 - Igualdade de Gênero" },
-  { id: 6, nome: "ODS 6 - Água Potável e Saneamento" },
-  { id: 7, nome: "ODS 7 - Energia Limpa e Acessível" },
-  { id: 8, nome: "ODS 8 - Trabalho Decente e Crescimento Econômico" },
-  { id: 9, nome: "ODS 9 - Indústria, Inovação e Infraestrutura" },
-  { id: 10, nome: "ODS 10 - Redução das Desigualdades" },
-  { id: 11, nome: "ODS 11 - Cidades e Comunidades Sustentáveis" },
-  { id: 12, nome: "ODS 12 - Consumo e Produção Responsáveis" },
-  { id: 13, nome: "ODS 13 - Ação Contra a Mudança Global do Clima" },
-  { id: 14, nome: "ODS 14 - Vida na Água" },
-  { id: 15, nome: "ODS 15 - Vida Terrestre" },
-  { id: 16, nome: "ODS 16 - Paz, Justiça e Instituições Eficazes" },
-  { id: 17, nome: "ODS 17 - Parcerias e Meios de Implementação" },
-];
-
-const capitais = [
-  { id: 1, nome: "Financeiro" },
-  { id: 2, nome: "Humano" },
-  { id: 3, nome: "Intelectual" },
-  { id: 4, nome: "Social e Relacionamento" },
-  { id: 5, nome: "Manufaturado" },
-  { id: 6, nome: "Natural" },
-];
-
-const impactosEsg = [
-  { id: 1, nome: "Diminuição do nível de água no rio dificulta a utilização da água na produção", tipo: "financeiro" },
-  { id: 2, nome: "As emissões das fábricas aumenta o efeito estufa", tipo: "impacto" },
-  { id: 3, nome: "Redução de custos operacionais", tipo: "financeiro" },
-  { id: 4, nome: "Melhoria da imagem corporativa", tipo: "impacto" },
-  { id: 5, nome: "Aumento da produtividade", tipo: "financeiro" },
-];
-
-const empresas = [
-  { id: 1, nome: "Empresa A" },
-  { id: 2, nome: "Empresa B" },
-  { id: 3, nome: "Empresa C" },
-];
-
-const processos = [
-  { id: 1, nome: "Processo de Produção" },
-  { id: 2, nome: "Processo de Vendas" },
-  { id: 3, nome: "Processo de RH" },
-  { id: 4, nome: "Processo Financeiro" },
-];
-
-const departamentos = [
-  { id: 1, nome: "Departamento de Sustentabilidade" },
-  { id: 2, nome: "Departamento de RH" },
-  { id: 3, nome: "Departamento Financeiro" },
-  { id: 4, nome: "Departamento de Produção" },
-];
-
-const riscos = [
-  { id: 1, nome: "Risco Climático" },
-  { id: 2, nome: "Risco Regulatório" },
-  { id: 3, nome: "Risco Reputacional" },
-  { id: 4, nome: "Risco Operacional" },
-];
-
-const planosAcao = [
-  { id: 1, nome: "Plano de Redução de Emissões" },
-  { id: 2, nome: "Plano de Diversidade e Inclusão" },
-  { id: 3, nome: "Plano de Gestão de Resíduos" },
-];
-
-const padroesEsg = [
-  { id: 1, nome: "GRI", topicos: ["GRI 102", "GRI 201", "GRI 302", "GRI 401"] },
-  { id: 2, nome: "SASB", topicos: ["SASB-001", "SASB-002", "SASB-003"] },
-  { id: 3, nome: "TCFD", topicos: ["TCFD-Gov", "TCFD-Str", "TCFD-Risk"] },
-  { id: 4, nome: "CDP", topicos: ["CDP-CC", "CDP-Water", "CDP-Forest"] },
-];
-
-const colaboradores = [
-  { id: 1, nome: "João Silva" },
-  { id: 2, nome: "Maria Santos" },
-  { id: 3, nome: "Pedro Oliveira" },
-  { id: 4, nome: "Ana Costa" },
-];
 
 // ==============================|| NOVO TEMA ESG ||============================== //
 function NovoTema() {
   const { token } = useToken();
   const navigate = useNavigate();
+  const { themeCode } = useParams();
   const location = useLocation();
   const { temaDados } = location.state || {};
-  
+  const [localTemaDados, setLocalTemaDados] = useState(temaDados || null);
+
+  const [indicadores, setIndicadores] = useState([]);
+  const [gruposTema, setGruposTema] = useState([]);
+  const [stakeholders, setStakeholders] = useState([]);
+  const [ods, setOds] = useState([]);
+  const [capitais] = useState([]);
+  const [impactosEsgFinanceiro] = useState([]);
+  const [impactosEsgImpacto] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
+  const [processos, setProcessos] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
+  const [riscos, setRiscos] = useState([]);
+  const [planosAcao, setPlanosAcao] = useState([]);
+  const [frameworks, setFrameworks] = useState([]);
+  const [frameworkTopics, setFrameworkTopics] = useState([]);
+  const [colaboradores, setColaboradores] = useState([]);
+
   const [loading, setLoading] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(true);
   const [requisicao, setRequisicao] = useState("Criar");
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
   const [hasChanges, setHasChanges] = useState(false);
-  
+
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
   const [formData, setFormData] = useState({
-    // Campos obrigatórios
+    id: "",
     codigoTema: "",
     nomeTema: "",
     descricaoTema: "",
     responsavel: null,
-    
-    // Campos de seleção múltipla
-    eixoEsg: [],
+    eixoEsg: null,
     criteriosRelacionadosAvaliados: [],
     grupoTema: [],
     indicadoresTema: [],
@@ -243,28 +91,122 @@ function NovoTema() {
     departamentoTema: [],
     riscoTema: [],
     planoAcao: [],
-    
-    // Campos de padrão/framework
-    nomePadrao: null,
-    nomeTopico: null,
-    
-    // Campos automáticos (readonly)
-    cicloPriorizacao: null,
-    statusTema: "Ativo",
-    
-    // Anexos
-    anexos: [],
+    frameworks: [],
+    frameTopics: [],
+    statusTema: true,
   });
 
-  // Em caso de edição
+  // Fetch all options
   useEffect(() => {
-    if (temaDados) {
+    const fetchOptions = async () => {
+      if (!token) return;
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+        const requests = [
+          { url: `${API_URL}Indicator`, setter: setIndicadores, nameKey: 'indicatorName' },
+          { url: `${API_URL}ThemeGroup`, setter: setGruposTema, nameKey: 'themeGroupName' },
+          { url: `${API_URL}SDG`, setter: setOds, nameKey: 'sdgName' },
+          { url: `${API_URL}Stakeholder`, setter: setStakeholders, nameKey: 'name', filterActive: true },
+          { url: `${API_URL}collaborators`, setter: setColaboradores, nameKey: 'name' },
+          { url: `${API_URL}departments`, setter: setDepartamentos, nameKey: 'departmentName' },
+          { url: `${API_URL}companies`, setter: setEmpresas, nameKey: 'companyName' },
+          { url: `${API_URL}processes`, setter: setProcessos, nameKey: 'processName' },
+          { url: `${API_URL}risks`, setter: setRiscos, nameKey: 'riskName' },
+          { url: `${API_URL}Framework`, setter: setFrameworks, nameKey: 'frameworkName' },
+          { url: `${API_URL}FrameworkTopic`, setter: setFrameworkTopics, nameKey: 'frameworkTopicName' },
+          { url: `${API_URL}action-plans`, setter: setPlanosAcao, nameKey: 'name' },
+        ];
+
+        await Promise.all(requests.map(async (req) => {
+          try {
+            const res = await axios.get(req.url, { headers });
+            let data = res.data || [];
+            // Filtra globalmente garantindo que itens com active ou status definidos como false não sejam exibidos nos seletores
+            data = data.filter(item => {
+              if (item.active !== undefined) return item.active === true;
+              if (item.status !== undefined) return item.status === true;
+              return true;
+            });
+            const mappedData = data.map(item => {
+              const id = item.id || item.idActionPlan || item.idCompany || item.idProcess || item.idDepartment || item.idRisk || item.idCollaborator || item.idThemeGroup || item.indicatorId || item.sdgId || item.idFramework || item.idFrameworkTopic || item.idStakeholder;
+              return {
+                ...item,
+                id: id,
+                nome: item[req.nameKey] || item.nome || item.name || id
+              };
+            });
+            req.setter(mappedData);
+          } catch (e) {
+            console.error(`Error fetching ${req.url}:`, e);
+          }
+        }));
+        setOptionsLoading(false);
+      } catch (error) {
+        console.error("Error fetching options:", error);
+        setOptionsLoading(false);
+      }
+    };
+    fetchOptions();
+  }, [token]);
+
+  // Se não houver temaDados no state, mas houver themeCode no param, buscar da API
+  useEffect(() => {
+    const fetchByCode = async () => {
+      if (themeCode && token) {
+        setLoading(true);
+        try {
+          const res = await axios.get(`${API_URL}Theme/Code/${themeCode}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data) {
+            setLocalTemaDados(res.data);
+          }
+        } catch (error) {
+          console.error("Erro ao buscar tema por código:", error);
+          enqueueSnackbar("Não foi possível carregar os dados do tema.", { variant: "error" });
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchByCode();
+  }, [themeCode, token]);
+
+  // Handle Edit Mode from State
+  useEffect(() => {
+    if (localTemaDados && !optionsLoading) {
       setRequisicao("Editar");
       setMensagemFeedback("editado");
-      // Aqui você carregaria os dados do tema para edição
-      // setFormData com os dados existentes
+
+      const findItem = (list, id, key = 'id') => list.find(item => item[key] === id) || null;
+      const findMultiple = (list, ids, key = 'id') => list.filter(item => ids?.includes(item[key]));
+
+      setFormData({
+        id: localTemaDados.id || "",
+        codigoTema: localTemaDados.themeCode || "",
+        nomeTema: localTemaDados.themeName || "",
+        descricaoTema: localTemaDados.themeDescription || "",
+        responsavel: findItem(colaboradores, localTemaDados.responsibleId, 'idCollaborator'),
+        eixoEsg: findItem(eixosEsg, localTemaDados.esgAxis),
+        grupoTema: findMultiple(gruposTema, localTemaDados.themeThemeGroups?.map(x => x.id) || localTemaDados.themeGroupIds || []),
+        indicadoresTema: findMultiple(indicadores, localTemaDados.themeIndicators?.map(x => x.id) || localTemaDados.indicatorIds || []),
+        stakeholders: findMultiple(stakeholders, localTemaDados.themeStakeholders?.map(x => x.id) || localTemaDados.stakeholderIds || []),
+        ods: findMultiple(ods, localTemaDados.themeSDGs?.map(x => x.id) || localTemaDados.sdgIds || []),
+        capitais: findMultiple(capitais, localTemaDados.themeCapitals?.map(x => x.id) || localTemaDados.capitalIds || []),
+        significanciaFinanceira: findMultiple(impactosEsgFinanceiro, localTemaDados.themeFinancialSignificances?.map(x => x.id) || localTemaDados.financialSignificanceIds || []),
+        significanciaDeImpacto: findMultiple(impactosEsgImpacto, localTemaDados.themeSignificanceImpacts?.map(x => x.id) || localTemaDados.significanceImpactIds || []),
+        empresaTema: findMultiple(empresas, localTemaDados.themeCompanies?.map(x => x.id) || localTemaDados.companyIds || []),
+        processoTema: findMultiple(processos, localTemaDados.themeProcesses?.map(x => x.id) || localTemaDados.processIds || []),
+        departamentoTema: findMultiple(departamentos, localTemaDados.themeDepartments?.map(x => x.id) || localTemaDados.departmentIds || []),
+        riscoTema: findMultiple(riscos, localTemaDados.themeRisks?.map(x => x.id) || localTemaDados.riskIds || []),
+        planoAcao: findMultiple(planosAcao, localTemaDados.themeActionPlans?.map(x => x.id) || localTemaDados.actionPlanIds || []),
+        frameworks: findMultiple(frameworks, localTemaDados.themeFrameworks?.map(x => x.id) || localTemaDados.frameworkIds || []),
+        frameTopics: findMultiple(frameworkTopics, localTemaDados.themeFrameTopics?.map(x => x.id) || localTemaDados.frameTopicIds || []),
+        statusTema: localTemaDados.active ?? true,
+      });
+      setHasChanges(false);
     }
-  }, [temaDados]);
+  }, [localTemaDados, colaboradores, gruposTema, indicadores, stakeholders, ods, capitais, impactosEsgFinanceiro, impactosEsgImpacto, empresas, processos, departamentos, riscos, planosAcao, frameworks, frameworkTopics, optionsLoading]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -282,20 +224,6 @@ function NovoTema() {
     setHasChanges(true);
   };
 
-  const handlePadraoChange = (event, newValue) => {
-    setFormData(prev => ({
-      ...prev,
-      nomePadrao: newValue,
-      nomeTopico: null // Reset tópico quando muda padrão
-    }));
-    setHasChanges(true);
-  };
-
-  const getTopicosPorPadrao = () => {
-    if (!formData.nomePadrao) return [];
-    const padrao = padroesEsg.find(p => p.id === formData.nomePadrao.id);
-    return padrao ? padrao.topicos.map((topico, index) => ({ id: index + 1, nome: topico })) : [];
-  };
 
   const [formValidation, setFormValidation] = useState({
     codigoTema: true,
@@ -341,22 +269,22 @@ function NovoTema() {
 
   const tratarSubmit = async () => {
     const missingFields = [];
-    
+
     if (!formData.codigoTema.trim() || !validarCodigoTema(formData.codigoTema)) {
       setFormValidation(prev => ({ ...prev, codigoTema: false }));
       missingFields.push("Código do Tema");
     }
-    
+
     if (!formData.nomeTema.trim() || !validarNomeTema(formData.nomeTema)) {
       setFormValidation(prev => ({ ...prev, nomeTema: false }));
       missingFields.push("Nome do Tema");
     }
-    
+
     if (!formData.descricaoTema.trim()) {
       setFormValidation(prev => ({ ...prev, descricaoTema: false }));
       missingFields.push("Descrição do Tema");
     }
-    
+
     if (!formData.responsavel) {
       setFormValidation(prev => ({ ...prev, responsavel: false }));
       missingFields.push("Responsável");
@@ -364,8 +292,8 @@ function NovoTema() {
 
     if (missingFields.length > 0) {
       const fieldsMessage = missingFields.join(" e ");
-      const singularOrPlural = missingFields.length > 1 
-        ? "são obrigatórios e devem estar válidos!" 
+      const singularOrPlural = missingFields.length > 1
+        ? "são obrigatórios e devem estar válidos!"
         : "é obrigatório e deve estar válido!";
       enqueueSnackbar(`O campo ${fieldsMessage} ${singularOrPlural}`, {
         variant: "error",
@@ -375,10 +303,48 @@ function NovoTema() {
 
     try {
       setLoading(true);
-      
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
+      // Helper: extrai IDs válidos, sem nulos e sem duplicatas
+      const uniqueIds = (arr) => [...new Set(arr.map(i => i.id).filter(id => id && id !== ''))];
+
+      const payload = {
+        id: requisicao === "Editar" ? formData.id : undefined,
+        themeCode: formData.codigoTema,
+        themeName: formData.nomeTema,
+        themeDescription: formData.descricaoTema,
+        responsibleId: formData.responsavel?.id || formData.responsavel?.idCollaborator || null,
+        esgAxis: formData.eixoEsg?.id || 0,
+        active: formData.statusTema,
+        frameworkIds: uniqueIds(formData.frameworks),
+        frameTopicIds: uniqueIds(formData.frameTopics),
+        themeGroupIds: uniqueIds(formData.grupoTema),
+        indicatorIds: uniqueIds(formData.indicadoresTema),
+        stakeholderIds: uniqueIds(formData.stakeholders),
+        sdgIds: uniqueIds(formData.ods),
+        capitalIds: uniqueIds(formData.capitais),
+        sdgCapitalIds: [],
+        financialSignificanceIds: uniqueIds(formData.significanciaFinanceira),
+        significanceImpactIds: uniqueIds(formData.significanciaDeImpacto),
+        companyIds: uniqueIds(formData.empresaTema),
+        processIds: uniqueIds(formData.processoTema),
+        departmentIds: uniqueIds(formData.departamentoTema),
+        riskIds: uniqueIds(formData.riscoTema),
+        actionPlanIds: uniqueIds(formData.planoAcao),
+      };
+
+      const url = `${API_URL}Theme`;
+      const method = requisicao === "Editar" ? "put" : "post";
+
+      await axios({
+        method,
+        url,
+        data: payload,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
       enqueueSnackbar(`Tema ESG ${mensagemFeedback} com sucesso!`, {
         variant: "success",
       });
@@ -400,10 +366,10 @@ function NovoTema() {
 
   return (
     <>
-      <LoadingOverlay isActive={loading} />
+      <LoadingOverlay isActive={loading || optionsLoading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={3} marginTop={1}>
-          
+
           {/* Seção: Informações Básicas */}
           <Grid item xs={12}>
             <Typography variant="h5" gutterBottom>
@@ -421,7 +387,8 @@ function NovoTema() {
                 error={!formData.codigoTema && formValidation.codigoTema === false}
                 placeholder="Digite o código do tema (máx. 10 caracteres)"
                 inputProps={{ maxLength: 10 }}
-                helperText="Máximo de 10 caracteres. Deve ser único."
+                disabled={requisicao === "Editar"}
+                helperText={requisicao === "Editar" ? "O código não pode ser alterado na edição." : "Máximo de 10 caracteres. Deve ser único."}
               />
             </Stack>
           </Grid>
@@ -461,13 +428,14 @@ function NovoTema() {
               <InputLabel>Padrão/Framework</InputLabel>
               <Autocomplete
                 multiple
-                options={padroesEsg}
-                getOptionLabel={(option) => option.nome}
-                value={formData.padroesEsg}
-                onChange={handleMultiSelectChange('padroesEsg')}
+                options={frameworks}
+                getOptionLabel={(option) => option.nome || ""}
+                value={formData.frameworks}
+                onChange={handleMultiSelectChange('frameworks')}
                 renderInput={(params) => (
                   <TextField {...params} placeholder="Selecione os padrões" />
                 )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
                 renderTags={(value, getTagProps) =>
                   value.map((option, index) => (
                     <Chip
@@ -486,14 +454,25 @@ function NovoTema() {
             <Stack spacing={1}>
               <InputLabel>Tópico do Padrão</InputLabel>
               <Autocomplete
-                options={getTopicosPorPadrao()}
-                getOptionLabel={(option) => option.nome}
-                value={formData.nomeTopico}
-                onChange={(event, newValue) => handleInputChange('nomeTopico', newValue)}
-                disabled={!formData.nomePadrao}
+                multiple
+                options={frameworkTopics}
+                getOptionLabel={(option) => option.nome || ""}
+                value={formData.frameTopics}
+                onChange={handleMultiSelectChange('frameTopics')}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Selecione o tópico" />
+                  <TextField {...params} placeholder="Selecione os tópicos" />
                 )}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      variant="outlined"
+                      label={option.nome}
+                      {...getTagProps({ index })}
+                      key={option.id}
+                    />
+                  ))
+                }
               />
             </Stack>
           </Grid>
@@ -529,24 +508,13 @@ function NovoTema() {
             <Stack spacing={1}>
               <InputLabel>Eixo ESG</InputLabel>
               <Autocomplete
-                multiple
                 options={eixosEsg}
                 getOptionLabel={(option) => option.nome}
                 value={formData.eixoEsg}
-                onChange={handleMultiSelectChange('eixoEsg')}
+                onChange={(event, newValue) => handleInputChange('eixoEsg', newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} placeholder="Selecione os eixos ESG" />
+                  <TextField {...params} placeholder="Selecione o eixo ESG" />
                 )}
-                renderTags={(value, getTagProps) =>
-                  value.map((option, index) => (
-                    <Chip
-                      variant="outlined"
-                      label={option.nome}
-                      {...getTagProps({ index })}
-                      key={option.id}
-                    />
-                  ))
-                }
               />
             </Stack>
           </Grid>
@@ -703,7 +671,7 @@ function NovoTema() {
               <InputLabel>Significância Financeira</InputLabel>
               <Autocomplete
                 multiple
-                options={impactosEsg.filter(i => i.tipo === 'financeiro')}
+                options={impactosEsgFinanceiro}
                 getOptionLabel={(option) => option.nome}
                 value={formData.significanciaFinanceira}
                 onChange={handleMultiSelectChange('significanciaFinanceira')}
@@ -730,7 +698,7 @@ function NovoTema() {
               <InputLabel>Significância de Impacto</InputLabel>
               <Autocomplete
                 multiple
-                options={impactosEsg.filter(i => i.tipo === 'impacto')}
+                options={impactosEsgImpacto}
                 getOptionLabel={(option) => option.nome}
                 value={formData.significanciaDeImpacto}
                 onChange={handleMultiSelectChange('significanciaDeImpacto')}
@@ -915,7 +883,7 @@ function NovoTema() {
               <InputLabel>Status do Tema</InputLabel>
               <TextField
                 fullWidth
-                value={formData.statusTema}
+                value={formData.statusTema ? "Ativo" : "Inativo"}
                 InputProps={{ readOnly: true }}
                 helperText="Status baseado na última priorização realizada"
               />
@@ -937,8 +905,12 @@ function NovoTema() {
                 color="primary"
                 onClick={tratarSubmit}
                 sx={{ minWidth: 120 }}
+                disabled={
+                  (requisicao === "Editar" && !hasChanges) ||
+                  (requisicao === "Criar" && (!formData.codigoTema.trim() || !formData.nomeTema.trim() || !formData.descricaoTema.trim() || !formData.responsavel))
+                }
               >
-                {requisicao === "Criar" ? "Criar" : "Atualizar"}
+                {requisicao === "Criar" ? "Criar" : "Salvar"}
               </Button>
               <Button
                 variant="outlined"

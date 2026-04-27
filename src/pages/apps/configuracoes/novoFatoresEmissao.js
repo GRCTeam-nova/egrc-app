@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import { API_URL } from 'config';
 import * as React from "react";
 import {
   Button,
@@ -40,39 +41,56 @@ function NovoFatorEmissaoESG() {
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
 
-  // Mocks para campos de seleção/autocomplete
-  const mockUnidades = [
-    { id: 1, nome: "Litro", valor: "Litro" },
-    { id: 2, nome: "kWh", valor: "kWh" },
-    { id: 3, nome: "Tonelada", valor: "Tonelada" },
-    { id: 4, nome: "Passageiro.km", valor: "Passageiro.km" },
-    { id: 5, nome: "kg CO2e/unidade", valor: "kg CO2e/unidade" },
-  ];
-
-  const mockFontesOficiais = [
-    { id: 1, nome: "IPCC 2006", valor: "IPCC 2006" },
-    { id: 2, nome: "MCTI 2023", valor: "MCTI 2023" },
-    { id: 3, nome: "MCTI 2022", valor: "MCTI 2022" },
-    { id: 4, nome: "ABRIPE 2021", valor: "ABRIPE 2021" },
-  ];
+  const [unidades, setUnidades] = useState([]);
+  const [fontes, setFontes] = useState([]);
 
   const [formData, setFormData] = useState({
-    codigo_fator_emissao: "", // número
-    nome_fator_emissao: "", // alpha
-    unidade_de: null, // seleção (unidade de origem)
-    valor_de: "", // número (valor de origem)
-    unidade_para: null, // seleção (unidade da conversão)
-    valor_para: "", // número (valor convertido)
-    fonte_oficial: null, // alpha / seleção
+    id: "",
+    emissionFactorESGCode: "",
+    emissionFactorESGName: "",
+    originUnitId: null,
+    originValue: "",
+    convertedUnitId: null,
+    dataSourceId: null,
+    convertedOriginValue: "",
+    emissionFactorESGDescription: "",
+    active: true
   });
 
   // Em caso de edição
   useEffect(() => {
+    const fetchData = async () => {
+      if (!token) return;
+      try {
+        const [resUnits, resSources] = await Promise.all([
+          axios.get("https://api.egrc.homologacao.com.br/api/v1/Measure/enums", { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API_URL}DataSource`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        setUnidades(resUnits.data?.units || []);
+        setFontes(resSources.data || []);
+      } catch (e) {
+        console.error("Erro ao buscar dados auxiliares:", e);
+      }
+    };
+    fetchData();
+  }, [token]);
+
+  useEffect(() => {
     if (fatorEmissao) {
       setRequisicao("Editar");
       setMensagemFeedback("editado");
-      // Aqui você carregaria os dados do fator de emissão para edição
-      // setFormData com os dados existentes
+      setFormData({
+        id: fatorEmissao.id || "",
+        emissionFactorESGCode: fatorEmissao.emissionFactorESGCode || "",
+        emissionFactorESGName: fatorEmissao.emissionFactorESGName || "",
+        originUnitId: fatorEmissao.originUnitId || null,
+        originValue: fatorEmissao.originValue ?? "",
+        convertedUnitId: fatorEmissao.convertedUnitId || null,
+        dataSourceId: fatorEmissao.dataSourceId || null,
+        convertedOriginValue: fatorEmissao.convertedOriginValue ?? "",
+        emissionFactorESGDescription: fatorEmissao.emissionFactorESGDescription || "",
+        active: fatorEmissao.active ?? true
+      });
     }
   }, [fatorEmissao]);
 
@@ -85,13 +103,13 @@ function NovoFatorEmissaoESG() {
   };
 
   const [formValidation, setFormValidation] = useState({
-    codigo_fator_emissao: true,
-    nome_fator_emissao: true,
-    unidade_de: true,
-    valor_de: true,
-    unidade_para: true,
-    valor_para: true,
-    fonte_oficial: true,
+    emissionFactorESGCode: true,
+    emissionFactorESGName: true,
+    originUnitId: true,
+    originValue: true,
+    convertedUnitId: true,
+    dataSourceId: true,
+    convertedOriginValue: true,
   });
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -115,63 +133,60 @@ function NovoFatorEmissaoESG() {
     const missingFields = [];
     let isValid = true;
     
-    // Validação dos campos obrigatórios (código e nome)
-    if (!formData.codigo_fator_emissao.toString().trim()) {
-      setFormValidation(prev => ({ ...prev, codigo_fator_emissao: false }));
-      missingFields.push("Código do Fator de Emissão");
+    if (!formData.emissionFactorESGCode) {
+      setFormValidation(prev => ({ ...prev, emissionFactorESGCode: false }));
+      missingFields.push("Código");
       isValid = false;
     } else {
-      setFormValidation(prev => ({ ...prev, codigo_fator_emissao: true }));
+      setFormValidation(prev => ({ ...prev, emissionFactorESGCode: true }));
     }
     
-    if (!formData.nome_fator_emissao.trim()) {
-      setFormValidation(prev => ({ ...prev, nome_fator_emissao: false }));
-      missingFields.push("Nome do Fator de Emissão");
+    if (!formData.emissionFactorESGName?.trim()) {
+      setFormValidation(prev => ({ ...prev, emissionFactorESGName: false }));
+      missingFields.push("Nome");
       isValid = false;
     } else {
-      setFormValidation(prev => ({ ...prev, nome_fator_emissao: true }));
+      setFormValidation(prev => ({ ...prev, emissionFactorESGName: true }));
     }
 
-    // Validação dos campos de seleção (unidade_de, unidade_para, fonte_oficial)
-    if (!formData.unidade_de) {
-        setFormValidation(prev => ({ ...prev, unidade_de: false }));
+    if (!formData.originUnitId) {
+        setFormValidation(prev => ({ ...prev, originUnitId: false }));
         missingFields.push("Unidade de Origem");
         isValid = false;
     } else {
-        setFormValidation(prev => ({ ...prev, unidade_de: true }));
+        setFormValidation(prev => ({ ...prev, originUnitId: true }));
     }
 
-    if (!formData.unidade_para) {
-        setFormValidation(prev => ({ ...prev, unidade_para: false }));
+    if (!formData.convertedUnitId) {
+        setFormValidation(prev => ({ ...prev, convertedUnitId: false }));
         missingFields.push("Unidade da Conversão");
         isValid = false;
     } else {
-        setFormValidation(prev => ({ ...prev, unidade_para: true }));
+        setFormValidation(prev => ({ ...prev, convertedUnitId: true }));
     }
 
-    if (!formData.fonte_oficial) {
-        setFormValidation(prev => ({ ...prev, fonte_oficial: false }));
-        missingFields.push("Fonte Oficial");
+    if (!formData.dataSourceId) {
+        setFormValidation(prev => ({ ...prev, dataSourceId: false }));
+        missingFields.push("Fonte de Dados");
         isValid = false;
     } else {
-        setFormValidation(prev => ({ ...prev, fonte_oficial: true }));
+        setFormValidation(prev => ({ ...prev, dataSourceId: true }));
     }
 
-    // Validação dos campos numéricos (valor_de, valor_para)
-    if (!formData.valor_de.toString().trim() || isNaN(Number(formData.valor_de))) {
-        setFormValidation(prev => ({ ...prev, valor_de: false }));
+    if (formData.originValue === "" || isNaN(Number(formData.originValue))) {
+        setFormValidation(prev => ({ ...prev, originValue: false }));
         missingFields.push("Valor de Origem");
         isValid = false;
     } else {
-        setFormValidation(prev => ({ ...prev, valor_de: true }));
+        setFormValidation(prev => ({ ...prev, originValue: true }));
     }
 
-    if (!formData.valor_para.toString().trim() || isNaN(Number(formData.valor_para))) {
-        setFormValidation(prev => ({ ...prev, valor_para: false }));
+    if (formData.convertedOriginValue === "" || isNaN(Number(formData.convertedOriginValue))) {
+        setFormValidation(prev => ({ ...prev, convertedOriginValue: false }));
         missingFields.push("Valor Convertido");
         isValid = false;
     } else {
-        setFormValidation(prev => ({ ...prev, valor_para: true }));
+        setFormValidation(prev => ({ ...prev, convertedOriginValue: true }));
     }
     
     if (!isValid) {
@@ -188,8 +203,25 @@ function NovoFatorEmissaoESG() {
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const payload = {
+        emissionFactorESGCode: formData.emissionFactorESGCode,
+        emissionFactorESGName: formData.emissionFactorESGName,
+        originUnitId: formData.originUnitId,
+        originValue: Number(formData.originValue),
+        convertedUnitId: formData.convertedUnitId,
+        dataSourceId: formData.dataSourceId,
+        convertedOriginValue: Number(formData.convertedOriginValue),
+        emissionFactorESGDescription: formData.emissionFactorESGDescription
+      };
+
+      const url = `${API_URL}EmissionFactorESG`;
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+
+      if (requisicao === "Criar") {
+        await axios.post(url, payload, config);
+      } else {
+        await axios.put(url, { ...payload, id: formData.id, active: formData.active }, config);
+      }
       
       enqueueSnackbar(`Fator de Emissão ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -221,18 +253,17 @@ function NovoFatorEmissaoESG() {
           <Divider sx={{ mb: 3 }} />
         </Grid>
 
-        {/* Campos do Fator de Emissão */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
             <InputLabel>Código do Fator de Emissão *</InputLabel>
             <TextField
               fullWidth
-              type="number"
-              value={formData.codigo_fator_emissao}
-              onChange={(e) => handleInputChange('codigo_fator_emissao', e.target.value)}
-              error={!formValidation.codigo_fator_emissao}
+              value={formData.emissionFactorESGCode}
+              onChange={(e) => handleInputChange('emissionFactorESGCode', e.target.value)}
+              error={!formValidation.emissionFactorESGCode}
               placeholder="Ex: 123"
-              helperText={!formValidation.codigo_fator_emissao ? "Campo obrigatório (número)" : "Ex: 123"}
+              disabled={requisicao === "Editar"}
+              helperText="Ex: 123"
             />
           </Stack>
         </Grid>
@@ -242,109 +273,115 @@ function NovoFatorEmissaoESG() {
             <InputLabel>Nome do Fator de Emissão *</InputLabel>
             <TextField
               fullWidth
-              value={formData.nome_fator_emissao}
-              onChange={(e) => handleInputChange('nome_fator_emissao', e.target.value)}
-              error={!formValidation.nome_fator_emissao}
+              value={formData.emissionFactorESGName}
+              onChange={(e) => handleInputChange('emissionFactorESGName', e.target.value)}
+              error={!formValidation.emissionFactorESGName}
               placeholder="Ex: Diesel (combustão móvel)"
-              helperText={!formValidation.nome_fator_emissao ? "Campo obrigatório (alpha)" : "Ex: Diesel (combustão móvel)"}
+              helperText="Ex: Diesel (combustão móvel)"
             />
           </Stack>
         </Grid>
 
-        {/* Unidade de Origem (Seleção) */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
             <InputLabel>Unidade de Origem *</InputLabel>
             <Autocomplete
-              fullWidth
-              options={mockUnidades}
-              getOptionLabel={(option) => option.nome || ""}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              value={formData.unidade_de}
-              onChange={(event, newValue) => handleInputChange('unidade_de', newValue)}
+              options={unidades}
+              getOptionLabel={(option) => option.name || ""}
+              value={unidades.find(u => u.id === formData.originUnitId) || null}
+              onChange={(event, newValue) => handleInputChange('originUnitId', newValue ? newValue.id : null)}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  error={!formValidation.unidade_de}
-                  helperText={!formValidation.unidade_de ? "Campo obrigatório (seleção)" : "Selecione a unidade de origem"}
+                <TextField 
+                  {...params} 
+                  error={!formValidation.originUnitId} 
+                  placeholder="Selecione a unidade de origem"
+                  helperText="Selecione a unidade de origem"
                 />
               )}
             />
           </Stack>
         </Grid>
 
-        {/* Valor de Origem (Número) */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
             <InputLabel>Valor de Origem *</InputLabel>
             <TextField
               fullWidth
               type="number"
-              value={formData.valor_de}
-              onChange={(e) => handleInputChange('valor_de', e.target.value)}
-              error={!formValidation.valor_de}
+              value={formData.originValue}
+              onChange={(e) => handleInputChange('originValue', e.target.value)}
+              error={!formValidation.originValue}
               placeholder="Ex: 1"
-              helperText={!formValidation.valor_de ? "Campo obrigatório (número)" : "Ex: 1"}
+              helperText="Ex: 1"
             />
           </Stack>
         </Grid>
 
-        {/* Unidade da Conversão (Seleção) */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
             <InputLabel>Unidade da Conversão *</InputLabel>
             <Autocomplete
-              fullWidth
-              options={mockUnidades}
-              getOptionLabel={(option) => option.nome || ""}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              value={formData.unidade_para}
-              onChange={(event, newValue) => handleInputChange('unidade_para', newValue)}
+              options={unidades}
+              getOptionLabel={(option) => option.name || ""}
+              value={unidades.find(u => u.id === formData.convertedUnitId) || null}
+              onChange={(event, newValue) => handleInputChange('convertedUnitId', newValue ? newValue.id : null)}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  error={!formValidation.unidade_para}
-                  helperText={!formValidation.unidade_para ? "Campo obrigatório (seleção)" : "Selecione a unidade da conversão"}
+                <TextField 
+                  {...params} 
+                  error={!formValidation.convertedUnitId} 
+                  placeholder="Selecione a unidade da conversão"
+                  helperText="Selecione a unidade da conversão"
                 />
               )}
             />
           </Stack>
         </Grid>
 
-        {/* Valor Convertido (Número) */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
             <InputLabel>Valor Convertido *</InputLabel>
             <TextField
               fullWidth
               type="number"
-              value={formData.valor_para}
-              onChange={(e) => handleInputChange('valor_para', e.target.value)}
-              error={!formValidation.valor_para}
+              value={formData.convertedOriginValue}
+              onChange={(e) => handleInputChange('convertedOriginValue', e.target.value)}
+              error={!formValidation.convertedOriginValue}
               placeholder="Ex: 2.68"
-              helperText={!formValidation.valor_para ? "Campo obrigatório (número)" : "Ex: 2.68"}
+              helperText="Ex: 2.68"
             />
           </Stack>
         </Grid>
 
-        {/* Fonte Oficial (Seleção/Alpha) */}
         <Grid item xs={12} md={6}>
           <Stack spacing={1}>
             <InputLabel>Fonte Oficial *</InputLabel>
             <Autocomplete
-              fullWidth
-              options={mockFontesOficiais}
-              getOptionLabel={(option) => option.nome || ""}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              value={formData.fonte_oficial}
-              onChange={(event, newValue) => handleInputChange('fonte_oficial', newValue)}
+              options={fontes}
+              getOptionLabel={(option) => option.dataSourceName || ""}
+              value={fontes.find(f => f.id === formData.dataSourceId) || null}
+              onChange={(event, newValue) => handleInputChange('dataSourceId', newValue ? newValue.id : null)}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  error={!formValidation.fonte_oficial}
-                  helperText={!formValidation.fonte_oficial ? "Campo obrigatório (seleção/alpha)" : "Selecione ou digite a fonte oficial"}
+                <TextField 
+                  {...params} 
+                  error={!formValidation.dataSourceId} 
+                  placeholder="Selecione ou digite a fonte oficial"
+                  helperText="Selecione ou digite a fonte oficial"
                 />
               )}
+            />
+          </Stack>
+        </Grid>
+
+        <Grid item xs={12} md={12}>
+          <Stack spacing={1}>
+            <InputLabel>Descrição</InputLabel>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              value={formData.emissionFactorESGDescription}
+              onChange={(e) => handleInputChange('emissionFactorESGDescription', e.target.value)}
+              placeholder="Descrição do fator de emissão"
             />
           </Stack>
         </Grid>

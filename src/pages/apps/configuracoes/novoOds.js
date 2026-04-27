@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import { API_URL } from 'config';
 import React, { useState, useEffect } from "react";
 import {
   Button,
@@ -9,7 +10,7 @@ import {
   InputLabel,
   Typography,
   Divider,
-  Alert
+  Autocomplete,
 } from "@mui/material";
 import { enqueueSnackbar } from "notistack";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -28,11 +29,15 @@ const NovoOds = () => {
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
   const [formData, setFormData] = useState({
+    id: "",
     sdgCode: "",
     sdgName: "",
     sdgDescription: "",
+    themeIds: [],
     active: true
   });
+
+  const [temasOptions, setTemasOptions] = useState([]);
 
   const [formValidation, setFormValidation] = useState({
     sdgCode: true,
@@ -40,22 +45,34 @@ const NovoOds = () => {
   });
 
   useEffect(() => {
+    const fetchTemas = async () => {
+      if (!token) return;
+      try {
+        const res = await axios.get(`${API_URL}Theme`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setTemasOptions(res.data || []);
+      } catch (error) {
+        console.error("Erro ao carregar temas:", error);
+      }
+    };
+
     const fetchOdsData = async () => {
-      if (id && !odsDados && token) {
+      if (id && token) {
         try {
           setLoading(true);
-          const res = await axios.get("https://api.egrc.homologacao.com.br/api/v1/SDG", {
+          const res = await axios.get(`${API_URL}SDG/Code/${id}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
-          const allOds = Array.isArray(res.data) ? res.data : [];
-          const item = allOds.find(o => o.id === id || o.sdgCode.toString() === id);
+          const item = res.data;
           if (item) {
             setFormData({
-              id: item.id,
+              id: item.id || "",
               sdgCode: item.sdgCode,
-              sdgName: item.sdgName,
+              sdgName: item.sdgName || "",
               sdgDescription: item.sdgDescription || "",
-              active: item.active
+              themeIds: item.themeIds || [],
+              active: item.active !== undefined ? item.active : true
             });
             setRequisicao("Editar");
           } else {
@@ -66,17 +83,9 @@ const NovoOds = () => {
         } finally {
           setLoading(false);
         }
-      } else if (odsDados) {
-        setFormData({
-          id: odsDados.id,
-          sdgCode: odsDados.sdgCode,
-          sdgName: odsDados.sdgName,
-          sdgDescription: odsDados.sdgDescription || "",
-          active: odsDados.active
-        });
-        setRequisicao("Editar");
       }
     };
+    fetchTemas();
     fetchOdsData();
   }, [id, odsDados, token]);
 
@@ -107,11 +116,12 @@ const NovoOds = () => {
       const payload = {
         sdgCode: Number(formData.sdgCode),
         sdgName: formData.sdgName,
-        sdgDescription: formData.sdgDescription || null
+        sdgDescription: formData.sdgDescription || null,
+        themeIds: formData.themeIds || []
       };
 
       if (requisicao === "Editar") {
-        await axios.put("https://api.egrc.homologacao.com.br/api/v1/SDG", {
+        await axios.put(`${API_URL}SDG`, {
           ...payload,
           id: formData.id,
           active: formData.active
@@ -120,7 +130,7 @@ const NovoOds = () => {
         });
         enqueueSnackbar("ODS atualizado com sucesso!", { variant: "success" });
       } else {
-        await axios.post("https://api.egrc.homologacao.com.br/api/v1/SDG", payload, {
+        await axios.post(`${API_URL}SDG`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         enqueueSnackbar("ODS criado com sucesso!", { variant: "success" });
@@ -136,9 +146,10 @@ const NovoOds = () => {
   return (
     <Box p={3}>
       <LoadingOverlay isActive={loading} />
-      <Typography variant="h4" mb={3} sx={{ color: '#1C5297', fontWeight: 600 }}>
+      <Typography variant="h4" mb={2} sx={{ color: "#1C5297", fontWeight: 600 }}>
         {requisicao === "Criar" ? "Novo ODS" : "Editar ODS"}
       </Typography>
+      <Divider sx={{ mb: 3 }} />
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
@@ -184,10 +195,29 @@ const NovoOds = () => {
 
         <Grid item xs={12}>
           <Stack spacing={1}>
-            <InputLabel>Temas Conectados ao ODS</InputLabel>
-            <Alert severity="info" sx={{ backgroundColor: 'rgba(28, 82, 151, 0.05)', color: '#1C5297' }}>
-              Funcionalidade de vinculação de temas disponível em breve.
-            </Alert>
+            <InputLabel>Temas Relacionados</InputLabel>
+            <Autocomplete
+              multiple
+              filterSelectedOptions
+              options={temasOptions}
+              getOptionLabel={(option) => option.themeName || ""}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              value={temasOptions.filter(t => formData.themeIds.includes(t.id))}
+              onChange={(event, newValue) => {
+                handleInputChange('themeIds', newValue.map(v => v.id));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="Selecione os temas"
+                />
+              )}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                }
+              }}
+            />
           </Stack>
         </Grid>
 

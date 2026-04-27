@@ -188,11 +188,15 @@ export const routeMapping = {
   },
   "/colaboradores/trocar-senha": { title: "Trocar Senha", parent: null },
 
-  "/tema/lista": { title: "Temas", parent: null },
-  "/tema/criar": {
+  "/temas/lista": { title: "Temas", parent: null },
+  "/temas/criar": {
     title: "Novo Tema",
     editTitle: "Editar Tema",
-    parent: "/tema/lista",
+    parent: "/temas/lista",
+  },
+  "/temas/editar/<<themeCode>>": {
+    title: "Editar Tema",
+    parent: "/temas/lista",
   },
 
   "/impactoEsg/lista": { title: "Impacto ESG", parent: null },
@@ -231,6 +235,10 @@ export const routeMapping = {
   "/ods/criar": {
     title: "Novo ODS",
     editTitle: "Editar ODS",
+    parent: "/ods/lista",
+  },
+  "/ods/editar/<<idOds>>": {
+    title: "Editar ODS",
     parent: "/ods/lista",
   },
 
@@ -291,7 +299,19 @@ export const getRouteInfo = (path, options = {}) => {
 
 export const buildBreadcrumbPath = (pathname, options = {}) => {
   const items = [];
-  const currentRoute = routeMapping[pathname];
+  let currentRoute = routeMapping[pathname];
+
+  if (!currentRoute) {
+    const matchingKey = Object.keys(routeMapping).find((key) => {
+      if (!key.includes("<<")) return false;
+      const regexStr = key.replace(/<<.*?>>/g, ".*");
+      const regex = new RegExp(`^${regexStr}$`);
+      return regex.test(pathname);
+    });
+    if (matchingKey) {
+      currentRoute = routeMapping[matchingKey];
+    }
+  }
 
   if (!currentRoute) {
     return items;

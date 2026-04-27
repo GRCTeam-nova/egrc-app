@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+import { API_URL } from 'config';
 import React, { useMemo, useState, useEffect } from "react";
 import {
   Box,
@@ -32,8 +33,6 @@ import MainCard from "../../../components/MainCard";
 import ScrollX from "../../../components/ScrollX";
 import { PlusOutlined } from "@ant-design/icons";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
 import { TablePagination } from "../../../components/third-party/react-table";
 
 function ActionCell({ row, refreshData }) {
@@ -51,9 +50,10 @@ function ActionCell({ row, refreshData }) {
         sdgCode: row.original.sdgCode,
         sdgName: row.original.sdgName,
         sdgDescription: row.original.sdgDescription,
+        themeIds: row.original.themeIds || [],
         active: !row.original.active
       };
-      await axios.put(`https://api.egrc.homologacao.com.br/api/v1/SDG`, payload, {
+      await axios.put(`${API_URL}SDG`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       enqueueSnackbar(`Status alterado com sucesso!`, { variant: "success" });
@@ -64,18 +64,6 @@ function ActionCell({ row, refreshData }) {
     handleClose();
   };
 
-  const handleDelete = async () => {
-    try {
-      await axios.delete(`https://api.egrc.homologacao.com.br/api/v1/SDG/${row.original.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      enqueueSnackbar(`Excluído com sucesso!`, { variant: "success" });
-      refreshData();
-    } catch (error) {
-      enqueueSnackbar(`Erro ao excluir: ${error.message}`, { variant: "error" });
-    }
-    handleClose();
-  };
 
   return (
     <>
@@ -83,12 +71,14 @@ function ActionCell({ row, refreshData }) {
       <Popover open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={handleClose} anchorOrigin={{ vertical: "bottom", horizontal: "left" }}>
         <Stack sx={{ p: 1 }}>
           <Button onClick={() => {
-            navigation(`/ods/editar/${row.original.sdgCode || row.original.id}`, { state: { odsDados: row.original } });
+            navigation(`/ods/editar/${row.original.sdgCode || row.original.id}`, { 
+              state: { 
+                odsDados: row.original,
+                dadosApi: { ...row.original, nome: row.original.sdgName } 
+              } 
+            });
             handleClose();
           }} sx={{ textTransform: 'none', color: 'text.secondary' }}>Editar</Button>
-          <Button startIcon={<FontAwesomeIcon icon={faTrash} />} onClick={() => {
-            if (window.confirm("Deseja realmente excluir?")) handleDelete();
-          }} color="error" sx={{ textTransform: 'none' }}>Excluir</Button>
           <Button onClick={toggleStatus} sx={{ textTransform: 'none', color: 'text.secondary' }}>
             {row.original.active ? "Inativar" : "Ativar"}
           </Button>
@@ -108,7 +98,7 @@ const ListagemODS = () => {
     if (!token) return;
     setIsLoading(true);
     try {
-      const res = await axios.get("https://api.egrc.homologacao.com.br/api/v1/SDG", {
+      const res = await axios.get(`${API_URL}SDG`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setData(Array.isArray(res.data) ? res.data : []);
@@ -131,7 +121,12 @@ const ListagemODS = () => {
       accessorKey: "sdgName",
       cell: ({ row }) => (
         <Typography
-          onClick={() => navigation(`/ods/editar/${row.original.sdgCode || row.original.id}`, { state: { odsDados: row.original } })}
+          onClick={() => navigation(`/ods/editar/${row.original.sdgCode || row.original.id}`, { 
+            state: { 
+              odsDados: row.original,
+              dadosApi: { ...row.original, nome: row.original.sdgName } 
+            } 
+          })}
           sx={{ cursor: "pointer", color: "#1C5297", fontWeight: 500 }}
         >
           {row.original.sdgName}

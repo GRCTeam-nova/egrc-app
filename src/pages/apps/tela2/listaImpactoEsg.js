@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import PropTypes from "prop-types";
-import { API_COMMAND } from "../../../config";
+import { API_COMMAND, API_URL } from "../../../config";
 import { Fragment, useMemo, useState, useEffect } from "react";
 import Popover from "@mui/material/Popover";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -8,7 +8,7 @@ import { useNavigate } from "react-router";
 import CustomerModal from "../../../sections/apps/customer/CustomerModal";
 import { enqueueSnackbar } from "notistack";
 import AlertCustomerDelete from "../../../sections/apps/customer/AlertCustomerDelete";
-import { useGetPlanos } from "../../../api/planos";
+import { useGetESGImpact } from "../../../api/impactos";
 import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRef } from "react";
@@ -650,12 +650,12 @@ function ActionCell({ row, refreshData }) {
   };
 
   const toggleStatus = async () => {
-    const idActionPlan = row.original.idActionPlan;
-    const newStatus = status === true ? "Inativo" : "Ativo";
+    const impactId = row.original.id;
+    const newStatus = !status;
     
     try {
-      // Buscar os dados do departamento pelo ID
-      const getResponse = await axios.get(`${process.env.REACT_APP_API_URL}action-plans/${idActionPlan}`, {
+      // Buscar os dados do impacto pelo ID
+      const getResponse = await axios.get(`${API_URL}ESGImpact/${impactId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -664,10 +664,10 @@ function ActionCell({ row, refreshData }) {
       const dadosEndpoint = getResponse.data;
   
       // Definir o novo status do campo "active"
-      const dadosAtualizados = { ...dadosEndpoint, active: newStatus === "Ativo" };
+      const dadosAtualizados = { ...dadosEndpoint, active: newStatus };
   
       // Enviar os dados atualizados via PUT
-      await axios.put(`${process.env.REACT_APP_API_URL}action-plans`, dadosAtualizados, {
+      await axios.put(`${API_URL}ESGImpact`, dadosAtualizados, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -676,7 +676,7 @@ function ActionCell({ row, refreshData }) {
   
       // Atualizar o estado e exibir mensagem de sucesso
       setStatus(newStatus);
-      const message = `Plano de ação ${row.original.name} ${newStatus.toLowerCase()}.`;
+      const message = `Impacto ESG ${row.original.impactESGName} ${newStatus ? "ativado" : "inativado"} com sucesso.`;
   
       enqueueSnackbar(message, {
         variant: "success",
@@ -768,7 +768,7 @@ function ActionCell({ row, refreshData }) {
           <Button
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/impactoEsg/criar`, {
+              navigation(`/impactoEsg/editar/${row.original.id}`, {
                 state: {
                   indoPara: "NovoImpapctoEsg",
                   dadosApi,
@@ -1171,10 +1171,10 @@ const ListagemEmpresa = () => {
   const { processoSelecionadoId } = location.state || {};
   const [formData, setFormData] = useState({ refreshCount: 0 });
   const {
-    acoesJudiciais: lists,
+    impacts: lists,
     isLoading,
     refetch,
-  } = useGetPlanos(formData, processoSelecionadoId);
+  } = useGetESGImpact(formData);
   const processosTotal = lists ? lists.length : 0;
   const [open, setOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -1217,8 +1217,17 @@ const ListagemEmpresa = () => {
   const columns = useMemo(
     () => [
       {
+        header: "Código",
+        accessorKey: "impactCode",
+        cell: ({ row }) => (
+          <Typography sx={{ fontSize: '13px' }}>
+            {row.original.impactCode}
+          </Typography>
+        ),
+      },
+      {
         header: "Impacto",
-        accessorKey: "name",
+        accessorKey: "impactESGName",
         cell: ({ row }) => (
           <Typography
           sx={{
@@ -1227,7 +1236,7 @@ const ListagemEmpresa = () => {
           }}
             onClick={() => {
               const dadosApi = row.original;
-              navigation(`/impactoEsg/criar`, {
+              navigation(`/impactoEsg/editar/${row.original.id}`, {
                 state: {
                   indoPara: "NovoESG",
                   dadosApi,
@@ -1235,7 +1244,7 @@ const ListagemEmpresa = () => {
               });
             }}
           >
-            {row.original.name}
+            {row.original.impactESGName}
           </Typography>
         ),
       },
