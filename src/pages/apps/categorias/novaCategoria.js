@@ -160,6 +160,11 @@ function ColumnsLayouts() {
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
+  const getCategoriaErrorMessage = (errorData, fallbackMessage) =>
+    errorData?.notifications?.[0]?.message ||
+    errorData?.message ||
+    fallbackMessage;
+
   const tratarSubmit = async () => {
     let url = '';
     let method = '';
@@ -222,7 +227,21 @@ function ColumnsLayouts() {
       }
 
       if (!response.ok) {
+        const fallbackMessage =
+          requisicao === 'Criar'
+            ? 'NÃ£o foi possÃ­vel cadastrar essa categoria.'
+            : 'NÃ£o foi possÃ­vel atualizar essa categoria.';
+
+        void fallbackMessage;
+        const fallbackMessageText =
+          requisicao === 'Criar'
+            ? 'Nao foi possivel cadastrar essa categoria.'
+            : 'Nao foi possivel atualizar essa categoria.';
+
+        throw new Error(getCategoriaErrorMessage(data, fallbackMessageText));
+        /*
         throw new Error('O Código informado já foi cadastrado.');
+        */
       } else {
         enqueueSnackbar(`Categoria ${mensagemFeedback} com sucesso!`, { variant: 'success' });
       }
@@ -236,7 +255,22 @@ function ColumnsLayouts() {
       }
     } catch (error) {
       console.error(error.message);
+      const fallbackMessage =
+        requisicao === 'Criar'
+          ? 'NÃ£o foi possÃ­vel cadastrar essa categoria.'
+          : 'NÃ£o foi possÃ­vel atualizar essa categoria.';
+
+      void fallbackMessage;
+      const fallbackMessageText =
+        requisicao === 'Criar'
+          ? 'Nao foi possivel cadastrar essa categoria.'
+          : 'Nao foi possivel atualizar essa categoria.';
+
+      enqueueSnackbar(error.message || fallbackMessageText, { variant: 'error' });
+      return;
+      /*
       enqueueSnackbar('Não foi possível cadastrar essa categoria.', { variant: 'error' });
+      */
     } finally {
       setLoading(false);
     }
