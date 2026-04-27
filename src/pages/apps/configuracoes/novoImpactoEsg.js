@@ -24,23 +24,24 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { enqueueSnackbar } from "notistack";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useState, useEffect } from "react";
 import LoadingOverlay from "./LoadingOverlay";
 import ptBR from "date-fns/locale/pt-BR";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { API_URL } from "../../../config";
 
 // Dados mock para os selects
 const tiposImpacto = [
-  { id: "real", nome: "Real" },
-  { id: "potencial", nome: "Potencial" },
+  { id: 1, nome: "Real" },
+  { id: 2, nome: "Potencial" },
 ];
 
 const naturezasImpacto = [
-  { id: "positivo", nome: "Positivo" },
-  { id: "negativo", nome: "Negativo" },
+  { id: 1, nome: "Positivo" },
+  { id: 2, nome: "Negativo" },
 ];
 
 const temasMock = [
@@ -59,34 +60,64 @@ function NovoImpactoEsg() {
   const location = useLocation();
   const { impactoDados } = location.state || {};
   
+  const { id } = useParams();
   const [loading, setLoading] = useState(false);
   const [requisicao, setRequisicao] = useState("Criar");
   const [mensagemFeedback, setMensagemFeedback] = useState("cadastrado");
   const [hasChanges, setHasChanges] = useState(false);
-  
+
   window.hasChanges = hasChanges;
   window.setHasChanges = setHasChanges;
-
   const [formData, setFormData] = useState({
-    // Campos obrigatórios
-    codigoImpactoEsg: "",
-    nomeImpactoEsg: "",
-    tipoImpacto: "",
-    naturezaImpacto: "",
-    
-    // Campos automáticos (readonly)
+    id: "",
+    impactCode: "",
+    impactESGName: "",
+    impactType: "",
+    impactNature: "",
+    active: true,
     temas: [],
   });
 
   // Em caso de edição
   useEffect(() => {
-    if (impactoDados) {
-      setRequisicao("Editar");
-      setMensagemFeedback("editado");
-      // Aqui você carregaria os dados do impacto para edição
-      // setFormData com os dados existentes
+    const fetchImpact = async () => {
+      if (id || impactoDados) {
+        setRequisicao("Editar");
+        setMensagemFeedback("editado");
+        
+        try {
+          setLoading(true);
+          const impactId = id || impactoDados?.id;
+          const res = await axios.get(`${API_URL}ESGImpact/${impactId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          const d = res.data;
+          setFormData({
+            id: d.id,
+            impactCode: d.impactCode || "",
+            impactESGName: d.impactESGName || "",
+            impactType: d.impactType || "",
+            impactNature: d.impactNature || "",
+            active: d.active ?? true,
+            temas: d.themes || d.temas || [], // Supondo que a API possa retornar temas vinculados
+          });
+        } catch (error) {
+          console.error("Erro ao buscar impacto:", error);
+          enqueueSnackbar("Não foi possível carregar os dados do impacto.", { variant: "error" });
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setRequisicao("Criar");
+        setMensagemFeedback("cadastrado");
+      }
+    };
+
+    if (token) {
+      fetchImpact();
     }
-  }, [impactoDados]);
+  }, [id, impactoDados, token]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -97,10 +128,10 @@ function NovoImpactoEsg() {
   };
 
   const [formValidation, setFormValidation] = useState({
-    codigoImpactoEsg: true,
-    nomeImpactoEsg: true,
-    tipoImpacto: true,
-    naturezaImpacto: true,
+    impactCode: true,
+    impactESGName: true,
+    impactType: true,
+    impactNature: true,
   });
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
@@ -141,23 +172,23 @@ function NovoImpactoEsg() {
   const tratarSubmit = async () => {
     const missingFields = [];
     
-    if (!formData.codigoImpactoEsg.trim() || !validarCodigoImpacto(formData.codigoImpactoEsg)) {
-      setFormValidation(prev => ({ ...prev, codigoImpactoEsg: false }));
+    if (!formData.impactCode.trim() || !validarCodigoImpacto(formData.impactCode)) {
+      setFormValidation(prev => ({ ...prev, impactCode: false }));
       missingFields.push("Código do Impacto ESG");
     }
     
-    if (!formData.nomeImpactoEsg.trim() || !validarNomeImpacto(formData.nomeImpactoEsg)) {
-      setFormValidation(prev => ({ ...prev, nomeImpactoEsg: false }));
+    if (!formData.impactESGName.trim() || !validarNomeImpacto(formData.impactESGName)) {
+      setFormValidation(prev => ({ ...prev, impactESGName: false }));
       missingFields.push("Nome do Impacto ESG");
     }
     
-    if (!formData.tipoImpacto) {
-      setFormValidation(prev => ({ ...prev, tipoImpacto: false }));
+    if (!formData.impactType) {
+      setFormValidation(prev => ({ ...prev, impactType: false }));
       missingFields.push("Tipo de Impacto");
     }
     
-    if (!formData.naturezaImpacto) {
-      setFormValidation(prev => ({ ...prev, naturezaImpacto: false }));
+    if (!formData.impactNature) {
+      setFormValidation(prev => ({ ...prev, impactNature: false }));
       missingFields.push("Natureza do Impacto");
     }
 
@@ -175,8 +206,24 @@ function NovoImpactoEsg() {
     try {
       setLoading(true);
       
-      // Simular requisição para API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const payload = {
+        impactCode: formData.impactCode,
+        impactESGName: formData.impactESGName,
+        impactType: Number(formData.impactType),
+        impactNature: Number(formData.impactNature),
+        active: formData.active
+      };
+
+      if (requisicao === "Editar") {
+        payload.id = formData.id;
+        await axios.put(`${API_URL}ESGImpact`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.post(`${API_URL}ESGImpact`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
       
       enqueueSnackbar(`Impacto ESG ${mensagemFeedback} com sucesso!`, {
         variant: "success",
@@ -215,9 +262,9 @@ function NovoImpactoEsg() {
               <InputLabel>Código do Impacto ESG *</InputLabel>
               <TextField
                 fullWidth
-                value={formData.codigoImpactoEsg}
-                onChange={(e) => handleInputChange("codigoImpactoEsg", e.target.value)}
-                error={!formData.codigoImpactoEsg && formValidation.codigoImpactoEsg === false}
+                value={formData.impactCode}
+                onChange={(e) => handleInputChange("impactCode", e.target.value)}
+                error={!formData.impactCode && formValidation.impactCode === false}
                 placeholder="Digite o código do impacto (máx. 10 caracteres)"
                 inputProps={{ maxLength: 10 }}
                 helperText="Máximo de 10 caracteres. Deve ser único."
@@ -230,9 +277,9 @@ function NovoImpactoEsg() {
               <InputLabel>Nome do Impacto ESG *</InputLabel>
               <TextField
                 fullWidth
-                value={formData.nomeImpactoEsg}
-                onChange={(e) => handleInputChange("nomeImpactoEsg", e.target.value)}
-                error={!formData.nomeImpactoEsg && formValidation.nomeImpactoEsg === false}
+                value={formData.impactESGName}
+                onChange={(e) => handleInputChange("impactESGName", e.target.value)}
+                error={!formData.impactESGName && formValidation.impactESGName === false}
                 placeholder="Digite o nome do impacto"
                 inputProps={{ maxLength: 200 }}
                 helperText="Tamanho médio (máx. 200 caracteres). Não pode se repetir."
@@ -252,9 +299,9 @@ function NovoImpactoEsg() {
               <InputLabel>Tipo de Impacto *</InputLabel>
               <RadioGroup
                 row
-                name="tipoImpacto"
-                value={formData.tipoImpacto}
-                onChange={(e) => handleInputChange("tipoImpacto", e.target.value)}
+                name="impactType"
+                value={formData.impactType}
+                onChange={(e) => handleInputChange("impactType", Number(e.target.value))}
               >
                 {tiposImpacto.map((tipo) => (
                   <FormControlLabel
@@ -265,7 +312,7 @@ function NovoImpactoEsg() {
                   />
                 ))}
               </RadioGroup>
-              {!formData.tipoImpacto && formValidation.tipoImpacto === false && (
+              {!formData.impactType && formValidation.impactType === false && (
                 <Typography color="error" variant="caption">
                   Selecione o tipo de impacto.
                 </Typography>
@@ -278,9 +325,9 @@ function NovoImpactoEsg() {
               <InputLabel>Natureza do Impacto *</InputLabel>
               <RadioGroup
                 row
-                name="naturezaImpacto"
-                value={formData.naturezaImpacto}
-                onChange={(e) => handleInputChange("naturezaImpacto", e.target.value)}
+                name="impactNature"
+                value={formData.impactNature}
+                onChange={(e) => handleInputChange("impactNature", Number(e.target.value))}
               >
                 {naturezasImpacto.map((natureza) => (
                   <FormControlLabel
@@ -291,7 +338,7 @@ function NovoImpactoEsg() {
                   />
                 ))}
               </RadioGroup>
-              {!formData.naturezaImpacto && formValidation.naturezaImpacto === false && (
+              {!formData.impactNature && formValidation.impactNature === false && (
                 <Typography color="error" variant="caption">
                   Selecione a natureza do impacto.
                 </Typography>
@@ -299,43 +346,47 @@ function NovoImpactoEsg() {
             </Stack>
           </Grid>
 
-          {/* Seção: Temas Relacionados (Automático) */}
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="h5" gutterBottom>
-              Temas Relacionados
-            </Typography>
-          </Grid>
+          {/* Seção: Temas Relacionados (Apenas na edição se houver dados) */}
+          {requisicao === "Editar" && formData.temas && formData.temas.length > 0 && (
+            <>
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="h5" gutterBottom>
+                  Temas Relacionados
+                </Typography>
+              </Grid>
 
-          <Grid item xs={12}>
-            <Stack spacing={1}>
-              <InputLabel>Temas que utilizam este impacto</InputLabel>
-              <Autocomplete
-                multiple
-                options={temasMock}
-                getOptionLabel={(option) => option.nome}
-                value={formData.temas}
-                readOnly // Este campo é automático
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="Temas relacionados (automático)" />
-                )}
-                renderTags={(value, getTagProps) =>
-                  value.map((option, index) => (
-                    <Chip
-                      variant="outlined"
-                      label={option.nome}
-                      {...getTagProps({ index })}
-                      key={option.id}
-                      size="small"
-                    />
-                  ))
-                }
-              />
-              <Typography variant="caption" color="textSecondary">
-                Este campo é preenchido automaticamente na tela de temas.
-              </Typography>
-            </Stack>
-          </Grid>
+              <Grid item xs={12}>
+                <Stack spacing={1}>
+                  <InputLabel>Temas que utilizam este impacto</InputLabel>
+                  <Autocomplete
+                    multiple
+                    options={formData.temas}
+                    getOptionLabel={(option) => option.themeName || option.nome || option.tema || ""}
+                    value={formData.temas}
+                    readOnly
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Temas relacionados" />
+                    )}
+                    renderTags={(value, getTagProps) =>
+                      value.map((option, index) => (
+                        <Chip
+                          variant="outlined"
+                          label={option.themeName || option.nome || option.tema || ""}
+                          {...getTagProps({ index })}
+                          key={option.id || index}
+                          size="small"
+                        />
+                      ))
+                    }
+                  />
+                  <Typography variant="caption" color="textSecondary">
+                    Este campo é preenchido automaticamente na tela de temas.
+                  </Typography>
+                </Stack>
+              </Grid>
+            </>
+          )}
 
           {/* Botões de ação */}
           <Grid item xs={12}>

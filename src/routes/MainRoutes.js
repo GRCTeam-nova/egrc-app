@@ -445,6 +445,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovoESG />
             },
+            {
+              path: 'editar/:id',
+              element: <NovoESG />
+            },
           ]
         },
         {
@@ -486,7 +490,7 @@ const MainRoutes = {
           ]
         },
         {
-          path: 'tema',
+          path: 'temas',
           children: [
             {
               path: 'lista',
@@ -494,6 +498,10 @@ const MainRoutes = {
             },
             {
               path: 'criar',
+              element: <NovoTema />
+            },
+            {
+              path: 'editar/:themeCode',
               element: <NovoTema />
             },
           ]
@@ -524,6 +532,10 @@ const MainRoutes = {
             },
             {
               path: 'criar',
+              element: <NovoImpactoEsg />
+            },
+            {
+              path: 'editar/:id',
               element: <NovoImpactoEsg />
             },
           ]
@@ -620,6 +632,10 @@ const MainRoutes = {
               path: 'criar',
               element: <NovoFatoresEmissao />
             },
+            {
+              path: 'editar/:id',
+              element: <NovoFatoresEmissao />
+            },
           ]
         },
         {
@@ -653,6 +669,10 @@ const MainRoutes = {
             },
             {
               path: 'criar',
+              element: <NovaPriorizacao />
+            },
+            {
+              path: 'editar/:id',
               element: <NovaPriorizacao />
             },
           ]

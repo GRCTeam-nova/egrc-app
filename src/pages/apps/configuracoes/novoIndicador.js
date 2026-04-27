@@ -32,6 +32,7 @@ import ptBR from "date-fns/locale/pt-BR";
 import { useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { useToken } from "../../../api/TokenContext";
+import { API_URL } from "config";
 
 const eixosESG = [
     { id: 1, nome: "Ambiental" },
@@ -67,15 +68,6 @@ const metricas = [
 ];
 
 const temas = [
-    { id: 1, nome: "Mudanças Climáticas", grupoTema: "Meio Ambiente" },
-    { id: 2, nome: "Biodiversidade", grupoTema: "Meio Ambiente" },
-    { id: 3, nome: "Gestão de Resíduos", grupoTema: "Meio Ambiente" },
-    { id: 4, nome: "Direitos Humanos", grupoTema: "Social" },
-    { id: 5, nome: "Diversidade e Inclusão", grupoTema: "Social" },
-    { id: 6, nome: "Saúde e Segurança", grupoTema: "Social" },
-    { id: 7, nome: "Ética Empresarial", grupoTema: "Governança" },
-    { id: 8, nome: "Transparência", grupoTema: "Governança" },
-    { id: 9, nome: "Compliance", grupoTema: "Governança" },
 ];
 
 const gruposTema = [
@@ -104,13 +96,12 @@ function NovoIndicador() {
             if (id && !indicadorDados && token) {
                 try {
                     setLoading(true);
-                    const res = await axios.get(`https://api.egrc.homologacao.com.br/api/v1/Indicator`, {
+                    const res = await axios.get(`${API_URL}Indicator/by-code/${id}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
-                    const indicators = Array.isArray(res.data) ? res.data : [];
-                    const item = indicators.find(ind => ind.id === id || ind.indicatorCode === id);
-                    if (item) {
-                        setIndicadorDados(item);
+                    
+                    if (res.data) {
+                        setIndicadorDados(res.data);
                     } else {
                         enqueueSnackbar("Indicador não encontrado", { variant: "error" });
                     }
@@ -134,23 +125,25 @@ function NovoIndicador() {
     const [riscos, setRiscos] = useState([]);
     const [padroesFrameworks, setPadroesFrameworks] = useState([]);
     const [planosAcao, setPlanosAcao] = useState([]);
+    const [temasOptions, setTemasOptions] = useState([]);
 
     useEffect(() => {
         const fetchOptions = async () => {
             if (!token) return;
             try {
                 const headers = { Authorization: `Bearer ${token}` };
-                
+
                 // Fetch for different endpoints in parallel
                 const endpoints = [
-                    { key: 'units', url: 'https://api.egrc.homologacao.com.br/api/v1/Measure/enums', setter: (data) => setUnidadesMedida(data.units || []) },
-                    { key: 'collaborators', url: 'https://api.egrc.homologacao.com.br/api/v1/collaborators', setter: setColaboradores },
-                    { key: 'departments', url: 'https://api.egrc.homologacao.com.br/api/v1/departments', setter: setDepartamentos },
-                    { key: 'companies', url: 'https://api.egrc.homologacao.com.br/api/v1/companies', setter: setEmpresas },
-                    { key: 'processes', url: 'https://api.egrc.homologacao.com.br/api/v1/processes', setter: setProcessos },
-                    { key: 'risks', url: 'https://api.egrc.homologacao.com.br/api/v1/risks', setter: setRiscos },
-                    { key: 'normatives', url: 'https://api.egrc.homologacao.com.br/api/v1/normatives', setter: setPadroesFrameworks },
-                    { key: 'action-plans', url: 'https://api.egrc.homologacao.com.br/api/v1/action-plans', setter: setPlanosAcao }
+                    { key: 'units', url: `${API_URL}Measure/enums`, setter: (data) => setUnidadesMedida(data.units || []) },
+                    { key: 'collaborators', url: `${API_URL}collaborators`, setter: setColaboradores },
+                    { key: 'departments', url: `${API_URL}departments`, setter: setDepartamentos },
+                    { key: 'companies', url: `${API_URL}companies`, setter: setEmpresas },
+                    { key: 'processes', url: `${API_URL}processes`, setter: setProcessos },
+                    { key: 'risks', url: `${API_URL}risks`, setter: setRiscos },
+                    { key: 'normatives', url: `${API_URL}normatives`, setter: setPadroesFrameworks },
+                    { key: 'action-plans', url: `${API_URL}action-plans`, setter: setPlanosAcao },
+                    { key: 'themes', url: `${API_URL}Theme`, setter: setTemasOptions }
                 ];
 
                 await Promise.all(endpoints.map(async (ep) => {
@@ -216,13 +209,13 @@ function NovoIndicador() {
         if (indicadorDados) {
             setRequisicao("Editar");
             setMensagemFeedback("editado");
-            
-             // Mapper de indicadorDados para formData
+
+            // Mapper de indicadorDados para formData
             const safeParse = (str) => {
                 if (!str) return [];
                 try {
-                   return str.split(',').map(s => ({ id: isNaN(s) ? s : parseInt(s), nome: s }));
-                } catch(e) { return [] }
+                    return str.split(',').map(s => ({ id: isNaN(s) ? s : parseInt(s), nome: s }));
+                } catch (e) { return [] }
             };
 
             const findItem = (list, id, idField) => {
@@ -239,7 +232,7 @@ function NovoIndicador() {
                 codigoIndicador: indicadorDados.indicatorCode || "",
                 nomeIndicador: indicadorDados.indicatorName || "",
                 eixoEsg: eixosESG.find(e => e.id === indicadorDados.esgAxis) || null,
-                metrica: metricas.find(m => m.id === Number(indicadorDados.metric)) ? [metricas.find(m => m.id === Number(indicadorDados.metric))] : safeParse(indicadorDados.metric), 
+                metrica: metricas.find(m => m.id === Number(indicadorDados.metric)) ? [metricas.find(m => m.id === Number(indicadorDados.metric))] : safeParse(indicadorDados.metric),
                 tipoMeta: tiposMeta.find(t => t.id === Number(indicadorDados.goalType)) || null,
                 valorMeta: indicadorDados.goalValue || "",
                 planoAcaoMitigacao: mapItems(planosAcao, indicadorDados.actionPlanIds, 'idActionPlan'),
@@ -260,13 +253,13 @@ function NovoIndicador() {
                 observacoes: "",
                 requisitosObrigatorios: indicadorDados.mandatoryRequirementsDescription || "",
                 requisitosSugeridos: indicadorDados.suggestedRequirementsDescription || "",
-                conexao: "online", 
+                conexao: "online",
                 coleta: "automatico",
                 natureza: "quantitativo",
                 tempoImpacto: "lagging",
             });
         }
-    }, [indicadorDados, unidadesMedida, colaboradores, departamentos, empresas, processos, riscos, padroesFrameworks, planosAcao]);
+    }, [indicadorDados, unidadesMedida, colaboradores, departamentos, empresas, processos, riscos, padroesFrameworks, planosAcao, temasOptions]);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -297,7 +290,8 @@ function NovoIndicador() {
         if (formData.tema.length > 0) {
             const gruposUnicos = [...new Set(
                 formData.tema.map(tema =>
-                    temas.find(t => t.id === tema.id)?.grupoTema
+                    // A API original de Theme pode não ter grupoTema facilmente pareado, mock base para não quebrar:
+                    temas.find(t => t.id === tema.id)?.grupoTema || tema.themeGroup || "Econômico"
                 ).filter(Boolean)
             )];
 
@@ -403,8 +397,8 @@ function NovoIndicador() {
                 indicatorName: formData.nomeIndicador || null,
                 measureUnitId: formData.unidadeMedida ? formData.unidadeMedida.id : null,
                 esgAxis: formData.eixoEsg ? formData.eixoEsg.id : 1,
-                metric: typeof formData.metrica === "string" ? formData.metrica : (formData.metrica.length > 0 ? formData.metrica.map(x=>x.id || x).join(',') : null),
-                theme: typeof formData.tema === "string" ? formData.tema : (formData.tema.length > 0 ? formData.tema.map(x=>x.id || x).join(',') : null),
+                metric: typeof formData.metrica === "string" ? formData.metrica : (formData.metrica.length > 0 ? formData.metrica.map(x => x.id || x).join(',') : null),
+                theme: typeof formData.tema === "string" ? formData.tema : (formData.tema.length > 0 ? formData.tema.map(x => x.id || x).join(',') : null),
                 periodicity: formData.periodicidade ? (formData.periodicidade.id ? String(formData.periodicidade.id) : formData.periodicidade) : null,
                 responsibleId: formData.responsavelInterno ? String(formData.responsavelInterno.idCollaborator || formData.responsavelInterno.id) : null,
                 indicatorType: 1, // DEFAULT type 1 per spec
@@ -426,7 +420,7 @@ function NovoIndicador() {
 
             let response;
             if (requisicao === "Criar") {
-                response = await fetch('https://api.egrc.homologacao.com.br/api/v1/Indicator', {
+                response = await fetch(`${API_URL}Indicator`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -437,7 +431,7 @@ function NovoIndicador() {
             } else {
                 payload.id = indicadorDados.id;
                 payload.active = indicadorDados.active !== undefined ? indicadorDados.active : true;
-                response = await fetch('https://api.egrc.homologacao.com.br/api/v1/Indicator', {
+                response = await fetch(`${API_URL}Indicator`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -597,14 +591,14 @@ function NovoIndicador() {
                             <InputLabel>Temas</InputLabel>
                             <Autocomplete
                                 multiple
-                                options={temas}
-                                getOptionLabel={(option) => option.nome || ""}
-                                value={formData.tema}
+                                options={temasOptions}
+                                getOptionLabel={(option) => option.themeName || option.nomeTema || option.nome || option.id || "Sem nome"}
+                                value={formData.tema.map(t => temasOptions.find(opt => opt.id === (t.id || t)) || { id: t.id || t, themeName: t.themeName || t.nome || t })}
                                 onChange={handleMultiSelectChange('tema')}
                                 renderInput={(params) => (
-                                    <TextField {...params} placeholder="Selecione os temas relacionados" />
+                                    <TextField {...params} placeholder="Pesquise e selecione os temas relacionados" />
                                 )}
-                                isOptionEqualToValue={(option, value) => option.id === value.id}
+                                isOptionEqualToValue={(option, value) => option.id === (value.id || value)}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => (
                                         <Box
@@ -620,7 +614,7 @@ function NovoIndicador() {
                                             }}
                                             {...getTagProps({ index })}
                                         >
-                                            {option.nome}
+                                            {option.themeName || option.nomeTema || option.nome || option.id}
                                         </Box>
                                     ))
                                 }

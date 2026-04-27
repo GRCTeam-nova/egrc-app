@@ -50,7 +50,7 @@ const pages = {
           id: '45466576',
           title: <FormattedMessage id="Temas" />,
           type: 'item',
-          url: '/tema/lista',
+          url: '/temas/lista',
           
         },
         {
