@@ -39,18 +39,15 @@ import {
   TablePagination,
 } from "../../../components/third-party/react-table";
 import { useGetTestesByControle } from "../../../api/controleTestes";
-
-const getTestDate = (test) => test?.baseDate || test?.date || null;
-
-const getCompletionDate = (test) =>
-  test?.completionDate || test?.completitionDate || null;
-
-const getCompletionDescription = (test) => {
-  const value = test?.descriptionTestCompletion;
-  return typeof value === "string" && value.trim() ? value.trim() : "-";
-};
-
-const getActiveStatus = (test) => (test?.active === true ? "Ativo" : "Inativo");
+import {
+  formatTestDate,
+  getCompletionDate,
+  getCompletionDescription,
+  getTestConclusionLabel,
+  getTestStatusLabel,
+  getTestStatusMeta,
+  getTestDate,
+} from "./testeResumoUtils";
 
 export const fuzzyFilter = (row, columnId, value) => {
   let cellValue = row.getValue(columnId);
@@ -72,7 +69,13 @@ export const fuzzyFilter = (row, columnId, value) => {
   return cellValue.includes(valueStr);
 };
 
-function ReactTable({ data, columns, totalItems, isLoading, onCreateNovo }) {
+function ReactTable({
+  data,
+  columns,
+  totalItems,
+  isLoading,
+  onCreateNovo,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const matchDownSM = useMediaQuery(theme.breakpoints.down("sm"));
@@ -136,7 +139,7 @@ function ReactTable({ data, columns, totalItems, isLoading, onCreateNovo }) {
               <DebouncedInput
                 value={globalFilter ?? ""}
                 onFilterChange={(value) => setGlobalFilter(String(value))}
-                placeholder="Pesquise por projeto, conclusao ou status"
+                placeholder="Pesquise por projeto, conclusão ou status"
                 style={{
                   width: "350px",
                   height: "33px",
@@ -206,8 +209,8 @@ function ReactTable({ data, columns, totalItems, isLoading, onCreateNovo }) {
                             onClick={header.column.getToggleSortingHandler()}
                             {...(header.column.getCanSort() &&
                               header.column.columnDef.meta === undefined && {
-                              className: "cursor-pointer prevent-select",
-                            })}
+                                className: "cursor-pointer prevent-select",
+                              })}
                           >
                             {header.isPlaceholder ? null : (
                               <Stack
@@ -397,17 +400,6 @@ const ListaControleTestes = ({ controlId }) => {
     controlId,
   );
 
-  const formatDate = (value) => {
-    if (!value) return "-";
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "-";
-
-    return new Intl.DateTimeFormat("pt-BR", {
-      dateStyle: "short",
-    }).format(date);
-  };
-
   const columns = useMemo(
     () => [
       {
@@ -440,38 +432,53 @@ const ListaControleTestes = ({ controlId }) => {
         id: "testDate",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
-            {formatDate(getTestDate(row.original))}
+            {formatTestDate(getTestDate(row.original))}
           </Typography>
         ),
       },
       {
-        header: "Conclusao do ultimo teste",
-        accessorFn: (row) => getCompletionDescription(row),
+        header: "Conclusão do último teste",
+        accessorFn: (row) =>
+          [getTestConclusionLabel(row), getCompletionDescription(row)]
+            .filter((value) => value && value !== "-")
+            .join(" "),
         id: "lastTestConclusion",
         cell: ({ row }) => (
-          <Typography sx={{ fontSize: "13px" }}>
-            {getCompletionDescription(row.original)}
-          </Typography>
+          <Stack spacing={0.25}>
+            <Typography sx={{ fontSize: "13px", fontWeight: 600 }}>
+              {getTestConclusionLabel(row.original)}
+            </Typography>
+            {getCompletionDescription(row.original) !== "-" ? (
+              <Typography
+                sx={{
+                  fontSize: "11px",
+                  color: "rgba(0, 0, 0, 0.6)",
+                  whiteSpace: "normal",
+                }}
+              >
+                {getCompletionDescription(row.original)}
+              </Typography>
+            ) : null}
+          </Stack>
         ),
       },
       {
-        header: "Data de conclusao",
+        header: "Data de conclusão",
         accessorFn: (row) => getCompletionDate(row),
         id: "completionDate",
         cell: ({ row }) => (
           <Typography sx={{ fontSize: "13px" }}>
-            {formatDate(getCompletionDate(row.original))}
+            {formatTestDate(getCompletionDate(row.original))}
           </Typography>
         ),
       },
       {
         header: "Status do teste",
-        accessorFn: (row) => getActiveStatus(row),
+        accessorFn: (row) => getTestStatusLabel(row),
         id: "testStatus",
         cell: ({ row }) => (
           <Chip
-            label={getActiveStatus(row.original)}
-            color={row.original.active === true ? "success" : "error"}
+            label={getTestStatusLabel(row.original)}
             sx={{
               backgroundColor: "transparent",
               color: "#00000099",
@@ -479,15 +486,14 @@ const ListaControleTestes = ({ controlId }) => {
               fontSize: "12px",
               height: "28px",
               "& .MuiChip-icon": {
-                color:
-                  row.original.active === true ? "success.main" : "error.main",
+                color: getTestStatusMeta(row.original).color,
                 marginLeft: "4px",
               },
             }}
             icon={
               <span
                 style={{
-                  backgroundColor: row.original.active === true ? "green" : "red",
+                  backgroundColor: getTestStatusMeta(row.original).color,
                   borderRadius: "50%",
                   display: "inline-block",
                   width: "8px",
