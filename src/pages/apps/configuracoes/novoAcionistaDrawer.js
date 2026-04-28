@@ -64,8 +64,61 @@ const normalizeActionTypes = (responseData) =>
     })
     .filter(Boolean);
 
+const getAuthorizationToken = (token) =>
+  token || localStorage.getItem("access_token") || "";
 
-function DrawerAcionista({ acionista, hideButton = false }) {
+const parseQuantidade = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  let normalizedValue = String(value).trim().replace(/\s/g, "");
+
+  if (normalizedValue === "") {
+    return null;
+  }
+
+  const hasComma = normalizedValue.includes(",");
+  const hasDot = normalizedValue.includes(".");
+
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(normalizedValue)) {
+    normalizedValue = normalizedValue.replace(/\./g, "").replace(",", ".");
+  } else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(normalizedValue)) {
+    normalizedValue = normalizedValue.replace(/,/g, "");
+  } else if (hasComma && hasDot) {
+    if (normalizedValue.lastIndexOf(",") > normalizedValue.lastIndexOf(".")) {
+      normalizedValue = normalizedValue.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalizedValue = normalizedValue.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    normalizedValue = normalizedValue.replace(",", ".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(normalizedValue)) {
+    normalizedValue = normalizedValue.replace(/\./g, "");
+  }
+
+  const parsedValue = Number(normalizedValue);
+  return Number.isNaN(parsedValue) ? null : parsedValue;
+};
+
+const extractSharedholderId = (responseData) =>
+  responseData?.idSharedholder ??
+  responseData?.data?.idSharedholder ??
+  responseData?.data?.data?.idSharedholder ??
+  responseData?.result?.idSharedholder ??
+  responseData?.result?.data?.idSharedholder ??
+  null;
+
+const extractSharedholderData = (responseData) =>
+  responseData?.data?.data ??
+  responseData?.data ??
+  responseData?.result?.data ??
+  responseData?.result ??
+  responseData ??
+  null;
+
+
+function DrawerAcionista({ acionista, hideButton = false, onClose }) {
   const [open, setOpen] = useState(false);
   const { token } = useToken();
   const location = useLocation();
@@ -81,27 +134,81 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   const [loadingActionTypes, setLoadingActionTypes] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [currentAcionista, setCurrentAcionista] = useState(null);
+
+  const applyAcionistaData = (data) => {
+    setCurrentAcionista(data || null);
+    setNome(data?.name || "");
+    setDocumento(data?.document || "");
+    setIdActionType(normalizeActionTypeId(data?.idActionType));
+    setQuantidade(
+      data?.percentage !== undefined && data?.percentage !== null
+        ? String(data.percentage)
+        : "",
+    );
+  };
 
   
   useEffect(() => {
-    if (acionista) {
-      setNome(acionista.name || "");
-      setDocumento(acionista.document || "");
-      setIdActionType(normalizeActionTypeId(acionista.idActionType));
-
-      
-      setQuantidade(
-        acionista.percentage !== undefined && acionista.percentage !== null
-          ? String(acionista.percentage)
-          : "",
-      );
-      setOpen(true);
+    if (!acionista) {
+      return undefined;
     }
-  }, [acionista]);
+
+    let isMounted = true;
+    const authToken = getAuthorizationToken(token);
+
+    applyAcionistaData(acionista);
+    setOpen(true);
+
+    if (!acionista.idSharedholder || !authToken) {
+      return undefined;
+    }
+
+    const fetchSharedholderDetails = async () => {
+      try {
+        setLoading(true);
+
+        const response = await fetch(
+          `${process.env.REACT_APP_API_URL}companies/shared-holders/${acionista.idSharedholder}`,
+          {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Erro ao carregar os dados do participante.");
+        }
+
+        const responseData = await response.json();
+        const sharedholderData = extractSharedholderData(responseData);
+
+        if (isMounted && sharedholderData) {
+          applyAcionistaData(sharedholderData);
+        }
+      } catch (error) {
+        if (isMounted) {
+          enqueueSnackbar(error.message, { variant: "error" });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSharedholderDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [acionista, token]);
 
   
   useEffect(() => {
     if (open && !acionista) {
+      setCurrentAcionista(null);
       setNome("");
       setDocumento("");
       setQuantidade("");
@@ -122,7 +229,7 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           `${process.env.REACT_APP_API_URL}companies/shared-holders/action-types`,
           {
             headers: {
-              Authorization: `Bearer ${token || localStorage.getItem("access_token")}`,
+              Authorization: `Bearer ${getAuthorizationToken(token)}`,
             },
           },
         );
@@ -151,19 +258,24 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   
   const handleQuantidadeChange = (event) => {
     const value = event.target.value;
-    
-    if (true) {
-      setQuantidade(value);
-    }
+    setQuantidade(value);
   };
 
   const tratarSubmit = async () => {
     let url = "";
     let method = "";
     let payload = {};
+    const authToken = getAuthorizationToken(token);
+    const quantidadeValue = String(quantidade || "").trim() || null;
+    const normalizedActionTypeId = idActionType || null;
 
     if (!nome.trim() || !documento.trim()) {
       enqueueSnackbar("Preencha os campos obrigatórios!", { variant: "error" });
+      return;
+    }
+
+    if (!authToken) {
+      enqueueSnackbar("Token de autenticacao nao encontrado.", { variant: "error" });
       return;
     }
 
@@ -175,20 +287,20 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         url = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
         method = "PUT";
         payload = {
-          idSharedholder: acionista.idSharedholder,
+          idSharedholder:
+            currentAcionista?.idSharedholder || acionista.idSharedholder,
           name: nome,
           document: documento,
-          
-          percentage: quantidade.trim() !== "" && !isNaN(Number(quantidade)) ? Number(quantidade) : null,
-          idActionType: idActionType || null,
-          active: true,
+          percentage: quantidadeValue,
+          idActionType: normalizedActionTypeId,
+          active: currentAcionista?.active ?? acionista.active ?? true,
         };
 
         const response = await fetch(url, {
           method,
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify(payload),
         });
@@ -207,14 +319,13 @@ function DrawerAcionista({ acionista, hideButton = false }) {
           name: nome,
           document: documento,
           idCompany: companyId,
-          idActionType: idActionType || null,
         };
 
         const postResponse = await fetch(url, {
           method,
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify(payload),
         });
@@ -224,25 +335,34 @@ function DrawerAcionista({ acionista, hideButton = false }) {
         }
 
         
-        if (quantidade.trim() !== "") {
-          const createdData = await postResponse.json();
-          const idSharedholder = createdData.data.idSharedholder;
+        const shouldSyncAdditionalFields =
+          quantidadeValue !== null || normalizedActionTypeId !== null;
+
+        if (shouldSyncAdditionalFields) {
+          const createdData = await postResponse.json().catch(() => null);
+          const idSharedholder = extractSharedholderId(createdData);
+
+          if (!idSharedholder) {
+            throw new Error(
+              "Participante cadastrado, mas a API nao retornou o identificador necessario para salvar tipo e quantidade.",
+            );
+          }
 
           const editUrl = `${process.env.REACT_APP_API_URL}companies/shared-holders`;
           const editPayload = {
             idSharedholder,
             name: nome,
             document: documento,
-            percentage: quantidade.trim() !== "" && !isNaN(Number(quantidade)) ? Number(quantidade) : null, 
+            percentage: quantidadeValue,
             active: true,
-            idActionType: idActionType || null, 
+            idActionType: normalizedActionTypeId,
           };
 
           const editResponse = await fetch(editUrl, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${authToken}`,
             },
             body: JSON.stringify(editPayload),
           });
@@ -263,10 +383,11 @@ function DrawerAcionista({ acionista, hideButton = false }) {
       if (window.refreshOrgaos) {
         window.refreshOrgaos();
       }
+      setCurrentAcionista(null);
       setOpen(false);
+      onClose?.();
     } catch (error) {
       enqueueSnackbar(error.message, { variant: "error" });
-      setOpen(false);
     } finally {
       setLoading(false);
     }
@@ -277,7 +398,9 @@ function DrawerAcionista({ acionista, hideButton = false }) {
   };
 
   const handleClose = () => {
+    setCurrentAcionista(null);
     setOpen(false);
+    onClose?.();
   };
 
   const selectedActionTypeValue =
