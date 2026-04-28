@@ -3,6 +3,7 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Alert,
   Button,
   Box,
   TextField,
@@ -68,6 +69,12 @@ function ColumnsLayouts() {
   const [controleAccordionExpanded, setControleAccordionExpanded] =
     useState(false);
   const [controleDados, setControleDados] = useState(null);
+  const [testPhases, setTestPhases] = useState([]);
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+  const [completionValidation, setCompletionValidation] = useState({
+    conclusaoTeste: true,
+    descricaoConclusao: true,
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [setDeletedFiles] = useState([]);
   const [statuss] = useState([
@@ -130,6 +137,33 @@ function ColumnsLayouts() {
     responsavel: "",
     dataInicioOperacao: null,
   });
+
+  const serializeDate = (value) => {
+    if (!value) return null;
+    const parsedDate = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
+  };
+
+  const getActivePhases = (phases = []) =>
+    phases.filter((phase) => phase?.active !== false);
+
+  const isPhaseFinished = (phase) => Number(phase?.testPhaseStatus) >= 4;
+
+  const fetchTestPhases = async (testId) => {
+    if (!testId) {
+      setTestPhases([]);
+      return [];
+    }
+
+    const response = await axios.get(
+      `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${testId}/phases`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+
+    const phases = Array.isArray(response.data) ? response.data : [];
+    setTestPhases(phases);
+    return phases;
+  };
 
   const fetchData = async (url, setState) => {
     try {
@@ -270,11 +304,11 @@ function ColumnsLayouts() {
         }));
 
         // 2) Busca fases do teste e calcula status principal
-        const resPhases = await axios.get(
-          `https://api.egrc.homologacao.com.br/api/v1/projects/tests/${dadosApi.idTest}/phases`,
-          { headers: { Authorization: `Bearer ${token}` } },
+        const phases = await fetchTestPhases(dadosApi.idTest);
+        const mainStatus = computeTestStatus(
+          phases,
+          Boolean(data.completionDate),
         );
-        const mainStatus = computeMainStatus(resPhases.data);
         setFormData((prev) => ({ ...prev, status: mainStatus }));
         setLoading(false);
       } catch (err) {
@@ -338,6 +372,22 @@ function ColumnsLayouts() {
     // Senão (todos são >=3)
     return 3; // InRevision
   }
+
+  void computeMainStatus;
+
+  const computeTestStatus = (phases, isCompleted) => {
+    const activePhases = getActivePhases(phases);
+
+    if (isCompleted) return 4;
+    if (
+      activePhases.length === 0 ||
+      activePhases.every((phase) => Number(phase?.testPhaseStatus) === 1)
+    ) {
+      return 1;
+    }
+
+    return 2;
+  };
 
   const formatarNome = (nome) => nome.replace(/\s+/g, "").toLowerCase();
 
@@ -520,6 +570,64 @@ function ColumnsLayouts() {
     elementosContabil.length > 0;
 
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const activeTestPhases = getActivePhases(testPhases);
+  const pendingTestPhases = activeTestPhases.filter(
+    (phase) => !isPhaseFinished(phase),
+  );
+  const isTestConcluded = Boolean(dataConclusao);
+  const hasStartedTest = activeTestPhases.some(
+    (phase) => Number(phase?.testPhaseStatus) > 1,
+  );
+  const canConcludeTest =
+    activeTestPhases.length > 0 &&
+    pendingTestPhases.length === 0 &&
+    !isTestConcluded;
+  const isTestResponsible =
+    String(formData.responsaveisTeste || "") === String(responsavelPadrao || "");
+  const testFieldsLocked =
+    requisicao === "Editar" && (hasStartedTest || isTestConcluded);
+  const displayStatus = computeTestStatus(testPhases, isTestConcluded);
+  const actionButtonLabel = requisicao === "Criar" ? "Criar" : "Atualizar";
+
+  let conclusionButtonTooltip = "";
+  if (isTestConcluded) {
+    conclusionButtonTooltip = "Este teste jÃ¡ foi concluÃ­do.";
+  } else if (activeTestPhases.length === 0) {
+    conclusionButtonTooltip =
+      "Cadastre pelo menos uma fase antes de concluir o teste.";
+  } else if (pendingTestPhases.length > 0) {
+    conclusionButtonTooltip =
+      "Finalize ou revise todas as fases para concluir o teste.";
+  } else if (!isTestResponsible) {
+    conclusionButtonTooltip =
+      "Somente o responsÃ¡vel pelo teste pode concluir este registro.";
+  }
+
+  conclusionButtonTooltip = conclusionButtonTooltip
+    .replace("jÃƒÂ¡", "ja")
+    .replace("concluÃƒÂ­do", "concluido")
+    .replace("responsÃƒÂ¡vel", "responsavel");
+
+  if (isTestConcluded) {
+    conclusionButtonTooltip = "Este teste ja foi concluido.";
+  } else if (activeTestPhases.length === 0) {
+    conclusionButtonTooltip =
+      "Cadastre pelo menos uma fase antes de concluir o teste.";
+  } else if (pendingTestPhases.length > 0) {
+    conclusionButtonTooltip =
+      "Finalize ou revise todas as fases para concluir o teste.";
+  } else if (!isTestResponsible) {
+    conclusionButtonTooltip =
+      "Somente o responsavel pelo teste pode concluir este registro.";
+  }
+
+  useEffect(() => {
+    if (requisicao !== "Editar") return;
+
+    setFormData((prev) =>
+      prev.status === displayStatus ? prev : { ...prev, status: displayStatus },
+    );
+  }, [displayStatus, requisicao]);
 
   const tratarSubmit = async () => {
     let url = "";
@@ -554,7 +662,7 @@ function ColumnsLayouts() {
         method = "POST";
         payload = {
           description: descricaoTeste,
-          expectedCompletionDate: dataPrevistaConclusao,
+          expectedCompletionDate: serializeDate(dataPrevistaConclusao),
           idProject: formData.projeto,
           idControl: formData.controle,
           idResponsible: formData.responsaveisTeste, // NOVO: Incluído no Criar
@@ -566,14 +674,11 @@ function ColumnsLayouts() {
           idTest: controleDados?.idTest,
           name: nome,
           description: descricaoTeste,
-          expectedCompletionDate: dataPrevistaConclusao,
+          expectedCompletionDate: serializeDate(dataPrevistaConclusao),
           idProject: formData.projeto,
           idControl: formData.controle,
           idProjectType: tiposControles,
           idResponsible: formData.responsaveisTeste,
-          descriptionTestCompletion: descricaoConclusao,
-          completionDate: dataConclusao,
-          testConclusion: formData.conclusaoTeste,
           active: true,
         };
       }
@@ -623,6 +728,123 @@ function ColumnsLayouts() {
     }
   };
 
+  const handleOpenCompletionDialog = () => {
+    if (!canConcludeTest) {
+      enqueueSnackbar(
+        "Ainda existem fases pendentes. Finalize ou revise todas as fases antes de concluir o teste.",
+        {
+          variant: "warning",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
+
+    if (!isTestResponsible) {
+      enqueueSnackbar(
+        "Somente o responsavel pelo teste pode concluir este registro.",
+        {
+          variant: "warning",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
+
+    setCompletionValidation({
+      conclusaoTeste: true,
+      descricaoConclusao: true,
+    });
+    setCompletionDialogOpen(true);
+  };
+
+  const handleCloseCompletionDialog = () => {
+    setCompletionValidation({
+      conclusaoTeste: true,
+      descricaoConclusao: true,
+    });
+    setCompletionDialogOpen(false);
+  };
+
+  const handleConcluirTeste = async () => {
+    const nextValidation = {
+      conclusaoTeste: Boolean(formData.conclusaoTeste),
+      descricaoConclusao: Boolean(descricaoConclusao.trim()),
+    };
+
+    setCompletionValidation(nextValidation);
+
+    if (!nextValidation.conclusaoTeste || !nextValidation.descricaoConclusao) {
+      enqueueSnackbar(
+        "Conclusao do teste e descricao da conclusao sao obrigatorias.",
+        {
+          variant: "error",
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        },
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const completionDate = new Date();
+      const payload = {
+        idTest: controleDados?.idTest,
+        name: nome,
+        description: descricaoTeste,
+        expectedCompletionDate: serializeDate(dataPrevistaConclusao),
+        idProject: formData.projeto,
+        idControl: formData.controle,
+        idProjectType: tiposControles,
+        idResponsible: formData.responsaveisTeste,
+        descriptionTestCompletion: descricaoConclusao.trim(),
+        completionDate: completionDate.toISOString(),
+        testConclusion: formData.conclusaoTeste,
+        active: true,
+      };
+
+      const response = await fetch(
+        "https://api.egrc.homologacao.com.br/api/v1/projects/tests",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Erro ao concluir o teste.");
+      }
+
+      setDataConclusao(completionDate);
+      setControleDados((prev) => ({
+        ...prev,
+        completionDate: completionDate.toISOString(),
+        descriptionTestCompletion: descricaoConclusao.trim(),
+        testConclusion: formData.conclusaoTeste,
+      }));
+      setFormData((prev) => ({ ...prev, status: 4 }));
+      handleCloseCompletionDialog();
+
+      enqueueSnackbar("Teste concluido com sucesso!", {
+        variant: "success",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+    } catch (error) {
+      console.error(error.message);
+      enqueueSnackbar("Nao foi possivel concluir esse teste.", {
+        variant: "error",
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <LoadingOverlay isActive={loading} />
@@ -632,6 +854,7 @@ function ColumnsLayouts() {
             <Stack spacing={1}>
               <InputLabel>Projeto *</InputLabel>
               <Autocomplete
+                disabled={testFieldsLocked}
                 options={projetos}
                 getOptionLabel={(option) => option.nome}
                 value={
@@ -656,6 +879,7 @@ function ColumnsLayouts() {
             <Stack spacing={1}>
               <InputLabel>Controle *</InputLabel>
               <Autocomplete
+                disabled={testFieldsLocked}
                 options={controles}
                 getOptionLabel={(option) => option.nome}
                 value={
@@ -685,6 +909,7 @@ function ColumnsLayouts() {
             <Stack spacing={1}>
               <InputLabel>Descrição do teste *</InputLabel>
               <TextField
+                disabled={testFieldsLocked}
                 onChange={(event) => setDescricaoTeste(event.target.value)}
                 fullWidth
                 multiline
@@ -698,6 +923,7 @@ function ColumnsLayouts() {
             <Stack spacing={1}>
               <InputLabel>Data prevista de conclusão *</InputLabel>
               <DatePicker
+                disabled={testFieldsLocked}
                 value={dataPrevistaConclusao}
                 onChange={(newValue) => setDataPrevistaConclusao(newValue)}
                 inputFormat="dd/MM/yyyy"
@@ -710,6 +936,7 @@ function ColumnsLayouts() {
             <Stack spacing={1}>
               <InputLabel>Responsável pelo teste *</InputLabel>
               <Autocomplete
+                disabled={testFieldsLocked}
                 options={responsaveisTestes}
                 getOptionLabel={(option) => option.nome || ""}
                 value={
@@ -746,7 +973,7 @@ function ColumnsLayouts() {
                     options={statuss}
                     getOptionLabel={(option) => option.nome}
                     value={
-                      statuss.find((status) => status.id === formData.status) ||
+                      statuss.find((status) => status.id === displayStatus) ||
                       null
                     }
                     onChange={(event, newValue) => {
@@ -764,6 +991,7 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Data de Conclusão *</InputLabel>
                   <DatePicker
+                    disabled
                     value={dataConclusao}
                     onChange={(newValue) => setDataConclusao(newValue)}
                     inputFormat="dd/MM/yyyy"
@@ -778,6 +1006,7 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Conclusão do teste *</InputLabel>
                   <Autocomplete
+                    disabled
                     options={conclusaoTestes}
                     getOptionLabel={(option) => option.nome}
                     value={
@@ -801,6 +1030,7 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Descrição da conclusão</InputLabel>
                   <TextField
+                    disabled
                     multiline
                     rows={2}
                     onChange={(event) =>
@@ -842,6 +1072,7 @@ function ColumnsLayouts() {
                 <Stack spacing={1}>
                   <InputLabel>Data base</InputLabel>
                   <DatePicker
+                    disabled={testFieldsLocked}
                     value={dataBase}
                     onChange={(newValue) => setDataBase(newValue)}
                     inputFormat="dd/MM/yyyy"
@@ -1327,16 +1558,47 @@ function ColumnsLayouts() {
                     <Typography variant="h6">Fase de teste</Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <ListagemFaseTestes novoOrgao={dadosApi} />
+                    <ListagemFaseTestes
+                      disableCreate={testFieldsLocked}
+                      novoOrgao={dadosApi}
+                    />
                   </AccordionDetails>
                 </Accordion>
               </Grid>
+
+              {!isTestConcluded && (
+                <Grid item xs={12} sx={{ paddingBottom: 3 }}>
+                  {activeTestPhases.length === 0 ? (
+                    <Alert severity="info">
+                      Cadastre pelo menos uma fase para liberar a conclusao do
+                      teste.
+                    </Alert>
+                  ) : pendingTestPhases.length > 0 ? (
+                    <Alert severity="warning">
+                      Existem {pendingTestPhases.length} fase(s) pendente(s). O
+                      teste so pode ser concluido quando todas as fases
+                      estiverem concluidas ou revisadas.
+                    </Alert>
+                  ) : !isTestResponsible ? (
+                    <Alert severity="info">
+                      Todas as fases estao finalizadas. A conclusao do teste
+                      deve ser feita pelo responsavel designado.
+                    </Alert>
+                  ) : (
+                    <Alert severity="success">
+                      Todas as fases estao finalizadas. O teste ja pode ser
+                      concluido.
+                    </Alert>
+                  )}
+                </Grid>
+              )}
 
               <Grid item xs={12} sx={{ paddingBottom: 5 }}>
                 <Stack spacing={1}>
                   <InputLabel>Anexo</InputLabel>
                   <FileUploader
                     containerFolder={1}
+                    disabled={testFieldsLocked}
                     initialFiles={formData.files}
                     onFilesChange={(files) =>
                       setFormData((prev) => ({ ...prev, files }))
@@ -1362,21 +1624,131 @@ function ColumnsLayouts() {
               }}
             >
               <Button
-                variant="contained"
+                variant={
+                  requisicao === "Editar" && testFieldsLocked
+                    ? "outlined"
+                    : "contained"
+                }
                 color="primary"
                 style={{
-                  width: "91px",
                   height: "32px",
                   borderRadius: "4px",
                   fontSize: "14px",
                   fontWeight: 600,
                 }}
-                onClick={tratarSubmit}
+                onClick={
+                  requisicao === "Editar" && testFieldsLocked
+                    ? voltarParaCadastroMenu
+                    : tratarSubmit
+                }
               >
-                Atualizar
+                {requisicao === "Editar" && testFieldsLocked
+                  ? "Sair"
+                  : actionButtonLabel}
               </Button>
+              {requisicao === "Editar" && !isTestConcluded && (
+                <Tooltip title={conclusionButtonTooltip}>
+                  <span>
+                    <Button
+                      variant={testFieldsLocked ? "contained" : "outlined"}
+                      color="primary"
+                      style={{
+                        height: "32px",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                      disabled={!canConcludeTest || !isTestResponsible}
+                      onClick={handleOpenCompletionDialog}
+                    >
+                      Concluir teste
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
             </Box>
           </Grid>
+          <Dialog
+            open={completionDialogOpen}
+            onClose={handleCloseCompletionDialog}
+            fullWidth
+            maxWidth="sm"
+          >
+            <DialogTitle>Concluir teste</DialogTitle>
+            <DialogContent>
+              <DialogContentText sx={{ mb: 2 }}>
+                Informe o resultado final do teste. A data de conclusao sera
+                registrada automaticamente.
+              </DialogContentText>
+              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                <Grid item xs={12} sm={6}>
+                  <Stack spacing={1}>
+                    <InputLabel>Conclusao do teste *</InputLabel>
+                    <Autocomplete
+                      options={conclusaoTestes}
+                      getOptionLabel={(option) => option.nome}
+                      value={
+                        conclusaoTestes.find(
+                          (conclusaoTeste) =>
+                            conclusaoTeste.id === formData.conclusaoTeste,
+                        ) || null
+                      }
+                      onChange={(event, newValue) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          conclusaoTeste: newValue ? newValue.id : "",
+                        }));
+                        setCompletionValidation((prev) => ({
+                          ...prev,
+                          conclusaoTeste: true,
+                        }));
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          error={!completionValidation.conclusaoTeste}
+                          helperText={
+                            !completionValidation.conclusaoTeste
+                              ? "Selecione a conclusao do teste."
+                              : ""
+                          }
+                        />
+                      )}
+                    />
+                  </Stack>
+                </Grid>
+                <Grid item xs={12}>
+                  <Stack spacing={1}>
+                    <InputLabel>Descricao da conclusao *</InputLabel>
+                    <TextField
+                      multiline
+                      rows={4}
+                      value={descricaoConclusao}
+                      onChange={(event) => {
+                        setDescricaoConclusao(event.target.value);
+                        setCompletionValidation((prev) => ({
+                          ...prev,
+                          descricaoConclusao: true,
+                        }));
+                      }}
+                      error={!completionValidation.descricaoConclusao}
+                      helperText={
+                        !completionValidation.descricaoConclusao
+                          ? "Informe a descricao da conclusao."
+                          : ""
+                      }
+                    />
+                  </Stack>
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCloseCompletionDialog}>Cancelar</Button>
+              <Button variant="contained" onClick={handleConcluirTeste}>
+                Concluir teste
+              </Button>
+            </DialogActions>
+          </Dialog>
           <Dialog
             open={successDialogOpen}
             onClose={voltarParaListagem}

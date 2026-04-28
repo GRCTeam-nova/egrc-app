@@ -50,6 +50,7 @@ function ColumnsLayouts() {
   const [descricaoRevisor, setDescricaoRevisor] = useState("");
   const [testadores, setTestadores] = useState([]);
   const [revisores, setRevisores] = useState([]);
+  const [deficiencias, setDeficiencias] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const isInitialEdit = Boolean(dadosApi?.idTestPhase);
@@ -108,7 +109,7 @@ function ColumnsLayouts() {
     elementoContabil: [],
     carv: [],
     plano: [],
-    deficiencia: [],
+    deficiencia: null,
     ameaca: [],
     controle: "",
     tipoTeste: "",
@@ -185,6 +186,16 @@ function ColumnsLayouts() {
     }
   };
 
+  const getPhaseDeficiencyId = (phaseData) => {
+    if (!phaseData) return null;
+    if (phaseData.idDeficiency != null) return phaseData.idDeficiency;
+    if (phaseData.deficiency?.idDeficiency != null) {
+      return phaseData.deficiency.idDeficiency;
+    }
+    if (phaseData.deficiency?.id != null) return phaseData.deficiency.id;
+    return null;
+  };
+
   useEffect(() => {
     fetchData(
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
@@ -194,6 +205,7 @@ function ColumnsLayouts() {
       `${process.env.REACT_APP_API_URL}collaborators/responsibles`,
       setRevisores
     );
+    fetchData(`${process.env.REACT_APP_API_URL}deficiencies`, setDeficiencias);
     window.scrollTo(0, 0);
   }, []);
 
@@ -257,6 +269,7 @@ function ColumnsLayouts() {
             conclusaoTeste: data.testConclusion,
             status: data.testPhaseStatus,
             revisor: data.idReviewers || [],
+            deficiencia: getPhaseDeficiencyId(data),
           }));
 
           setDescricaoRevisor(data.descriptionConclusionReviewer || "");
@@ -486,6 +499,7 @@ function ColumnsLayouts() {
           idTest: TesteId,
           idTester: formData.testador,
           idReviewer: hasReviewers ? formData.revisor[0] : null,
+          idDeficiency: formData.deficiencia || null,
           descriptionConclusionReviewer: descricaoRevisor,
           population: Number(populacao),
           sample: Number(amostra),
@@ -560,6 +574,9 @@ function ColumnsLayouts() {
     let url = "";
     let method = "";
     let payload = {};
+    const hasReviewers =
+      Array.isArray(formData.revisor) && formData.revisor.length > 0;
+    const nextStatus = hasReviewers ? 3 : 4;
 
     // VALIDAÇÃO CONDICIONAL: Campos obrigatórios quando status for "teste realizado" (3)
     const missingFields = [];
@@ -658,7 +675,7 @@ function ColumnsLayouts() {
           idTestPhase: faseTesteDados?.idTestPhase,
           name: nomeFaseTeste,
           description: descricao,
-          testPhaseStatus: 3,
+          testPhaseStatus: nextStatus,
           note: faseTesteDados?.note || "",
           startDateCoverage: dataInicioCobertura
             ? new Date(dataInicioCobertura).toISOString()
@@ -675,10 +692,8 @@ function ColumnsLayouts() {
             : null,
           idTest: TesteId,
           idTester: formData.testador,
-          idReviewer:
-            formData.revisor && formData.revisor.length > 0
-              ? formData.revisor[0]
-              : "",
+          idReviewer: hasReviewers ? formData.revisor[0] : null,
+          idDeficiency: formData.deficiencia || null,
           descriptionConclusionReviewer: descricaoRevisor,
           population: Number(populacao),
           sample: Number(amostra),
@@ -686,10 +701,12 @@ function ColumnsLayouts() {
           active: true,
           files: finalFilesPayload,
           testConclusion: formData.conclusaoTeste,
-          reviewers: formData.revisor.map((reviewerId, index) => ({
-            order: index,
-            idReviewer: reviewerId,
-          })),
+          reviewers: hasReviewers
+            ? formData.revisor.map((reviewerId, index) => ({
+                order: index,
+                idReviewer: reviewerId,
+              }))
+            : [],
         };
       }
 
@@ -720,13 +737,18 @@ function ColumnsLayouts() {
         setSuccessDialogOpen(true);
       } else {
         // Para edição, mesmo sem retorno, redirecionamos para a listagem
-        setFormData((prev) => ({ ...prev, status: 3 }));
-        setFaseTesteDados((prev) => ({ ...prev, testPhaseStatus: 3 }));
+        setFormData((prev) => ({ ...prev, status: nextStatus }));
+        setFaseTesteDados((prev) => ({ ...prev, testPhaseStatus: nextStatus }));
         setHasStartedByTester(true);
-        enqueueSnackbar("Teste realizado com sucesso!", {
-          variant: "success",
-          anchorOrigin: { vertical: "top", horizontal: "right" },
-        });
+        enqueueSnackbar(
+          hasReviewers
+            ? "Teste realizado com sucesso!"
+            : "Teste concluido com sucesso!",
+          {
+            variant: "success",
+            anchorOrigin: { vertical: "top", horizontal: "right" },
+          },
+        );
         window.scrollTo(0, 0);
       }
     } catch (error) {
@@ -847,6 +869,7 @@ function ColumnsLayouts() {
             formData.revisor && formData.revisor.length > 0
               ? formData.revisor[0]
               : "",
+          idDeficiency: formData.deficiencia || null,
           descriptionConclusionReviewer: descricaoRevisor,
           population: Number(populacao),
           sample: Number(amostra),
@@ -941,6 +964,7 @@ function ColumnsLayouts() {
         idTest: TesteId,
         idTester: formData.testador,
         idReviewer: formData.revisor.length > 0 ? formData.revisor[0] : "",
+        idDeficiency: formData.deficiencia || null,
         descriptionConclusionReviewer: descricaoRevisor,
         population: Number(populacao),
         sample: Number(amostra),
@@ -1084,6 +1108,7 @@ function ColumnsLayouts() {
           sampleSelectionMethodology: descricaoMetodologia,
           idTest: TesteId,
           idTester: formData.testador,
+          idDeficiency: formData.deficiencia || null,
           reviewers: formData.revisor.map((reviewerId, index) => ({
             order: index,
             idReviewer: reviewerId,
@@ -1119,6 +1144,7 @@ function ColumnsLayouts() {
             formData.revisor && formData.revisor.length > 0
               ? formData.revisor[0]
               : "",
+          idDeficiency: formData.deficiencia || null,
           descriptionConclusionReviewer: descricaoRevisor,
           population: Number(populacao),
           sample: Number(amostra),
@@ -1204,6 +1230,7 @@ function ColumnsLayouts() {
         tipoTeste: true,
         amostra: true,
         metodologia: true,
+        deficiencia: true,
         testador: true, // agora também liberado em "Criar"
         revisores: true,
         descricao: true,
@@ -1226,6 +1253,7 @@ function ColumnsLayouts() {
         tipoTeste: false,
         amostra: false,
         metodologia: false,
+        deficiencia: false,
         testador: false,
         revisores: false,
         descricao: false,
@@ -1248,6 +1276,7 @@ function ColumnsLayouts() {
       tipoTeste: editing && isTester && started && status < 3,
       amostra: editing && isTester && started && status < 3,
       metodologia: editing && isTester && started && status < 3,
+      deficiencia: editing && isTester && status < 3,
 
       // nunca liberar a edição do testador no modo de edição
       testador: false,
@@ -1372,6 +1401,30 @@ function ColumnsLayouts() {
                 onChange={(event) => setPopulacao(event.target.value)}
                 fullWidth
                 value={populacao}
+              />
+            </Stack>
+          </Grid>
+
+          <Grid item xs={6} sx={{ paddingBottom: 5 }}>
+            <Stack spacing={1}>
+              <InputLabel>DeficiÃªncia</InputLabel>
+              <Autocomplete
+                disabled={!fieldPermissions.deficiencia}
+                options={deficiencias}
+                getOptionLabel={(option) => option?.nome || ""}
+                value={
+                  deficiencias.find(
+                    (deficiencia) => deficiencia.id === formData.deficiencia
+                  ) || null
+                }
+                onChange={(event, newValue) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    deficiencia: newValue ? newValue.id : null,
+                  }));
+                }}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                renderInput={(params) => <TextField {...params} />}
               />
             </Stack>
           </Grid>

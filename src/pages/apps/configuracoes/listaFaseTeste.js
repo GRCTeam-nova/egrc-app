@@ -116,7 +116,13 @@ export const fuzzyFilter = (row, columnId, value) => {
 
 // ==============================|| REACT TABLE - LIST ||============================== //
 
-function ReactTable({ data, columns, processosTotal, isLoading }) {
+function ReactTable({
+  data,
+  columns,
+  processosTotal,
+  isLoading,
+  disableCreate = false,
+}) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
   const location = useLocation();
@@ -278,20 +284,30 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
                 ml: 0.75,
               }}
             >
-              <Button
-                variant="contained"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigation(`/fase/criar`, {
-                    state: { indoPara: "NovaFaseTeste", TesteId },
-                  });
-                  
-                }}
-                startIcon={<PlusOutlined />}
-                style={{ borderRadius: "20px", height: "32px" }}
+              <Tooltip
+                title={
+                  disableCreate
+                    ? "Nao e possivel adicionar novas fases apos o inicio do teste."
+                    : ""
+                }
               >
-                Novo
-              </Button>
+                <span>
+                  <Button
+                    variant="contained"
+                    disabled={disableCreate}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigation(`/fase/criar`, {
+                        state: { indoPara: "NovaFaseTeste", TesteId },
+                      });
+                    }}
+                    startIcon={<PlusOutlined />}
+                    style={{ borderRadius: "20px", height: "32px" }}
+                  >
+                    Novo
+                  </Button>
+                </span>
+              </Tooltip>
             </Box>
           </Stack>
         </Stack>
@@ -511,6 +527,7 @@ function ReactTable({ data, columns, processosTotal, isLoading }) {
 ReactTable.propTypes = {
   columns: PropTypes.array,
   data: PropTypes.array,
+  disableCreate: PropTypes.bool,
   getHeaderProps: PropTypes.func,
   handleAdd: PropTypes.func,
   modalToggler: PropTypes.func,
@@ -1068,7 +1085,7 @@ ActionCell.propTypes = {
 // ==============================|| LISTAGEM ||============================== //
 
 // Componente principal da página de listagem de registros
-const ListagemEmpresa = () => {
+const ListagemEmpresa = ({ disableCreate = false }) => {
   const theme = useTheme();
   const navigation = useNavigate();
   const location = useLocation();
@@ -1250,6 +1267,7 @@ const ListagemEmpresa = () => {
                 processosTotal,
                 onFormDataChange: handleFormDataChange,
                 isLoading,
+                disableCreate,
                 refreshData: refreshOrgaos,
               }}
             />
@@ -1269,6 +1287,10 @@ const ListagemEmpresa = () => {
       />
     </>
   );
+};
+
+ListagemEmpresa.propTypes = {
+  disableCreate: PropTypes.bool,
 };
 
 export default ListagemEmpresa;

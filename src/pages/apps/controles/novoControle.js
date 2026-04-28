@@ -41,6 +41,7 @@ import DrawerObjetivo from "../configuracoes/novoObjetivoDrawerControle";
 import DrawerIpe from "../configuracoes/novoIpeDrawerControle";
 import FileUploader from "../configuracoes/FileUploader";
 import ListaControleTestes from "./listaControleTestes";
+import ResumoUltimoTesteControleContainer from "./ResumoUltimoTesteControleContainer";
 
 // ==============================|| LAYOUTS - COLUMNS ||============================== //
 function ColumnsLayouts() {
@@ -1047,6 +1048,12 @@ useEffect(() => {
       <LoadingOverlay isActive={loading} />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
         <Grid container spacing={1} marginTop={2}>
+          {controleAtualId && (
+            <Grid item xs={12}>
+              <ResumoUltimoTesteControleContainer controlId={controleAtualId} />
+            </Grid>
+          )}
+
           <Grid item xs={6} sx={{ paddingBottom: 5 }}>
             <Stack spacing={1}>
               <InputLabel>Código *</InputLabel>
