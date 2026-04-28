@@ -1293,4 +1293,8 @@ ListagemEmpresa.propTypes = {
   disableCreate: PropTypes.bool,
 };
 
+ListagemEmpresa.propTypes = {
+  disableCreate: PropTypes.bool,
+};
+
 export default ListagemEmpresa;

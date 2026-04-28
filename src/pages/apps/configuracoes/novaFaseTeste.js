@@ -1878,4 +1878,3 @@ function ColumnsLayouts() {
 }
 
 export default ColumnsLayouts;
-
