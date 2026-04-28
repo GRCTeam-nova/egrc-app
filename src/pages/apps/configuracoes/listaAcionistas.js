@@ -1067,6 +1067,7 @@ const ListagemAcionistas = () => {
 
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
+    setSelectedAcionista(null);
   };
 
   useEffect(() => {
